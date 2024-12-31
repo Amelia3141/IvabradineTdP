@@ -1,5 +1,6 @@
 import os
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+import plotly.subplots as sp
 import numpy as np
 import PyPDF2
 import spacy
@@ -14,9 +15,144 @@ import json
 import argparse
 from io import StringIO
 from Bio import Medline
+import logging
 
 # Set your email for PubMed API
 Entrez.email = "ghhercock@gmail.com"  # Replace with your email
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+try:
+    nlp = spacy.load('en_core_web_sm')
+except OSError:
+    import subprocess
+    subprocess.run(['python', '-m', 'spacy', 'download', 'en_core_web_sm'])
+    nlp = spacy.load('en_core_web_sm')
+
+def calculate_naranjo_score(text):
+    """Calculate Naranjo adverse drug reaction probability score."""
+    score = 0
+    
+    # Previous conclusive reports
+    if re.search(r'previous.*report|similar.*case|known.*reaction', text, re.I):
+        score += 1
+    
+    # Adverse event after drug
+    if re.search(r'after.*administration|following.*drug|post.*treatment', text, re.I):
+        score += 2
+    
+    # Improvement after discontinuation
+    if re.search(r'improve.*discontinu|resolve.*stop|better.*withdraw', text, re.I):
+        score += 1
+    
+    # Recurrence on readministration
+    if re.search(r'recur.*readminist|return.*restart|reappear.*rechallenge', text, re.I):
+        score += 2
+    
+    # Alternative causes
+    if not re.search(r'other.*cause|alternative.*explanation|different.*reason', text, re.I):
+        score += 2
+    
+    # Reaction with placebo
+    if re.search(r'placebo', text, re.I):
+        score -= 1
+    
+    # Drug levels in blood
+    if re.search(r'blood.*level|plasma.*concentration|serum.*drug', text, re.I):
+        score += 1
+    
+    # Dose-response relationship
+    if re.search(r'dose.*response|concentration.*dependent|dose.*related', text, re.I):
+        score += 1
+    
+    # Previous exposure
+    if re.search(r'previous.*exposure|prior.*treatment|history.*medication', text, re.I):
+        score += 1
+    
+    # Objective evidence
+    if re.search(r'ECG|EKG|QT|QTc|rhythm|arrhythmia|monitor', text, re.I):
+        score += 1
+    
+    return score
+
+def calculate_tisdale_score(text):
+    """Calculate Tisdale risk score for QT prolongation."""
+    score = 0
+    
+    # Age ≥68 years
+    if re.search(r'(?:age|year).{0,10}(?:6[8-9]|[7-9][0-9]|1[0-9][0-9])', text, re.I):
+        score += 1
+    
+    # Female sex
+    if re.search(r'female|woman|women', text, re.I):
+        score += 1
+    
+    # Loop diuretic
+    if re.search(r'furosemide|bumetanide|torsemide|ethacrynic acid', text, re.I):
+        score += 1
+    
+    # Serum K+ ≤3.5
+    if re.search(r'potassium.{0,20}(?:1\.[0-9]|2\.[0-9]|3\.[0-4])|K\+.{0,10}(?:1\.[0-9]|2\.[0-9]|3\.[0-4])', text, re.I):
+        score += 2
+    
+    # Admission QTc ≥450 ms
+    if re.search(r'QTc.{0,20}(?:4[5-9][0-9]|[5-9][0-9][0-9])', text, re.I):
+        score += 2
+    
+    # Acute MI
+    if re.search(r'myocardial infarction|MI|heart attack', text, re.I):
+        score += 2
+    
+    # Sepsis
+    if re.search(r'sepsis|septic|infection', text, re.I):
+        score += 3
+    
+    # Heart failure
+    if re.search(r'heart failure|CHF|cardiac failure|reduced ejection', text, re.I):
+        score += 3
+    
+    # One QTc-prolonging drug
+    if re.search(r'antiarrhythmic|antipsychotic|antibiotic|antidepressant', text, re.I):
+        score += 3
+    
+    # ≥2 QTc-prolonging drugs
+    if len(re.findall(r'antiarrhythmic|antipsychotic|antibiotic|antidepressant', text, re.I)) >= 2:
+        score += 3
+    
+    return score
+
+def assess_who_umc(text):
+    """Assess WHO-UMC causality categories."""
+    # Certain
+    if (re.search(r'rechallenge.*positive|readministration.*recur', text, re.I) and
+        re.search(r'dechallenge.*positive|discontinuation.*improve', text, re.I) and
+        re.search(r'plausible.*time|temporal.*relation', text, re.I)):
+        return "Certain"
+    
+    # Probable
+    elif (re.search(r'dechallenge.*positive|discontinuation.*improve', text, re.I) and
+          re.search(r'plausible.*time|temporal.*relation', text, re.I) and
+          not re.search(r'alternative.*cause|other.*explanation', text, re.I)):
+        return "Probable"
+    
+    # Possible
+    elif (re.search(r'plausible.*time|temporal.*relation', text, re.I) and
+          re.search(r'alternative.*cause|other.*explanation', text, re.I)):
+        return "Possible"
+    
+    # Unlikely
+    elif re.search(r'implausible.*time|unlikely.*relation|improbable', text, re.I):
+        return "Unlikely"
+    
+    # Conditional
+    elif re.search(r'more.*data|additional.*information|further.*investigation', text, re.I):
+        return "Conditional"
+    
+    # Unassessable
+    else:
+        return "Unassessable"
 
 def save_to_csv(data, filepath):
     """Save list of dictionaries to CSV file."""
@@ -267,6 +403,7 @@ def process_multiple_pdfs_for_cases(pdf_directory):
     return all_cases
 
 def get_reference_lines():
+    """Get reference lines for QT nomogram."""
     # Solid line coordinates
     nomogram_line_solid = [
         { 'hr': 10, 'qt': 480 },
@@ -281,90 +418,53 @@ def get_reference_lines():
         { 'hr': 150, 'qt': 322 }  # Added extra point to extend the line
     ]
     
-    return nomogram_line_solid, nomogram_line_dashed
-
-def is_point_above_line(hr, qt):
-    # Points with HR > 150 are automatically considered "above" the line
-    if hr > 150:
-        return True
-        
-    # Get reference lines
-    line_solid, line_dashed = get_reference_lines()
-    
-    # Convert to numpy arrays for interpolation
-    hr_all = [point['hr'] for point in line_solid + line_dashed]
-    qt_all = [point['qt'] for point in line_solid + line_dashed]
-    
-    # Interpolate the line at the given heart rate
-    qt_line = np.interp(hr, hr_all, qt_all)
-    
-    # Point is above or on the line if its QT value is greater than or equal to the line's QT value
-    return qt >= qt_line
+    return [
+        {'data': nomogram_line_solid, 'name': 'High Risk', 'color': 'red', 'dash': 'solid'},
+        {'data': nomogram_line_dashed, 'name': 'Normal Upper Limit', 'color': 'blue', 'dash': 'dash'}
+    ]
 
 def plot_qt_nomogram(data_points):
-    plt.figure(figsize=(10, 8))  # Approximate 800x550 pixels
+    """Plot QT nomogram using Plotly."""
+    # Create reference lines
+    ref_lines = get_reference_lines()
     
-    # Set margins
-    plt.subplots_adjust(left=0.12, right=0.95, top=0.95, bottom=0.15)
+    # Create figure
+    fig = go.Figure()
     
-    # Get reference lines
-    line_solid, line_dashed = get_reference_lines()
+    # Add reference lines
+    for line in ref_lines:
+        hr_values = [point['hr'] for point in line['data']]
+        qt_values = [point['qt'] for point in line['data']]
+        fig.add_trace(go.Scatter(
+            x=hr_values,
+            y=qt_values,
+            mode='lines',
+            name=line['name'],
+            line=dict(color=line['color'], dash=line['dash']),
+            showlegend=True
+        ))
     
-    # Plot grid
-    plt.grid(True, linestyle='--', alpha=0.7, dashes=(3, 3))
+    # Add data points
+    if data_points:
+        hr_values = [point['hr'] for point in data_points]
+        qt_values = [point['qt'] for point in data_points]
+        fig.add_trace(go.Scatter(
+            x=hr_values,
+            y=qt_values,
+            mode='markers',
+            name='Data Points',
+            marker=dict(color='red')
+        ))
     
-    # Plot reference lines
-    hr_solid = [point['hr'] for point in line_solid]
-    qt_solid = [point['qt'] for point in line_solid]
-    hr_dashed = [point['hr'] for point in line_dashed]
-    qt_dashed = [point['qt'] for point in line_dashed]
+    # Update layout
+    fig.update_layout(
+        title='QT Nomogram',
+        xaxis_title='Heart Rate (bpm)',
+        yaxis_title='QT Interval (ms)',
+        showlegend=True
+    )
     
-    plt.plot(hr_solid, qt_solid, '-', color='black', linewidth=3)
-    plt.plot(hr_dashed, qt_dashed, '--', color='black', linewidth=3, dashes=(5, 5))
-    
-    # Separate points above and below the line
-    above_points = []
-    below_points = []
-    
-    for point in data_points:
-        if is_point_above_line(point['hr'], point['qt']):
-            above_points.append(point)
-        else:
-            below_points.append(point)
-    
-    # Plot points above the line in red
-    if above_points:
-        hr_above = [point['hr'] for point in above_points]
-        qt_above = [point['qt'] for point in above_points]
-        plt.scatter(hr_above, qt_above, color='red', s=30)
-    
-    # Plot points below the line in black
-    if below_points:
-        hr_below = [point['hr'] for point in below_points]
-        qt_below = [point['qt'] for point in below_points]
-        plt.scatter(hr_below, qt_below, color='black', s=30)
-    
-    # Set axis limits and ticks
-    plt.xlim(0, 260)  # Increased to show HR values up to 250
-    plt.ylim(200, 900)
-    
-    plt.xticks([0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240, 260])
-    plt.yticks([200, 300, 400, 500, 600, 700, 800, 900])
-    
-    # Add labels with bold font
-    plt.xlabel('Heart Rate (bpm)', fontweight='bold', labelpad=15)
-    plt.ylabel('QT Interval (ms)', fontweight='bold')
-    
-    # Style the axes
-    ax = plt.gca()
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['left'].set_color('black')
-    ax.spines['bottom'].set_color('black')
-    
-    # Save the plot with high DPI for clarity
-    plt.savefig('qt_nomogram.png', dpi=300, bbox_inches='tight')
-    plt.close()
+    return fig
 
 def calculate_drug_concentrations(drug_name, dose_mg):
     """Calculate drug concentrations and hERG ratios."""
@@ -418,7 +518,7 @@ def calculate_drug_concentrations(drug_name, dose_mg):
 def extract_dose(text):
     """Extract drug dose from text."""
     # Look for dose patterns like "5 mg", "5mg", "5-10mg", etc.
-    dose_pattern = r'(\d+(?:\.\d+)?)\s*(?:-\s*\d+(?:\.\d+)?)?\s*mg'
+    dose_pattern = r'(\d+(?:\.\d+)?)\s*(?:mg|milligrams?)(?:\s*oral)?'
     match = re.search(dose_pattern, text.lower())
     if match:
         return float(match.group(1))
@@ -461,31 +561,16 @@ def plot_papers_table(papers, drug_name):
         data.append(row)
     
     # Create figure and axis
-    fig, ax = plt.subplots(figsize=(20, len(data) + 1))
+    fig = go.Figure(data=[go.Table(header=dict(values=columns),
+                                   cells=dict(values=data))])
     
-    # Hide axes
-    ax.axis('tight')
-    ax.axis('off')
-    
-    # Create table
-    table = ax.table(cellText=data,
-                    colLabels=columns,
-                    cellLoc='left',
-                    loc='center',
-                    colWidths=[0.3] + [0.07] * (len(columns)-1))
-    
-    # Adjust font size and row height
-    table.auto_set_font_size(False)
-    table.set_fontsize(8)
-    table.scale(1, 1.5)
-    
-    # Add title
-    plt.title(f'{drug_name} Case Reports Analysis', pad=20)
+    # Update layout
+    fig.update_layout(title=f'{drug_name} Case Reports Analysis')
     
     # Save figure
-    plt.savefig(f'{drug_name.lower()}_analysis_table.png', dpi=300, bbox_inches='tight')
-    plt.savefig(f'{drug_name.lower()}_analysis_table.pdf', bbox_inches='tight')
-    plt.close()
+    fig.write_html(f'{drug_name.lower()}_analysis_table.html')
+    fig.write_pdf(f'{drug_name.lower()}_analysis_table.pdf')
+    return fig
 
 def get_paper_abstract(pmid):
     """Get paper abstract from PubMed."""
@@ -529,15 +614,16 @@ def search_pubmed(mesh_terms, title_abs_terms):
                             if doi_match:
                                 doi = doi_match.group(1)
                         if not doi and 'AID' in record:
-                            for aid in record['AID']:
-                                if '[doi]' in aid:
-                                    doi = aid.replace(' [doi]', '')
+                            for id in record['AID']:
+                                if '[doi]' in id:
+                                    doi = id.replace(' [doi]', '')
                                     break
                         
                         paper = {
                             'title': record.get('TI', ''),
                             'abstract': record.get('AB', ''),
                             'authors': ', '.join(record.get('AU', [])),
+                            'journal': record.get('JT', ''),
                             'year': record.get('DP', '').split()[0] if record.get('DP') else '',
                             'doi': doi or 'N/A',
                             'naranjo_score': calculate_naranjo_score(record.get('AB', '')),
@@ -573,7 +659,6 @@ def save_to_csv(papers, output_path):
         
         for paper in papers:
             text = paper['title'] + ' ' + paper['abstract']
-            qt_hr_values = extract_qt_hr_values(text)
             
             # Extract age and sex
             age_match = re.search(r'(\d+)[\s-]*(?:year|yr)', text, re.IGNORECASE)
@@ -587,11 +672,11 @@ def save_to_csv(papers, output_path):
                 'Age': age_match.group(1) if age_match else 'N/A',
                 'Sex': sex_match.group(1).title() if sex_match else 'N/A',
                 'Dose (mg)': extract_dose(text) or 'N/A',
-                'QT (ms)': qt_hr_values['uncorrected_qt'] or 'N/A',
-                'QTc (ms)': qt_hr_values['qtc'] or 'N/A',
-                'QTB (ms)': qt_hr_values['qtb'] or 'N/A',
-                'QTF (ms)': qt_hr_values['qtf'] or 'N/A',
-                'HR (bpm)': qt_hr_values['hr'] or 'N/A',
+                'QT (ms)': extract_qt_hr_values(text)['qt_values'][0] if extract_qt_hr_values(text)['qt_values'] else 'N/A',
+                'QTc (ms)': extract_qt_hr_values(text)['qt_values'][1] if len(extract_qt_hr_values(text)['qt_values']) > 1 else 'N/A',
+                'QTB (ms)': extract_qt_hr_values(text)['qt_values'][2] if len(extract_qt_hr_values(text)['qt_values']) > 2 else 'N/A',
+                'QTF (ms)': extract_qt_hr_values(text)['qt_values'][3] if len(extract_qt_hr_values(text)['qt_values']) > 3 else 'N/A',
+                'HR (bpm)': extract_qt_hr_values(text)['hr_values'][0] if extract_qt_hr_values(text)['hr_values'] else 'N/A',
                 'TdP?': 'Yes' if 'torsade' in text.lower() else 'N/A',
                 'Medical History': extract_medical_history(text),
                 'Medication History': extract_medications(text),
@@ -666,9 +751,10 @@ def search_pubmed_papers(drug_name):
             }
             
             # Calculate causality scores
-            paper_info['naranjo_score'] = calculate_naranjo_score(paper_info)
-            paper_info['tisdale_score'] = calculate_tisdale_score(paper_info)
-            paper_info['who_umc'] = calculate_who_umc_score(paper_info)
+            combined_text = f"{paper_info['title']} {paper_info['abstract']}"
+            paper_info['naranjo_score'] = calculate_naranjo_score(combined_text)
+            paper_info['tisdale_score'] = calculate_tisdale_score(combined_text)
+            paper_info['who_umc'] = assess_who_umc(combined_text)
             
             # Print detailed information
             print(f"\nFound paper: {paper_info['title']}")
@@ -687,140 +773,634 @@ def search_pubmed_papers(drug_name):
 
 def plot_combined_analysis(papers, drug_name, qt_data):
     """Create a combined figure with QT nomogram and analysis table."""
-    # Create figure with two subplots - adjust height based on number of papers
-    fig = plt.figure(figsize=(20, 10 + len(papers)))
-    
-    # Add QT nomogram subplot
-    ax1 = plt.subplot2grid((2, 1), (0, 0))
-    
-    # Get reference lines
-    line_solid, line_dashed = get_reference_lines()
-    
-    # Plot grid
-    ax1.grid(True, linestyle='--', alpha=0.7)
-    
-    # Plot reference lines
-    hr_solid = [point['hr'] for point in line_solid]
-    qt_solid = [point['qt'] for point in line_solid]
-    hr_dashed = [point['hr'] for point in line_dashed]
-    qt_dashed = [point['qt'] for point in line_dashed]
-    
-    ax1.plot(hr_solid, qt_solid, '-', color='black', linewidth=2, label='Reference Line')
-    ax1.plot(hr_dashed, qt_dashed, '--', color='black', linewidth=2)
-    
-    # Plot data points
+    # Create subplots with more space for the table
+    fig = sp.make_subplots(
+        rows=2, cols=1,
+        row_heights=[0.6, 0.4],  # Give more height to the table
+        specs=[[{"type": "scatter"}],
+               [{"type": "table"}]],
+        vertical_spacing=0.1,
+        subplot_titles=(f"QT Nomogram for {drug_name}", f"Literature Analysis for {drug_name}")
+    )
+
+    # Add reference lines
+    ref_lines = get_reference_lines()
+    for line in ref_lines:
+        hr_values = [point['hr'] for point in line['data']]
+        qt_values = [point['qt'] for point in line['data']]
+        fig.add_trace(
+            go.Scatter(
+                x=hr_values,
+                y=qt_values,
+                mode='lines',
+                name=line['name'],
+                line=dict(
+                    color=line['color'],
+                    dash=line['dash']
+                )
+            ),
+            row=1, col=1
+        )
+
+    # Add data points
     if qt_data:
         hr_values = [point['hr'] for point in qt_data]
         qt_values = [point['qt'] for point in qt_data]
-        ax1.scatter(hr_values, qt_values, color='red', s=50, label='Data Points')
+        fig.add_trace(
+            go.Scatter(
+                x=hr_values,
+                y=qt_values,
+                mode='markers',
+                name='Data Points',
+                marker=dict(
+                    size=10,
+                    color='red',
+                    symbol='circle'
+                )
+            ),
+            row=1, col=1
+        )
+
+    # Update nomogram layout
+    fig.update_xaxes(title_text='Heart Rate (bpm)', range=[0, 300], row=1, col=1)
+    fig.update_yaxes(title_text='QT Interval (ms)', range=[200, 800], row=1, col=1)
+
+    # Create table data with more columns
+    table_data = {
+        'Title': [paper['Title'] for paper in papers],
+        'DOI': [paper['DOI'] for paper in papers],
+        'Year': [paper.get('Year', 'N/A') for paper in papers],
+        'QT Values': [paper.get('QT_values', 'N/A') for paper in papers],
+        'HR Values': [paper.get('HR_values', 'N/A') for paper in papers],
+        'Naranjo': [paper.get('Naranjo_Score', 'N/A') for paper in papers],
+        'Tisdale': [paper.get('Tisdale_Score', 'N/A') for paper in papers],
+        'WHO-UMC': [paper.get('WHO_UMC', 'N/A') for paper in papers]
+    }
+
+    # Add table with improved formatting
+    fig.add_trace(
+        go.Table(
+            header=dict(
+                values=list(table_data.keys()),
+                fill_color='paleturquoise',
+                align='left',
+                font=dict(size=12, color='black'),
+                height=40
+            ),
+            cells=dict(
+                values=list(table_data.values()),
+                fill_color='lavender',
+                align='left',
+                font=dict(size=11),
+                height=30,
+                line_color='darkslategray',
+                line_width=1
+            )
+        ),
+        row=2, col=1
+    )
+
+    # Update layout
+    fig.update_layout(
+        height=1500,  # Increased height to accommodate table
+        showlegend=True,
+        title_text=f"Combined Analysis for {drug_name}",
+        title_x=0.5,
+        paper_bgcolor='white',
+        plot_bgcolor='aliceblue'
+    )
+
+    return fig
+
+def get_paper_abstract(pmid):
+    """Get paper abstract from PubMed."""
+    try:
+        handle = Entrez.efetch(db="pubmed", id=pmid, rettype="abstract", retmode="text")
+        abstract = handle.read()
+        return abstract
+    except Exception as e:
+        print(f"Error fetching abstract for {pmid}: {e}")
+        return None
+
+def search_pubmed(mesh_terms, title_abs_terms):
+    """Search PubMed for papers matching the terms."""
+    papers = []
+    try:
+        # Search using MeSH terms
+        handle = Entrez.esearch(db="pubmed", term=mesh_terms)
+        record = Entrez.read(handle)
+        mesh_ids = record["IdList"]
+        
+        # Search using title/abstract terms
+        handle = Entrez.esearch(db="pubmed", term=title_abs_terms)
+        record = Entrez.read(handle)
+        title_abs_ids = record["IdList"]
+        
+        # Combine and deduplicate IDs
+        pmids = list(set(mesh_ids + title_abs_ids))
+        
+        # Fetch details for each paper
+        for pmid in pmids:
+            try:
+                handle = Entrez.efetch(db="pubmed", id=pmid, rettype="medline", retmode="text")
+                records = list(Medline.parse(handle))
+                if records:
+                    record = records[0]
+                    if 'TI' in record:  # Title exists
+                        # Clean up DOI - it might be in different fields
+                        doi = None
+                        if 'LID' in record:
+                            doi_match = re.search(r'(10\.\d{4,}/\S+)', record['LID'])
+                            if doi_match:
+                                doi = doi_match.group(1)
+                        if not doi and 'AID' in record:
+                            for id in record['AID']:
+                                if '[doi]' in id:
+                                    doi = id.replace(' [doi]', '')
+                                    break
+                        
+                        paper = {
+                            'title': record.get('TI', ''),
+                            'abstract': record.get('AB', ''),
+                            'authors': ', '.join(record.get('AU', [])),
+                            'journal': record.get('JT', ''),
+                            'year': record.get('DP', '').split()[0] if record.get('DP') else '',
+                            'doi': doi or 'N/A',
+                            'naranjo_score': calculate_naranjo_score(record.get('AB', '')),
+                            'tisdale_score': calculate_tisdale_score(record.get('AB', '')),
+                            'who_umc': assess_who_umc(record.get('AB', ''))
+                        }
+                        papers.append(paper)
+                        print(f"\nFound paper: {paper['title']}")
+                        print(f"DOI: {paper['doi']}")
+                        print("Causality Assessment:")
+                        print(f"- Naranjo Score: {paper['naranjo_score']}")
+                        print(f"- Tisdale Score: {paper['tisdale_score']}")
+                        print(f"- WHO-UMC: {paper['who_umc']}\n")
+            except Exception as e:
+                print(f"Error processing paper {pmid}: {e}")
+                continue
+                
+    except Exception as e:
+        print(f"Error searching PubMed: {e}")
     
-    ax1.set_xlabel('Heart Rate (bpm)', fontsize=12, fontweight='bold')
-    ax1.set_ylabel('QT Interval (ms)', fontsize=12, fontweight='bold')
-    ax1.set_title(f'{drug_name} QT Nomogram Analysis', fontsize=14, fontweight='bold', pad=20)
-    ax1.legend(fontsize=10)
-    
-    # Style the axes
-    ax1.spines['top'].set_visible(False)
-    ax1.spines['right'].set_visible(False)
-    ax1.tick_params(labelsize=10)
-    
-    # Set axis limits with padding
-    ax1.set_xlim(0, 160)
-    ax1.set_ylim(200, 800)
-    
-    # Extract table data
-    data = []
-    columns = ['Title', 'Year', 'DOI', 'Authors', 'Age', 'Sex', 'Dose (mg)', 
+    return papers
+
+def save_to_csv(papers, output_path):
+    """Save paper analysis to CSV file."""
+    headers = ['Title', 'Year', 'DOI', 'Authors', 'Age', 'Sex', 'Dose (mg)', 
               'QT (ms)', 'QTc (ms)', 'QTB (ms)', 'QTF (ms)', 'HR (bpm)', 
-              'TdP?', 'BP (mmHg)', 'Medical History', 'Medication History',
+              'TdP?', 'Medical History', 'Medication History',
               'Course of Treatment', 'Outcome', 'Naranjo', 'Tisdale', 'WHO-UMC']
     
+    with open(output_path, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(f, fieldnames=headers)
+        writer.writeheader()
+        
+        for paper in papers:
+            text = paper['title'] + ' ' + paper['abstract']
+            
+            # Extract age and sex
+            age_match = re.search(r'(\d+)[\s-]*(?:year|yr)', text, re.IGNORECASE)
+            sex_match = re.search(r'(male|female|man|woman|boy|girl)', text, re.IGNORECASE)
+            
+            row = {
+                'Title': paper['title'],
+                'Year': paper['year'],
+                'DOI': paper.get('doi', 'N/A'),
+                'Authors': paper['authors'],
+                'Age': age_match.group(1) if age_match else 'N/A',
+                'Sex': sex_match.group(1).title() if sex_match else 'N/A',
+                'Dose (mg)': extract_dose(text) or 'N/A',
+                'QT (ms)': extract_qt_hr_values(text)['qt_values'][0] if extract_qt_hr_values(text)['qt_values'] else 'N/A',
+                'QTc (ms)': extract_qt_hr_values(text)['qt_values'][1] if len(extract_qt_hr_values(text)['qt_values']) > 1 else 'N/A',
+                'QTB (ms)': extract_qt_hr_values(text)['qt_values'][2] if len(extract_qt_hr_values(text)['qt_values']) > 2 else 'N/A',
+                'QTF (ms)': extract_qt_hr_values(text)['qt_values'][3] if len(extract_qt_hr_values(text)['qt_values']) > 3 else 'N/A',
+                'HR (bpm)': extract_qt_hr_values(text)['hr_values'][0] if extract_qt_hr_values(text)['hr_values'] else 'N/A',
+                'TdP?': 'Yes' if 'torsade' in text.lower() else 'N/A',
+                'Medical History': extract_medical_history(text),
+                'Medication History': extract_medications(text),
+                'Course of Treatment': extract_treatment_course(text),
+                'Outcome': extract_outcome(text),
+                'Naranjo': str(paper['naranjo_score']),
+                'Tisdale': str(paper['tisdale_score']),
+                'WHO-UMC': paper['who_umc']
+            }
+            writer.writerow(row)
+
+def search_pubmed_papers(drug_name):
+    """Search PubMed for case reports of TdP with the specified drug."""
+    # MESH term query - replace drug names
+    mesh_query = f'((hERG) OR (QT) OR (QTc) OR (torsad*)) AND ({drug_name})'
+    
+    # Additional title/abstract terms
+    title_abs_query = f'({drug_name}[Title/Abstract]) AND (("torsades de pointes"[Title/Abstract]) OR (tdp[Title/Abstract]) OR (torsades[Title/Abstract]))'
+    
+    # Combine queries with case report filter
+    query = f'({mesh_query} OR {title_abs_query}) AND (case reports[Publication Type])'
+    
+    print(f"\nSearching PubMed using:")
+    print(f"MESH terms: {mesh_query}")
+    print(f"Title/Abstract terms: {title_abs_query}")
+    
+    # Search PubMed
+    handle = Entrez.esearch(db="pubmed", term=query, retmax=100)
+    record = Entrez.read(handle)
+    handle.close()
+    
+    if not record["IdList"]:
+        print("No papers found matching the criteria.")
+        return []
+    
+    print(f"\nFound {len(record['IdList'])} matching papers")
+    
+    # Fetch details for each paper
+    handle = Entrez.efetch(db="pubmed", id=record["IdList"], rettype="xml", retmode="xml")
+    papers = Entrez.read(handle)
+    handle.close()
+    
+    paper_details = []
+    for paper in papers['PubmedArticle']:
+        try:
+            article = paper['MedlineCitation']['Article']
+            
+            # Get DOI if available
+            doi = None
+            if 'ELocationID' in article:
+                for id in article['ELocationID']:
+                    if id.attributes['EIdType'] == 'doi':
+                        doi = str(id)
+                        break
+            
+            # Get full text if available
+            full_text = ""
+            if 'Abstract' in article:
+                if isinstance(article['Abstract']['AbstractText'], list):
+                    full_text = ' '.join([str(text) for text in article['Abstract']['AbstractText']])
+                else:
+                    full_text = str(article['Abstract']['AbstractText'])
+            
+            paper_info = {
+                'pmid': paper['MedlineCitation']['PMID'],
+                'title': article['ArticleTitle'],
+                'authors': ', '.join([author['LastName'] + ' ' + author['ForeName'] for author in article['AuthorList']]),
+                'journal': article['Journal']['Title'],
+                'year': article['Journal']['JournalIssue']['PubDate'].get('Year', ''),
+                'abstract': full_text,
+                'doi': doi
+            }
+            
+            # Calculate causality scores
+            combined_text = f"{paper_info['title']} {paper_info['abstract']}"
+            paper_info['naranjo_score'] = calculate_naranjo_score(combined_text)
+            paper_info['tisdale_score'] = calculate_tisdale_score(combined_text)
+            paper_info['who_umc'] = assess_who_umc(combined_text)
+            
+            # Print detailed information
+            print(f"\nFound paper: {paper_info['title']}")
+            print(f"DOI: {paper_info['doi'] if paper_info['doi'] else 'N/A'}")
+            print(f"Causality Assessment:")
+            print(f"- Naranjo Score: {paper_info['naranjo_score']}")
+            print(f"- Tisdale Score: {paper_info['tisdale_score']}")
+            print(f"- WHO-UMC: {paper_info['who_umc']}")
+            
+            paper_details.append(paper_info)
+            
+        except Exception as e:
+            print(f"Error processing paper: {str(e)}")
+    
+    return paper_details
+
+def plot_combined_analysis(papers, drug_name, qt_data):
+    """Create a combined figure with QT nomogram and analysis table."""
+    # Create subplots with more space for the table
+    fig = sp.make_subplots(
+        rows=2, cols=1,
+        row_heights=[0.6, 0.4],  # Give more height to the table
+        specs=[[{"type": "scatter"}],
+               [{"type": "table"}]],
+        vertical_spacing=0.1,
+        subplot_titles=(f"QT Nomogram for {drug_name}", f"Literature Analysis for {drug_name}")
+    )
+
+    # Add reference lines
+    ref_lines = get_reference_lines()
+    for line in ref_lines:
+        hr_values = [point['hr'] for point in line['data']]
+        qt_values = [point['qt'] for point in line['data']]
+        fig.add_trace(
+            go.Scatter(
+                x=hr_values,
+                y=qt_values,
+                mode='lines',
+                name=line['name'],
+                line=dict(
+                    color=line['color'],
+                    dash=line['dash']
+                )
+            ),
+            row=1, col=1
+        )
+
+    # Add data points
+    if qt_data:
+        hr_values = [point['hr'] for point in qt_data]
+        qt_values = [point['qt'] for point in qt_data]
+        fig.add_trace(
+            go.Scatter(
+                x=hr_values,
+                y=qt_values,
+                mode='markers',
+                name='Data Points',
+                marker=dict(
+                    size=10,
+                    color='red',
+                    symbol='circle'
+                )
+            ),
+            row=1, col=1
+        )
+
+    # Update nomogram layout
+    fig.update_xaxes(title_text='Heart Rate (bpm)', range=[0, 300], row=1, col=1)
+    fig.update_yaxes(title_text='QT Interval (ms)', range=[200, 800], row=1, col=1)
+
+    # Create table data with more columns
+    table_data = {
+        'Title': [paper['Title'] for paper in papers],
+        'DOI': [paper['DOI'] for paper in papers],
+        'Year': [paper.get('Year', 'N/A') for paper in papers],
+        'QT Values': [paper.get('QT_values', 'N/A') for paper in papers],
+        'HR Values': [paper.get('HR_values', 'N/A') for paper in papers],
+        'Naranjo': [paper.get('Naranjo_Score', 'N/A') for paper in papers],
+        'Tisdale': [paper.get('Tisdale_Score', 'N/A') for paper in papers],
+        'WHO-UMC': [paper.get('WHO_UMC', 'N/A') for paper in papers]
+    }
+
+    # Add table with improved formatting
+    fig.add_trace(
+        go.Table(
+            header=dict(
+                values=list(table_data.keys()),
+                fill_color='paleturquoise',
+                align='left',
+                font=dict(size=12, color='black'),
+                height=40
+            ),
+            cells=dict(
+                values=list(table_data.values()),
+                fill_color='lavender',
+                align='left',
+                font=dict(size=11),
+                height=30,
+                line_color='darkslategray',
+                line_width=1
+            )
+        ),
+        row=2, col=1
+    )
+
+    # Update layout
+    fig.update_layout(
+        height=1500,  # Increased height to accommodate table
+        showlegend=True,
+        title_text=f"Combined Analysis for {drug_name}",
+        title_x=0.5,
+        paper_bgcolor='white',
+        plot_bgcolor='aliceblue'
+    )
+
+    return fig
+
+def process_paper(paper):
+    """Process a single paper and extract all relevant information."""
+    paper_info = {
+        'Title': paper.get('title', 'N/A'),
+        'DOI': paper.get('doi', 'N/A'),
+        'Authors': paper.get('authors', 'N/A'),
+        'Age': 'N/A',
+        'Sex': 'N/A',
+        'QT_values': 'N/A',
+        'HR_values': 'N/A',
+        'BP_values': 'N/A',
+        'Medical_History': 'N/A',
+        'Naranjo_Score': 0,
+        'Tisdale_Score': 0,
+        'WHO_UMC': 'N/A'
+    }
+    
+    text = paper.get('abstract', '') + ' ' + paper.get('title', '')
+    if not text:
+        return paper_info
+    
+    # Extract age using improved patterns
+    age_patterns = [
+        r'(\d+)[-\s]year[-\s]old',
+        r'age[d]?\s+(\d+)',
+        r'(\d+)\s*(?:yo|y\.o\.|years\s+old)',
+        r'(\d+)\s*(?:year|yr)[-\s]old',
+        r'aged?\s*(?:of)?\s*(\d+)\s*(?:year|yr)',
+    ]
+    
+    for pattern in age_patterns:
+        match = re.search(pattern, text.lower())
+        if match:
+            try:
+                age = int(match.group(1))
+                if 0 <= age <= 120:  # Reasonable age range
+                    paper_info['Age'] = age
+                    break
+            except ValueError:
+                continue
+    
+    # Extract sex
+    sex_patterns = [
+        r'\b(male|female)\b',
+        r'\b(man|woman)\b',
+        r'\b(boy|girl)\b',
+        r'\b(gentleman|lady)\b'
+    ]
+    
+    for pattern in sex_patterns:
+        match = re.search(pattern, text.lower())
+        if match:
+            sex = match.group(1)
+            if sex in ['male', 'man', 'boy', 'gentleman']:
+                paper_info['Sex'] = 'Male'
+            elif sex in ['female', 'woman', 'girl', 'lady']:
+                paper_info['Sex'] = 'Female'
+            break
+    
+    # Extract clinical values
+    clinical_values = extract_qt_hr_values(text)
+    
+    # Format values for CSV
+    if clinical_values['qt_values']:
+        paper_info['QT_values'] = ', '.join(map(str, clinical_values['qt_values']))
+    if clinical_values['hr_values']:
+        paper_info['HR_values'] = ', '.join(map(str, clinical_values['hr_values']))
+    if clinical_values['bp_values']:
+        bp_str = []
+        for bp in clinical_values['bp_values']:
+            if isinstance(bp, tuple) and bp[1] is not None:
+                bp_str.append(f"{bp[0]}/{bp[1]}")
+            else:
+                bp_str.append(str(bp[0]))
+        paper_info['BP_values'] = ', '.join(bp_str)
+    
+    # Extract medical history
+    medical_history = extract_medical_history(text)
+    if medical_history:
+        paper_info['Medical_History'] = medical_history
+    
+    # Calculate scores
+    paper_info['Naranjo_Score'] = calculate_naranjo_score(text)
+    paper_info['Tisdale_Score'] = calculate_tisdale_score(text)
+    paper_info['WHO_UMC'] = assess_who_umc(text)
+    
+    return paper_info
+
+def save_to_csv(papers, filepath):
+    """Save paper analysis to CSV file with all extracted information."""
+    if not papers:
+        return
+    
+    fieldnames = [
+        'Title', 'Year', 'DOI', 'Authors', 'Age', 'Sex', 'QT_values', 'HR_values', 'BP_values',
+        'Medical_History', 'Naranjo_Score', 'Tisdale_Score', 'WHO_UMC', 'TdP_Present'
+    ]
+    
+    processed_papers = []
     for paper in papers:
-        text = paper['title'] + ' ' + paper['abstract']
+        paper_info = process_paper(paper)
         
-        # Extract all information
-        dose = extract_dose(text)
-        qt_hr_values = extract_qt_hr_values(text)
+        # Add TdP presence
+        text = paper.get('abstract', '') + ' ' + paper.get('title', '')
+        paper_info['TdP_Present'] = 'Yes' if any(term in text.lower() for term in ['torsade', 'tdp', 'torsades']) else 'No'
         
-        # Extract age and sex with capture groups
-        age_match = re.search(r'(\d+)[\s-]*(year|yr)', text, re.IGNORECASE)
-        sex_match = re.search(r'(male|female|man|woman|boy|girl)', text, re.IGNORECASE)
+        # Add year if available
+        paper_info['Year'] = paper.get('year', 'N/A')
         
-        row = [
-            paper['title'],
-            paper['year'],
-            paper.get('doi', 'N/A'),
-            paper['authors'],
-            age_match.group(1) if age_match else 'N/A',
-            sex_match.group(1).title() if sex_match else 'N/A',
-            str(dose) if dose else 'N/A',
-            qt_hr_values['uncorrected_qt'] or 'N/A',
-            qt_hr_values['qtc'] or 'N/A',
-            qt_hr_values['qtb'] or 'N/A',
-            qt_hr_values['qtf'] or 'N/A',
-            qt_hr_values['hr'] or 'N/A',
-            'Yes' if 'torsade' in text.lower() else 'N/A',
-            qt_hr_values['bp'] or 'N/A',
-            extract_medical_history(text),
-            extract_medications(text),
-            extract_treatment_course(text),
-            extract_outcome(text),
-            str(paper['naranjo_score']),
-            str(paper['tisdale_score']),
-            paper['who_umc']
-        ]
-        data.append(row)
+        processed_papers.append(paper_info)
     
-    # Add table subplot with auto-sized columns
-    ax2 = plt.subplot2grid((2, 1), (1, 0))
-    ax2.axis('tight')
-    ax2.axis('off')
+    with open(filepath, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(processed_papers)
+
+def extract_qt_hr_values(text):
+    """Extract QT and HR values from text."""
+    values = {
+        'qt_values': [],
+        'hr_values': [],
+        'bp_values': []
+    }
     
-    # Create table with auto column widths
-    table = ax2.table(cellText=data,
-                     colLabels=columns,
-                     cellLoc='left',
-                     loc='center')
+    # QT interval patterns
+    qt_patterns = [
+        r'QT\s*(?:interval)?\s*(?:of|was|is|=|:)?\s*(\d{2,3})(?:\s*(?:ms|msec|milliseconds))?',
+        r'QT\s*(?:interval)?\s*(?:prolonged|increased|decreased|measured)\s*(?:to|at)?\s*(\d{2,3})(?:\s*(?:ms|msec|milliseconds))?'
+    ]
     
-    # Auto-size columns based on content
-    table.auto_set_font_size(False)
-    table.set_fontsize(8)
+    # Heart rate patterns
+    hr_patterns = [
+        r'(?:heart rate|HR|pulse|rate)\s*(?:of|was|is|=|:)?\s*(\d{1,3})(?:\s*(?:bpm|beats per minute|beats/min))?',
+        r'(?:heart rate|HR|pulse|rate)\s*(?:increased|decreased|measured)\s*(?:to|at)?\s*(\d{1,3})(?:\s*(?:bpm|beats per minute|beats/min))?'
+    ]
     
-    # Calculate column widths based on content
-    widths = []
-    for col in range(len(columns)):
-        column_contents = [str(row[col]) for row in data]
-        column_contents.append(columns[col])
-        max_width = max(len(str(content)) for content in column_contents)
-        widths.append(max_width)
+    # Blood pressure patterns
+    bp_patterns = [
+        r'(?:blood pressure|BP)\s*(?:of|was|is|=|:)?\s*(\d{2,3})/(\d{2,3})(?:\s*(?:mmHg))?',
+        r'(?:blood pressure|BP)\s*(?:increased|decreased|measured)\s*(?:to|at)?\s*(\d{2,3})/(\d{2,3})(?:\s*(?:mmHg))?',
+        r'(\w+\s+kidney\s+disease)',
+        r'(coronary\s+artery\s+disease)',
+        r'(atrial\s+fibrillation)',
+        r'((?:type\s+[12]|gestational)\s+diabetes)',
+        r'(hypertension)',
+        r'(myocardial\s+infarction)',
+        r'(cardiac\s+arrest)',
+        r'((?:tachy|brady)(?:cardia|arrhythmia))',
+        r'((?:prolonged|long)\s+QT[a-z]*\s+(?:syndrome)?)',
+        r'(asthma|copd|bronchitis)',
+        r'(respiratory\s+(?:failure|distress|infection))',
+        r'(pneumonia)',
+        r'(seizure|epilepsy)',
+        r'(stroke|tia)',
+        r'(parkinson)',
+        r'(depression)',
+        r'(anxiety)',
+        r'(bipolar\s+disorder)',
+        r'(schizophrenia)',
+        r'(diabetes(?:\s+mellitus)?)',
+        r'(renal\s+(?:failure|insufficiency))',
+        r'(liver\s+(?:failure|disease|cirrhosis))',
+        r'(cancer|malignancy)',
+        r'(sepsis|infection)',
+        r'(covid-19|coronavirus)',
+        r'((?:low|high)\s+(?:potassium|magnesium|calcium))',
+        r'(electrolyte\s+(?:imbalance|abnormality))',
+    ]
     
-    # Normalize widths to sum to ~1
-    total_width = sum(widths)
-    col_widths = [w/total_width for w in widths]
+    for pattern in qt_patterns:
+        matches = re.finditer(pattern, text, re.IGNORECASE)
+        for match in matches:
+            try:
+                qt = int(match.group(1))
+                if 200 <= qt <= 1000:  # Reasonable QT range
+                    values['qt_values'].append(qt)
+            except ValueError:
+                continue
+
+    for pattern in hr_patterns:
+        matches = re.finditer(pattern, text, re.IGNORECASE)
+        for match in matches:
+            try:
+                hr = int(match.group(1))
+                if 20 <= hr <= 300:  # Reasonable HR range
+                    values['hr_values'].append(hr)
+            except ValueError:
+                continue
     
-    # Apply column widths and style cells
-    for (row, col), cell in table.get_celld().items():
-        cell.set_width(col_widths[col])
-        if row == 0:
-            cell.set_text_props(rotation=45)
-            cell.set_height(0.15)
-            cell.set_text_props(weight='bold')
-        else:
-            cell.set_height(0.1)
-            # Add word wrapping for text columns
-            if col in [0, 3, 14, 15, 16]:  # Title, Authors, and text fields
-                cell._text.set_wrap(True)
+    # Blood pressure extraction
+    for pattern in bp_patterns:
+        matches = re.finditer(pattern, text, re.IGNORECASE)
+        for match in matches:
+            try:
+                if len(match.groups()) == 2:
+                    sbp = int(match.group(1))
+                    dbp = int(match.group(2))
+                    if 60 <= sbp <= 250 and 30 <= dbp <= 150:  # Reasonable BP ranges
+                        values['bp_values'].append((sbp, dbp))
+                else:
+                    sbp = int(match.group(1))
+                    if 60 <= sbp <= 250:  # Reasonable systolic BP range
+                        values['bp_values'].append(sbp)
+            except ValueError:
+                continue
     
-    # Scale table to fit
-    table.scale(1, 2)
+    # Remove duplicates while preserving order
+    values['qt_values'] = list(dict.fromkeys(values['qt_values']))
+    values['hr_values'] = list(dict.fromkeys(values['hr_values']))
+    values['bp_values'] = list(dict.fromkeys(values['bp_values']))
     
-    plt.title(f'{drug_name} Case Reports Analysis', pad=20)
-    plt.tight_layout()
+    return values
+
+def extract_dose(text):
+    """Extract drug dose from text."""
+    dose_patterns = [
+        r"(\d+)\s*mg(?:\s*of\s*\w+)?",
+        r"dose\s*(?:of\s*)?(\d+)\s*mg",
+        r"(\d+)\s*milligrams?"
+    ]
     
-    # Save with high DPI
-    plt.savefig(f'{drug_name.lower()}_full_analysis.png', dpi=300, bbox_inches='tight')
-    plt.savefig(f'{drug_name.lower()}_full_analysis.pdf', bbox_inches='tight')
-    plt.close()
+    for pattern in dose_patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            try:
+                return int(match.group(1))
+            except ValueError:
+                continue
+    return None
 
 def extract_medical_history(text):
     """Extract medical history from text."""
@@ -828,7 +1408,6 @@ def extract_medical_history(text):
     
     # Common conditions and their variations
     condition_patterns = [
-        # Cardiovascular conditions
         r'(?:history of|diagnosed with|known|chronic|suffers? from)\s+([\w\s-]+(?:failure|disease|disorder|syndrome|attack|arrhythmia|hypertension|diabetes|cancer|infection))',
         r'(?:underlying|pre-existing)\s+([\w\s-]+(?:condition|disease|disorder))',
         r'(?:chronic|acute)\s+([\w\s-]+(?:failure|disease|disorder))',
@@ -843,28 +1422,23 @@ def extract_medical_history(text):
         r'(myocardial\s+infarction)',
         r'(cardiac\s+arrest)',
         r'((?:tachy|brady)(?:cardia|arrhythmia))',
-        r'((?:prolonged|long)\s+QT(?:\s+syndrome)?)',
-        # Respiratory conditions
+        r'((?:prolonged|long)\s+QT[a-z]*\s+(?:syndrome)?)',
         r'(asthma|copd|bronchitis)',
         r'(respiratory\s+(?:failure|distress|infection))',
         r'(pneumonia)',
-        # Neurological conditions
         r'(seizure|epilepsy)',
         r'(stroke|tia)',
         r'(parkinson)',
-        # Psychiatric conditions
         r'(depression)',
         r'(anxiety)',
         r'(bipolar\s+disorder)',
         r'(schizophrenia)',
-        # Other conditions
         r'(diabetes(?:\s+mellitus)?)',
         r'(renal\s+(?:failure|insufficiency))',
         r'(liver\s+(?:failure|disease|cirrhosis))',
         r'(cancer|malignancy)',
         r'(sepsis|infection)',
         r'(covid-19|coronavirus)',
-        # Lab values
         r'((?:low|high)\s+(?:potassium|magnesium|calcium))',
         r'(electrolyte\s+(?:imbalance|abnormality))',
     ]
@@ -886,11 +1460,9 @@ def extract_medications(text):
     
     # Common drug classes and specific drugs
     drug_patterns = [
-        # Administration patterns
         r'(?:taking|on|receiving|treated with|therapy with)\s+([\w\s-]+(?:blocker|inhibitor|antagonist|agonist|sartan|pril|statin))',
-        r'(?:prescribed|administered|given)\s+([\w\s-]+(?:mg|mcg|g|ml|units))',
+        r'(?:prescribed|administered|given|received)\s+([\w\s-]+(?:mg|mcg|g|ml|units))',
         r'(\w+)\s+(?:\d+\s*(?:mg|mcg|g|ml|units))',
-        # Drug classes
         r'((?:beta|alpha)\s*-?\s*blockers?)',
         r'(ace\s*inhibitors?)',
         r'(calcium\s*channel\s*blockers?)',
@@ -901,7 +1473,6 @@ def extract_medications(text):
         r'(anti-?\s*psychotics?)',
         r'(anti-?\s*biotics?)',
         r'(anti-?\s*virals?)',
-        # Common cardiovascular drugs
         r'\b(warfarin|heparin|aspirin|clopidogrel)',
         r'\b(metoprolol|atenolol|carvedilol|bisoprolol)',
         r'\b(lisinopril|enalapril|ramipril)',
@@ -909,21 +1480,16 @@ def extract_medications(text):
         r'\b(furosemide|bumetanide|spironolactone)',
         r'\b(amiodarone|sotalol|flecainide)',
         r'\b(digoxin)',
-        # Common antibiotics
         r'\b(azithromycin|clarithromycin|erythromycin)',
         r'\b(ciprofloxacin|levofloxacin|moxifloxacin)',
         r'\b(penicillin|amoxicillin|ampicillin)',
         r'\b(ceftriaxone|cefuroxime|cephalexin)',
-        # Common psychiatric drugs
         r'\b(fluoxetine|sertraline|paroxetine|citalopram|escitalopram)',
         r'\b(quetiapine|olanzapine|risperidone|haloperidol)',
         r'\b(lithium|valproate|carbamazepine)',
-        # Other common drugs
         r'\b(metformin|insulin)',
         r'\b(hydroxychloroquine|chloroquine)',
         r'\b(ivermectin|remdesivir)',
-        # Drug combinations
-        r'(\w+(?:\s*[+]\s*\w+)+)',
     ]
     
     for pattern in drug_patterns:
@@ -943,11 +1509,9 @@ def extract_treatment_course(text):
     
     # Treatment patterns
     treatment_patterns = [
-        # General treatment patterns
         r'(?:treated|managed)\s+with\s+([\w\s-]+)',
         r'(?:administered|given|received)\s+([\w\s-]+)',
         r'(?:therapy|treatment)\s+with\s+([\w\s-]+)',
-        # Specific interventions
         r'(defibrillation|cardioversion|pacing)',
         r'(magnesium\s+(?:infusion|supplementation))',
         r'(potassium\s+(?:infusion|supplementation))',
@@ -957,11 +1521,9 @@ def extract_treatment_course(text):
         r'(hemodialysis|dialysis)',
         r'(ecg\s+monitoring)',
         r'(telemetry)',
-        # Drug adjustments
         r'(discontinuation|withdrawal|stopped)\s+of\s+([\w\s-]+)',
         r'(dose\s+reduction|decreased|increased)\s+of\s+([\w\s-]+)',
         r'(monitoring|observation)',
-        # Specific treatments
         r'(iv\s+fluids?)',
         r'(oxygen\s+therapy)',
         r'(mechanical\s+ventilation)',
@@ -969,16 +1531,6 @@ def extract_treatment_course(text):
         r'(inotropes?)',
         r'(antibiotics?)',
         r'(antiarrhythmics?)',
-        # Procedures
-        r'(surgery|operation)',
-        r'(catheterization)',
-        r'(angiography)',
-        r'(stent(?:ing)?)',
-        r'(bypass)',
-        # Supportive care
-        r'(supportive\s+care)',
-        r'(symptomatic\s+treatment)',
-        r'(palliative\s+care)',
     ]
     
     for pattern in treatment_patterns:
@@ -994,414 +1546,6 @@ def extract_treatment_course(text):
     # Remove duplicates while preserving order
     treatments = list(dict.fromkeys(treatments))
     return '; '.join(treatments) if treatments else 'N/A'
-
-def extract_outcome(text):
-    """Extract patient outcome from text."""
-    # Outcome patterns
-    outcome_patterns = [
-        # Death patterns
-        (r'(?:patient|subject)\s+(?:died|expired|deceased|death)', 'Death'),
-        (r'(?:fatal|lethal)\s+outcome', 'Death'),
-        # Recovery patterns
-        (r'(?:complete|full)\s+recovery', 'Complete recovery'),
-        (r'discharged\s+(?:home|from\s+hospital)', 'Discharged'),
-        (r'returned\s+to\s+baseline', 'Returned to baseline'),
-        # Partial recovery
-        (r'partial\s+recovery', 'Partial recovery'),
-        (r'improved\s+(?:with|after)', 'Improved'),
-        # Ongoing/chronic
-        (r'chronic|ongoing|persistent', 'Ongoing symptoms'),
-        # Transfer
-        (r'transferred\s+to', 'Transferred'),
-        # Default pattern
-        (r'(?:survived|alive)', 'Survived'),
-    ]
-    
-    for pattern, outcome in outcome_patterns:
-        if re.search(pattern, text, re.IGNORECASE):
-            return outcome
-    
-    return 'Not reported'
-
-def extract_qt_hr_values(text):
-    """Extract QT and HR values using comprehensive patterns."""
-    values = {
-        'uncorrected_qt': None,
-        'qtc': None,
-        'qtb': None,
-        'qtf': None,
-        'hr': None,
-        'bp': None
-    }
-    
-    # QT patterns
-    qt_patterns = [
-        # General QT patterns
-        r'(?:QT|qt)\s*(?:interval)?\s*(?:of|was|is|=|:)\s*(\d+)(?:\.|,)?(?:\d+)?\s*(?:ms|msec|milliseconds)',
-        r'(?:QT|qt)\s*(?:interval)?\s*(?:prolonged|increased|extended)\s*to\s*(\d+)(?:\.|,)?(?:\d+)?\s*(?:ms|msec|milliseconds)',
-        # QTc patterns
-        r'(?:QTc|qtc|corrected\s*QT)\s*(?:interval)?\s*(?:of|was|is|=|:)\s*(\d+)(?:\.|,)?(?:\d+)?\s*(?:ms|msec|milliseconds)',
-        r'(?:QTc|qtc|corrected\s*QT)\s*(?:interval)?\s*(?:prolonged|increased|extended)\s*to\s*(\d+)(?:\.|,)?(?:\d+)?\s*(?:ms|msec|milliseconds)',
-        # QTB patterns
-        r'(?:QTb|qtb|Bazett)\s*(?:interval|correction)?\s*(?:of|was|is|=|:)\s*(\d+)(?:\.|,)?(?:\d+)?\s*(?:ms|msec|milliseconds)',
-        # QTF patterns
-        r'(?:QTf|qtf|Fridericia)\s*(?:interval|correction)?\s*(?:of|was|is|=|:)\s*(\d+)(?:\.|,)?(?:\d+)?\s*(?:ms|msec|milliseconds)',
-    ]
-    
-    # HR patterns
-    hr_patterns = [
-        # Direct HR mentions
-        r'(?:HR|heart\s*rate|ventricular\s*rate|pulse(?:\s*rate)?)\s*(?:of|was|is|=|:)\s*(\d+)(?:\.|,)?(?:\d+)?\s*(?:bpm|beats\s*(?:per|/)\s*min|b\.p\.m\.|min-1)',
-        r'(?:HR|heart\s*rate|ventricular\s*rate|pulse(?:\s*rate)?)\s*(?:increased|decreased)\s*to\s*(\d+)(?:\.|,)?(?:\d+)?\s*(?:bpm|beats\s*(?:per|/)\s*min|b\.p\.m\.|min-1)',
-        # Bradycardia/Tachycardia mentions
-        r'(?:bradycardia|tachycardia)\s*(?:at|of|with|showing)\s*(\d+)(?:\.|,)?(?:\d+)?\s*(?:bpm|beats\s*(?:per|/)\s*min|b\.p\.m\.|min-1)',
-        # General rate mentions
-        r'rate\s*(?:of|at|showing)\s*(\d+)(?:\.|,)?(?:\d+)?\s*(?:bpm|beats\s*(?:per|/)\s*min|b\.p\.m\.|min-1)',
-        # Numeric only with units
-        r'(\d+)(?:\.|,)?(?:\d+)?\s*(?:bpm|beats\s*(?:per|/)\s*min|b\.p\.m\.|min-1)',
-    ]
-    
-    # BP patterns
-    bp_patterns = [
-        r'(?:BP|blood\s*pressure)\s*(?:of|was|is|=|:)\s*(\d+)/(\d+)',
-        r'(?:systolic|SBP)\s*(?:of|was|is|=|:)\s*(\d+)',
-        r'(?:diastolic|DBP)\s*(?:of|was|is|=|:)\s*(\d+)'
-    ]
-    
-    # Extract QT values
-    for pattern in qt_patterns:
-        match = re.search(pattern, text, re.IGNORECASE)
-        if match:
-            if 'QTc' in pattern or 'qtc' in pattern or 'corrected' in pattern:
-                values['qtc'] = int(match.group(1))
-            elif 'QTb' in pattern or 'qtb' in pattern or 'Bazett' in pattern:
-                values['qtb'] = int(match.group(1))
-            elif 'QTf' in pattern or 'qtf' in pattern or 'Fridericia' in pattern:
-                values['qtf'] = int(match.group(1))
-            else:
-                values['uncorrected_qt'] = int(match.group(1))
-    
-    # Extract HR value
-    for pattern in hr_patterns:
-        match = re.search(pattern, text, re.IGNORECASE)
-        if match:
-            try:
-                hr = float(match.group(1))
-                if 20 <= hr <= 300:  # Reasonable HR range
-                    values['hr'] = hr
-                    break
-            except ValueError:
-                continue
-    
-    # Extract BP values
-    for pattern in bp_patterns:
-        match = re.search(pattern, text, re.IGNORECASE)
-        if match:
-            if len(match.groups()) == 2:
-                values['bp'] = f"{match.group(1)}/{match.group(2)}"
-            else:
-                values['bp'] = match.group(1)
-            break
-    
-    return values
-
-def calculate_naranjo_score(text):
-    """Calculate Naranjo score for adverse drug reaction causality."""
-    score = 0
-    
-    # Previous reports
-    if re.search(r'previous.*report|case.*report|literature|published', text, re.I):
-        score += 1
-    
-    # Temporal relationship
-    if re.search(r'after|following|subsequent|began|started', text, re.I):
-        score += 2
-    
-    # Improvement after discontinuation
-    if re.search(r'discontinu|withdraw|stop|ceased', text, re.I):
-        if re.search(r'improv|resolv|recover|normal', text, re.I):
-            score += 1
-    
-    # Recurrence on rechallenge
-    if re.search(r'rechallenge|reexposure', text, re.I):
-        score += 2
-    
-    # Alternative causes
-    if not re.search(r'alternative|other cause', text, re.I):
-        score += 2
-    
-    # Dose-response relationship
-    if re.search(r'dose.*relationship|concentration|level|plasma', text, re.I):
-        score += 1
-    
-    # Objective evidence
-    if re.search(r'ECG|EKG|monitor|measure|recorded', text, re.I):
-        score += 1
-    
-    return score
-
-def calculate_tisdale_score(text):
-    """Calculate Tisdale score for QT prolongation risk."""
-    score = 0
-    
-    # Age ≥68 years
-    age_match = re.search(r'(\d+)[\s-]*(?:year|yr)', text, re.I)
-    if age_match and int(age_match.group(1)) >= 68:
-        score += 1
-    
-    # Female sex
-    if re.search(r'female|woman', text, re.I):
-        score += 1
-    
-    # Loop diuretic
-    if re.search(r'furosemide|bumetanide|torsemide', text, re.I):
-        score += 1
-    
-    # Serum K+ ≤3.5
-    k_match = re.search(r'potassium.*?(\d+\.?\d*)', text, re.I)
-    if k_match and float(k_match.group(1)) <= 3.5:
-        score += 2
-    
-    # QTc on admission ≥450 ms
-    qtc_match = re.search(r'QTc.*?(\d+)', text)
-    if qtc_match and int(qtc_match.group(1)) >= 450:
-        score += 2
-    
-    # Acute MI
-    if re.search(r'myocardial infarction|MI|heart attack', text, re.I):
-        score += 2
-    
-    # Sepsis
-    if re.search(r'sepsis|septic', text, re.I):
-        score += 3
-    
-    # Heart failure
-    if re.search(r'heart failure|CHF|cardiac failure', text, re.I):
-        score += 3
-    
-    # One QTc-prolonging drug
-    if re.search(r'antiarrhythmic|antipsychotic|antibiotic|antidepressant', text, re.I):
-        score += 3
-    
-    # ≥2 QTc-prolonging drugs
-    drug_count = len(re.findall(r'antiarrhythmic|antipsychotic|antibiotic|antidepressant', text, re.I))
-    if drug_count >= 2:
-        score += 3
-    
-    return score
-
-def assess_who_umc(text):
-    """Assess WHO-UMC causality category."""
-    # Certain
-    if (re.search(r'rechallenge|reexposure', text, re.I) and 
-        re.search(r'positive|confirm|definite', text, re.I)):
-        return "Certain"
-    
-    # Probable/Likely
-    if (re.search(r'temporal|relationship|association', text, re.I) and 
-        re.search(r'improve|resolve|recover', text, re.I) and 
-        not re.search(r'alternative|other cause', text, re.I)):
-        return "Probable/Likely"
-    
-    # Possible
-    if (re.search(r'temporal|relationship|association', text, re.I) and 
-        re.search(r'could|may|possible', text, re.I)):
-        return "Possible"
-    
-    # Unlikely
-    if re.search(r'unlikely|doubtful|improbable', text, re.I):
-        return "Unlikely"
-    
-    # Default to Possible if no clear category
-    return "Possible"
-
-def download_pdf_from_doi(doi, output_dir):
-    """Try to download PDF from Sci-Hub or other open access sources."""
-    try:
-        # First try unpaywall API
-        unpaywall_url = f"https://api.unpaywall.org/v2/{doi}?email=your.email@example.com"
-        response = requests.get(unpaywall_url)
-        if response.status_code == 200:
-            data = response.json()
-            if data.get('is_oa') and data.get('best_oa_location', {}).get('url_for_pdf'):
-                pdf_url = data['best_oa_location']['url_for_pdf']
-                response = requests.get(pdf_url)
-                if response.status_code == 200:
-                    filename = f"{output_dir}/{doi.replace('/', '_')}.pdf"
-                    with open(filename, 'wb') as f:
-                        f.write(response.content)
-                    print(f"Successfully downloaded: {filename}")
-                    return filename
-        
-        print(f"Could not find free PDF for DOI: {doi}")
-        return None
-    
-    except Exception as e:
-        print(f"Error downloading PDF: {str(e)}")
-        return None
-
-def search_and_download_papers(drug_name, output_dir):
-    """Search for papers and try to download their PDFs."""
-    papers = search_pubmed_papers(drug_name)
-    
-    if not papers:
-        return []
-    
-    # Create output directory if it doesn't exist
-    os.makedirs(output_dir, exist_ok=True)
-    
-    # Save paper details to CSV
-    csv_path = os.path.join(output_dir, f"{drug_name}_papers.csv")
-    save_to_csv(papers, csv_path)
-    print(f"\nSaved paper details to: {csv_path}")
-    
-    # Try to download PDFs
-    downloaded_pdfs = []
-    for paper in papers:
-        if 'DOI' in paper:
-            pdf_path = download_pdf_from_doi(paper['DOI'], output_dir)
-            if pdf_path:
-                downloaded_pdfs.append(pdf_path)
-        time.sleep(1)  # Be nice to the servers
-    
-    return downloaded_pdfs
-
-def plot_combined_analysis(papers, drug_name, qt_data):
-    """Create a combined figure with QT nomogram and analysis table."""
-    # Create figure with two subplots - adjust height based on number of papers
-    fig = plt.figure(figsize=(20, 10 + len(papers)))
-    
-    # Add QT nomogram subplot
-    ax1 = plt.subplot2grid((2, 1), (0, 0))
-    
-    # Get reference lines
-    line_solid, line_dashed = get_reference_lines()
-    
-    # Plot grid
-    ax1.grid(True, linestyle='--', alpha=0.7)
-    
-    # Plot reference lines
-    hr_solid = [point['hr'] for point in line_solid]
-    qt_solid = [point['qt'] for point in line_solid]
-    hr_dashed = [point['hr'] for point in line_dashed]
-    qt_dashed = [point['qt'] for point in line_dashed]
-    
-    ax1.plot(hr_solid, qt_solid, '-', color='black', linewidth=2, label='Reference Line')
-    ax1.plot(hr_dashed, qt_dashed, '--', color='black', linewidth=2)
-    
-    # Plot data points
-    if qt_data:
-        hr_values = [point['hr'] for point in qt_data]
-        qt_values = [point['qt'] for point in qt_data]
-        ax1.scatter(hr_values, qt_values, color='red', s=50, label='Data Points')
-    
-    ax1.set_xlabel('Heart Rate (bpm)', fontsize=12, fontweight='bold')
-    ax1.set_ylabel('QT Interval (ms)', fontsize=12, fontweight='bold')
-    ax1.set_title(f'{drug_name} QT Nomogram Analysis', fontsize=14, fontweight='bold', pad=20)
-    ax1.legend(fontsize=10)
-    
-    # Style the axes
-    ax1.spines['top'].set_visible(False)
-    ax1.spines['right'].set_visible(False)
-    ax1.tick_params(labelsize=10)
-    
-    # Set axis limits with padding
-    ax1.set_xlim(0, 160)
-    ax1.set_ylim(200, 800)
-    
-    # Extract table data
-    data = []
-    columns = ['Title', 'Year', 'DOI', 'Authors', 'Age', 'Sex', 'Dose (mg)', 
-              'QT (ms)', 'QTc (ms)', 'QTB (ms)', 'QTF (ms)', 'HR (bpm)', 
-              'TdP?', 'BP (mmHg)', 'Medical History', 'Medication History',
-              'Course of Treatment', 'Outcome', 'Naranjo', 'Tisdale', 'WHO-UMC']
-    
-    for paper in papers:
-        text = paper['title'] + ' ' + paper['abstract']
-        
-        # Extract all information
-        dose = extract_dose(text)
-        qt_hr_values = extract_qt_hr_values(text)
-        
-        # Extract age and sex with capture groups
-        age_match = re.search(r'(\d+)[\s-]*(year|yr)', text, re.IGNORECASE)
-        sex_match = re.search(r'(male|female|man|woman|boy|girl)', text, re.IGNORECASE)
-        
-        row = [
-            paper['title'],
-            paper['year'],
-            paper.get('doi', 'N/A'),
-            paper['authors'],
-            age_match.group(1) if age_match else 'N/A',
-            sex_match.group(1).title() if sex_match else 'N/A',
-            str(dose) if dose else 'N/A',
-            qt_hr_values['uncorrected_qt'] or 'N/A',
-            qt_hr_values['qtc'] or 'N/A',
-            qt_hr_values['qtb'] or 'N/A',
-            qt_hr_values['qtf'] or 'N/A',
-            qt_hr_values['hr'] or 'N/A',
-            'Yes' if 'torsade' in text.lower() else 'N/A',
-            qt_hr_values['bp'] or 'N/A',
-            extract_medical_history(text),
-            extract_medications(text),
-            extract_treatment_course(text),
-            extract_outcome(text),
-            str(paper['naranjo_score']),
-            str(paper['tisdale_score']),
-            paper['who_umc']
-        ]
-        data.append(row)
-    
-    # Add table subplot with auto-sized columns
-    ax2 = plt.subplot2grid((2, 1), (1, 0))
-    ax2.axis('tight')
-    ax2.axis('off')
-    
-    # Create table with auto column widths
-    table = ax2.table(cellText=data,
-                     colLabels=columns,
-                     cellLoc='left',
-                     loc='center')
-    
-    # Auto-size columns based on content
-    table.auto_set_font_size(False)
-    table.set_fontsize(8)
-    
-    # Calculate column widths based on content
-    widths = []
-    for col in range(len(columns)):
-        column_contents = [str(row[col]) for row in data]
-        column_contents.append(columns[col])
-        max_width = max(len(str(content)) for content in column_contents)
-        widths.append(max_width)
-    
-    # Normalize widths to sum to ~1
-    total_width = sum(widths)
-    col_widths = [w/total_width for w in widths]
-    
-    # Apply column widths and style cells
-    for (row, col), cell in table.get_celld().items():
-        cell.set_width(col_widths[col])
-        if row == 0:
-            cell.set_text_props(rotation=45)
-            cell.set_height(0.15)
-            cell.set_text_props(weight='bold')
-        else:
-            cell.set_height(0.1)
-            # Add word wrapping for text columns
-            if col in [0, 3, 14, 15, 16]:  # Title, Authors, and text fields
-                cell._text.set_wrap(True)
-    
-    # Scale table to fit
-    table.scale(1, 2)
-    
-    plt.title(f'{drug_name} Case Reports Analysis', pad=20)
-    plt.tight_layout()
-    
-    # Save with high DPI
-    plt.savefig(f'{drug_name.lower()}_full_analysis.png', dpi=300, bbox_inches='tight')
-    plt.savefig(f'{drug_name.lower()}_full_analysis.pdf', bbox_inches='tight')
-    plt.close()
 
 def main():
     """Main function to run the TdP risk analysis."""
@@ -1419,6 +1563,10 @@ def main():
     output_dir = args.output
     
     # Create output directory
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Save to docs directory for GitHub Pages
+    output_dir = os.path.join(os.path.dirname(__file__), 'docs')
     os.makedirs(output_dir, exist_ok=True)
     
     # Search for hERG and bioavailability data
@@ -1478,7 +1626,7 @@ def main():
                     qt_data.append({'hr': hr, 'qt': qt})
                     print(f"Successfully added point: HR={hr}, QT={qt}")
                 except (ValueError, KeyError) as e:
-                    print(f"Error processing row: {e}")
+                    print(f"Error processing row: {row}, Error: {str(e)}")
         print(f"\nTotal points processed: {len(qt_data)}")
     
     # Search PubMed for TdP cases
@@ -1492,79 +1640,53 @@ def main():
     papers = search_pubmed(mesh_terms, title_abs_terms)
     print(f"\nFound {len(papers)} matching papers\n")
     
-    # Extract QT/HR data from papers
+    # Process each paper to extract detailed information
+    processed_papers = []
     for paper in papers:
-        text = paper['title'] + ' ' + paper['abstract']
-        qt_hr_values = extract_qt_hr_values(text)
-        if qt_hr_values['hr'] and qt_hr_values['uncorrected_qt']:
-            qt_data.append({
-                'hr': float(qt_hr_values['hr']),
-                'qt': float(qt_hr_values['uncorrected_qt'])
-            })
+        processed_paper = process_paper(paper)
+        
+        # Extract QT/HR values from the processed paper
+        if processed_paper['QT_values'] != 'N/A' and processed_paper['HR_values'] != 'N/A':
+            # Convert string values to lists if they're not already
+            qt_values = processed_paper['QT_values'] if isinstance(processed_paper['QT_values'], list) else [processed_paper['QT_values']]
+            hr_values = processed_paper['HR_values'] if isinstance(processed_paper['HR_values'], list) else [processed_paper['HR_values']]
+            
+            # Add each QT/HR pair to qt_data
+            for qt, hr in zip(qt_values, hr_values):
+                try:
+                    qt_val = float(qt)
+                    hr_val = float(hr)
+                    if 0 < hr_val < 300 and 200 < qt_val < 800:  # Basic validation
+                        qt_data.append({'hr': hr_val, 'qt': qt_val})
+                        print(f"Added QT/HR point from paper: HR={hr_val}, QT={qt_val}")
+                except (ValueError, TypeError):
+                    continue
     
     # Save papers to CSV
     csv_path = os.path.join(output_dir, f"{drug_name}_analysis.csv")
-    save_to_csv(papers, csv_path)
+    save_to_csv(processed_papers, csv_path)
     print(f"Saved analysis to: {csv_path}")
     
-    # Create and save the nomogram plot
-    plot_path = os.path.join(output_dir, f"{drug_name}_nomogram.png")
-    create_nomogram_plot(drug_name, qt_data, plot_path, herg_ic50, bioavailability)
-    print(f"Saved nomogram plot to: {plot_path}")
-
-def create_nomogram_plot(drug_name, qt_data, output_path, herg_ic50=None, bioavailability=None):
-    """Create QT nomogram plot with data points."""
-    plt.figure(figsize=(12, 8))
+    # Create and save the combined plot
+    fig = plot_combined_analysis(processed_papers, drug_name, qt_data)
+    html_path = os.path.join(output_dir, f"{drug_name}_analysis.html")
+    fig.write_html(html_path)
+    print(f"Saved combined analysis to: {html_path}")
     
-    # Get reference lines
-    line_solid, line_dashed = get_reference_lines()
-    
-    # Plot grid
-    plt.grid(True, linestyle='--', alpha=0.7)
-    
-    # Plot reference lines
-    hr_solid = [point['hr'] for point in line_solid]
-    qt_solid = [point['qt'] for point in line_solid]
-    hr_dashed = [point['hr'] for point in line_dashed]
-    qt_dashed = [point['qt'] for point in line_dashed]
-    
-    plt.plot(hr_solid, qt_solid, '-', color='black', linewidth=2, label='Reference Line')
-    plt.plot(hr_dashed, qt_dashed, '--', color='black', linewidth=2)
-    
-    # Plot data points if available
-    if qt_data:
-        hr_values = [point['hr'] for point in qt_data]
-        qt_values = [point['qt'] for point in qt_data]
-        plt.scatter(hr_values, qt_values, color='red', s=50, label='Data Points')
-    
-    plt.xlabel('Heart Rate (bpm)', fontsize=12, fontweight='bold')
-    plt.ylabel('QT Interval (ms)', fontsize=12, fontweight='bold')
-    
-    # Add title with drug properties if available
-    title = f'{drug_name} QT Nomogram Analysis'
-    if herg_ic50 or bioavailability:
-        props = []
-        if herg_ic50:
-            props.append(f'hERG IC50: {herg_ic50} nM')
-        if bioavailability:
-            props.append(f'Bioavailability: {bioavailability}%')
-        title += f'\n({", ".join(props)})'
-    
-    plt.title(title, fontsize=14, fontweight='bold', pad=20)
-    plt.legend(fontsize=10)
-    
-    # Style the axes
-    plt.gca().spines['top'].set_visible(False)
-    plt.gca().spines['right'].set_visible(False)
-    plt.tick_params(labelsize=10)
-    
-    # Set axis limits with padding
-    plt.xlim(0, 160)
-    plt.ylim(200, 800)
-    
-    # Save plot
-    plt.savefig(output_path, dpi=300, bbox_inches='tight')
-    plt.close()
+    # Create index.html that redirects to the analysis
+    index_path = os.path.join(output_dir, 'index.html')
+    with open(index_path, 'w') as f:
+        f.write(f"""<!DOCTYPE html>
+<html>
+<head>
+    <title>QT Nomogram Analysis</title>
+    <meta http-equiv="refresh" content="0; url=./{drug_name.lower()}_analysis.html">
+</head>
+<body>
+    <p>Redirecting to <a href="./{drug_name.lower()}_analysis.html">QT Nomogram Analysis</a>...</p>
+</body>
+</html>
+""")
 
 if __name__ == "__main__":
     main()
