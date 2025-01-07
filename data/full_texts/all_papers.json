@@ -1,0 +1,1075 @@
+{
+  "32921663": {
+    "PMID": "32921663",
+    "OWN": "NLM",
+    "STAT": "MEDLINE",
+    "DCOM": "20201013",
+    "LR": "20201013",
+    "IS": "1349-3299 (Electronic) 1349-2365 (Linking)",
+    "VI": "61",
+    "IP": "5",
+    "DP": "2020 Sep 29",
+    "TI": "Ivabradine-Induced Torsade de Pointes in Patients with Heart Failure Reduced Ejection Fraction.",
+    "PG": "1044-1048",
+    "LID": "10.1536/ihj.20-073 [doi]",
+    "AB": "Ivabradine is a selective inhibitor of the sinoatrial node \"funny\" current, prolonging the slow diastolic depolarization. As it has the ability to block the heart rate selectively, it is more effective at a faster heart rate. It is recommended for the treatment of heart failure reduced ejection fraction in the presence of beta-blocker therapy for the further reduction of the heart rate. However, previous reports have shown the association of Torsade de pointes (TdP) with concurrent use of ivabradine and drugs resulting in QT prolongation or blockage of the metabolic breakdown of ivabradine. In this article, we report two cases of patients with heart failure reduced ejection fraction who developed TdP after ivabradine use. Our report highlights the need to exercise caution with the administration of ivabradine in the presence of a reduced repolarization reserve, such as QT prolongation or metabolic insufficiency.",
+    "FAU": [
+      "Jang, Ji-Hun",
+      "Kwon, Sung Woo",
+      "Lee, Man-Jong",
+      "Ko, Kyu-Yong",
+      "Park, Jin-Hee",
+      "Yoon, Gwang-Seok",
+      "Choi, Seong-Huan",
+      "Beak, Yong-Soo",
+      "Park, Sang-Don",
+      "Shin, Sung-Hee",
+      "Woo, Seong-Ill",
+      "Kim, Dae-Hyeok",
+      "Kwan, Jun"
+    ],
+    "AU": [
+      "Jang JH",
+      "Kwon SW",
+      "Lee MJ",
+      "Ko KY",
+      "Park JH",
+      "Yoon GS",
+      "Choi SH",
+      "Beak YS",
+      "Park SD",
+      "Shin SH",
+      "Woo SI",
+      "Kim DH",
+      "Kwan J"
+    ],
+    "AD": [
+      "Department of Hospital Medicine, Inha University College of Medicine.",
+      "Department of Cardiology, Inha University Hospital Cardiovascular Center.",
+      "Department of Cardiology, Inha University Hospital Cardiovascular Center.",
+      "Department of Cardiology, Inha University Hospital Cardiovascular Center.",
+      "Division of Critical Care Medicine, Inha University College of Medicine.",
+      "Department of Cardiology, Inha University Hospital Cardiovascular Center.",
+      "Department of Cardiology, Inha University Hospital Cardiovascular Center.",
+      "Department of Cardiology, Inha University Hospital Cardiovascular Center.",
+      "Department of Cardiology, Inha University Hospital Cardiovascular Center.",
+      "Department of Cardiology, Inha University Hospital Cardiovascular Center.",
+      "Department of Cardiology, Inha University Hospital Cardiovascular Center.",
+      "Department of Cardiology, Inha University Hospital Cardiovascular Center.",
+      "Department of Cardiology, Inha University Hospital Cardiovascular Center.",
+      "Department of Cardiology, Inha University Hospital Cardiovascular Center.",
+      "Department of Cardiology, Inha University Hospital Cardiovascular Center."
+    ],
+    "LA": [
+      "eng"
+    ],
+    "PT": [
+      "Case Reports",
+      "Journal Article"
+    ],
+    "DEP": "20200912",
+    "PL": "Japan",
+    "TA": "Int Heart J",
+    "JT": "International heart journal",
+    "JID": "101244240",
+    "RN": [
+      "0 (Adrenergic beta-Antagonists)",
+      "0 (Cardiovascular Agents)",
+      "0 (Sodium Potassium Chloride Symporter Inhibitors)",
+      "3H48L0LPZQ (Ivabradine)"
+    ],
+    "SB": "IM",
+    "MH": [
+      "Adrenergic beta-Antagonists/adverse effects",
+      "Cardiovascular Agents/*adverse effects",
+      "Drug Interactions",
+      "Electric Countershock",
+      "Electrocardiography",
+      "Heart Failure/*drug therapy",
+      "Humans",
+      "Ivabradine/*adverse effects",
+      "Male",
+      "Middle Aged",
+      "Sodium Potassium Chloride Symporter Inhibitors/adverse effects",
+      "Stroke Volume",
+      "Torsades de Pointes/*chemically induced"
+    ],
+    "OTO": [
+      "NOTNLM"
+    ],
+    "OT": [
+      "Polymorphic ventricular tachycardia",
+      "QT prolongation"
+    ],
+    "EDAT": "2020/09/15 06:00",
+    "MHDA": "2020/10/21 06:00",
+    "CRDT": [
+      "2020/09/14 05:47"
+    ],
+    "PHST": [
+      "2020/09/15 06:00 [pubmed]",
+      "2020/10/21 06:00 [medline]",
+      "2020/09/14 05:47 [entrez]"
+    ],
+    "AID": [
+      "10.1536/ihj.20-073 [doi]"
+    ],
+    "PST": "ppublish",
+    "SO": "Int Heart J. 2020 Sep 29;61(5):1044-1048. doi: 10.1536/ihj.20-073. Epub 2020 Sep 12.",
+    "abstract": "Ivabradine is a selective inhibitor of the sinoatrial node \"funny\" current, prolonging the slow diastolic depolarization. As it has the ability to block the heart rate selectively, it is more effective at a faster heart rate. It is recommended for the treatment of heart failure reduced ejection fraction in the presence of beta-blocker therapy for the further reduction of the heart rate. However, previous reports have shown the association of Torsade de pointes (TdP) with concurrent use of ivabradine and drugs resulting in QT prolongation or blockage of the metabolic breakdown of ivabradine. In this article, we report two cases of patients with heart failure reduced ejection fraction who developed TdP after ivabradine use. Our report highlights the need to exercise caution with the administration of ivabradine in the presence of a reduced repolarization reserve, such as QT prolongation or metabolic insufficiency.",
+    "pmid": "32921663",
+    "year": "2020",
+    "title": "Ivabradine-Induced Torsade de Pointes in Patients with Heart Failure Reduced Ejection Fraction.",
+    "source": "pubmed",
+    "full_text": "1. Int Heart J. 2020 Sep 29;61(5):1044-1048. doi: 10.1536/ihj.20-073. Epub 2020\nSep  12.\n\nIvabradine-Induced Torsade de Pointes in Patients with Heart Failure Reduced \nEjection Fraction.\n\nJang JH(1)(2), Kwon SW(2), Lee MJ(2)(3), Ko KY(2), Park JH(2), Yoon GS(2), Choi \nSH(2), Beak YS(2), Park SD(2), Shin SH(2), Woo SI(2), Kim DH(2), Kwan J(2).\n\nAuthor information:\n(1)Department of Hospital Medicine, Inha University College of Medicine.\n(2)Department of Cardiology, Inha University Hospital Cardiovascular Center.\n(3)Division of Critical Care Medicine, Inha University College of Medicine.\n\nIvabradine is a selective inhibitor of the sinoatrial node \"funny\" current, \nprolonging the slow diastolic depolarization. As it has the ability to block the \nheart rate selectively, it is more effective at a faster heart rate. It is \nrecommended for the treatment of heart failure reduced ejection fraction in the \npresence of beta-blocker therapy for the further reduction of the heart rate. \nHowever, previous reports have shown the association of Torsade de pointes (TdP) \nwith concurrent use of ivabradine and drugs resulting in QT prolongation or \nblockage of the metabolic breakdown of ivabradine. In this article, we report \ntwo cases of patients with heart failure reduced ejection fraction who developed \nTdP after ivabradine use. Our report highlights the need to exercise caution \nwith the administration of ivabradine in the presence of a reduced \nrepolarization reserve, such as QT prolongation or metabolic insufficiency.\n\nDOI: 10.1536/ihj.20-073\nPMID: 32921663 [Indexed for MEDLINE]",
+    "full_text_source": "abstract"
+  },
+  "27659287": {
+    "PMID": "27659287",
+    "OWN": "NLM",
+    "STAT": "MEDLINE",
+    "DCOM": "20170407",
+    "LR": "20241107",
+    "IS": "1753-9455 (Electronic) 1753-9447 (Print) 1753-9447 (Linking)",
+    "VI": "10",
+    "IP": "6",
+    "DP": "2016 Dec",
+    "TI": "Emerging role of ivabradine for rate control in atrial fibrillation.",
+    "PG": "348-352",
+    "AB": "Control of ventricular rate is recommended for patients with paroxysmal, persistent, or permanent atrial fibrillation (AF). Existing rate-control options, including beta-blockers, nondihydropyridine calcium channel blockers, and digoxin, are limited by adverse hemodynamic effects and their ability to attain target heart rate (HR). Ivabradine, a novel HR-controlling agent, decreases HR through deceleration of conduction through I(f) ('funny') channels, and is approved for HR reduction in heart failure patients with ejection fraction less than 35% and elevated HR, despite optimal pharmacological treatment. Because I(f) channels were thought to be expressed solely in sinoatrial (SA) nodal tissue, ivabradine was not investigated in heart failure patients with concomitant AF. Subsequent identification of hyperpolarization-activated cyclic nucleotide-gated cation channel 4 (HCN4), the primary gene responsible for I(f) current expression throughout the myocardium, stimulated interest in the potential role of ivabradine for ventricular rate control in AF. Preclinical studies of ivabradine in animal models with induced AF demonstrated a reduction in HR, with no significant worsening of QT interval or mean arterial pressure. Preliminary human data suggest that ivabradine provides HR reduction without associated hemodynamic complications in patients with AF. Questions remain regarding efficacy, safety, optimal dosing, and length of therapy in these patients. Prospective, randomized studies are needed to determine if ivabradine has a role as a rate-control treatment in patients with AF.",
+    "CI": [
+      "(c) The Author(s), 2016."
+    ],
+    "FAU": [
+      "Turley, Sarah L",
+      "Francis, Kerry E",
+      "Lowe, Denise K",
+      "Cahoon, William D Jr"
+    ],
+    "AU": [
+      "Turley SL",
+      "Francis KE",
+      "Lowe DK",
+      "Cahoon WD Jr"
+    ],
+    "AD": [
+      "PGY2 Internal Medicine Pharmacy Resident, Virginia Commonwealth University Health System/Medical College of Virginia Hospitals, Richmond, VA, USA.",
+      "Department of Pharmacy Services, Virginia Commonwealth University Health System/Medical College of Virginia Hospitals, and Virginia Commonwealth University School of Pharmacy, Richmond, VA, USA.",
+      "Department of Pharmacy Services, Virginia Commonwealth University Health System/Medical College of Virginia Hospitals, and Virginia Commonwealth University School of Pharmacy, Richmond, VA, USA.",
+      "Department of Pharmacy Services, Virginia Commonwealth University School of Pharmacy, 401 North 12th Street, P.O. Box 980042, Richmond, VA 23298-0042, USA william.cahoon@vcuhealth.org."
+    ],
+    "LA": [
+      "eng"
+    ],
+    "PT": [
+      "Case Reports",
+      "Journal Article",
+      "Review"
+    ],
+    "DEP": "20160922",
+    "PL": "England",
+    "TA": "Ther Adv Cardiovasc Dis",
+    "JT": "Therapeutic advances in cardiovascular disease",
+    "JID": "101316343",
+    "RN": [
+      "0 (Benzazepines)",
+      "0 (Cyclic Nucleotide-Gated Cation Channels)",
+      "3H48L0LPZQ (Ivabradine)"
+    ],
+    "SB": "IM",
+    "MH": [
+      "Aged",
+      "Atrial Fibrillation/*drug therapy/physiopathology",
+      "Benzazepines/adverse effects/pharmacology/*therapeutic use",
+      "Cyclic Nucleotide-Gated Cation Channels/*antagonists & inhibitors",
+      "Electrocardiography/drug effects",
+      "Female",
+      "Heart Rate/drug effects",
+      "Humans",
+      "Ivabradine",
+      "Male",
+      "Middle Aged"
+    ],
+    "PMC": "PMC5933550",
+    "OTO": [
+      "NOTNLM"
+    ],
+    "OT": [
+      "atrial fibrillation",
+      "funny channel",
+      "heart rate",
+      "ivabradine",
+      "rate control"
+    ],
+    "COIS": [
+      "Conflict of interest statement: The authors declare that there is no conflict of",
+      "interest."
+    ],
+    "EDAT": "2016/09/24 06:00",
+    "MHDA": "2017/04/08 06:00",
+    "PMCR": [
+      "2016/12/01"
+    ],
+    "CRDT": [
+      "2016/09/24 06:00"
+    ],
+    "PHST": [
+      "2016/09/24 06:00 [pubmed]",
+      "2017/04/08 06:00 [medline]",
+      "2016/09/24 06:00 [entrez]",
+      "2016/12/01 00:00 [pmc-release]"
+    ],
+    "AID": [
+      "1753944716669658 [pii]",
+      "10.1177_1753944716669658 [pii]",
+      "10.1177/1753944716669658 [doi]"
+    ],
+    "PST": "ppublish",
+    "SO": "Ther Adv Cardiovasc Dis. 2016 Dec;10(6):348-352. doi: 10.1177/1753944716669658. Epub 2016 Sep 22.",
+    "abstract": "Control of ventricular rate is recommended for patients with paroxysmal, persistent, or permanent atrial fibrillation (AF). Existing rate-control options, including beta-blockers, nondihydropyridine calcium channel blockers, and digoxin, are limited by adverse hemodynamic effects and their ability to attain target heart rate (HR). Ivabradine, a novel HR-controlling agent, decreases HR through deceleration of conduction through I(f) ('funny') channels, and is approved for HR reduction in heart failure patients with ejection fraction less than 35% and elevated HR, despite optimal pharmacological treatment. Because I(f) channels were thought to be expressed solely in sinoatrial (SA) nodal tissue, ivabradine was not investigated in heart failure patients with concomitant AF. Subsequent identification of hyperpolarization-activated cyclic nucleotide-gated cation channel 4 (HCN4), the primary gene responsible for I(f) current expression throughout the myocardium, stimulated interest in the potential role of ivabradine for ventricular rate control in AF. Preclinical studies of ivabradine in animal models with induced AF demonstrated a reduction in HR, with no significant worsening of QT interval or mean arterial pressure. Preliminary human data suggest that ivabradine provides HR reduction without associated hemodynamic complications in patients with AF. Questions remain regarding efficacy, safety, optimal dosing, and length of therapy in these patients. Prospective, randomized studies are needed to determine if ivabradine has a role as a rate-control treatment in patients with AF.",
+    "pmid": "27659287",
+    "year": "2016",
+    "title": "Emerging role of ivabradine for rate control in atrial fibrillation.",
+    "source": "pubmed",
+    "full_text": "1. Ther Adv Cardiovasc Dis. 2016 Dec;10(6):348-352. doi:\n10.1177/1753944716669658.  Epub 2016 Sep 22.\n\nEmerging role of ivabradine for rate control in atrial fibrillation.\n\nTurley SL(1), Francis KE(2), Lowe DK(2), Cahoon WD Jr(3).\n\nAuthor information:\n(1)PGY2 Internal Medicine Pharmacy Resident, Virginia Commonwealth University \nHealth System/Medical College of Virginia Hospitals, Richmond, VA, USA.\n(2)Department of Pharmacy Services, Virginia Commonwealth University Health \nSystem/Medical College of Virginia Hospitals, and Virginia Commonwealth \nUniversity School of Pharmacy, Richmond, VA, USA.\n(3)Department of Pharmacy Services, Virginia Commonwealth University School of \nPharmacy, 401 North 12th Street, P.O. Box 980042, Richmond, VA 23298-0042, USA \nwilliam.cahoon@vcuhealth.org.\n\nControl of ventricular rate is recommended for patients with paroxysmal, \npersistent, or permanent atrial fibrillation (AF). Existing rate-control \noptions, including beta-blockers, nondihydropyridine calcium channel blockers, \nand digoxin, are limited by adverse hemodynamic effects and their ability to \nattain target heart rate (HR). Ivabradine, a novel HR-controlling agent, \ndecreases HR through deceleration of conduction through If ('funny') channels, \nand is approved for HR reduction in heart failure patients with ejection \nfraction less than 35% and elevated HR, despite optimal pharmacological \ntreatment. Because If channels were thought to be expressed solely in sinoatrial \n(SA) nodal tissue, ivabradine was not investigated in heart failure patients \nwith concomitant AF. Subsequent identification of hyperpolarization-activated \ncyclic nucleotide-gated cation channel 4 (HCN4), the primary gene responsible \nfor If current expression throughout the myocardium, stimulated interest in the \npotential role of ivabradine for ventricular rate control in AF. Preclinical \nstudies of ivabradine in animal models with induced AF demonstrated a reduction \nin HR, with no significant worsening of QT interval or mean arterial pressure. \nPreliminary human data suggest that ivabradine provides HR reduction without \nassociated hemodynamic complications in patients with AF. Questions remain \nregarding efficacy, safety, optimal dosing, and length of therapy in these \npatients. Prospective, randomized studies are needed to determine if ivabradine \nhas a role as a rate-control treatment in patients with AF.\n\n\u00a9 The Author(s), 2016.\n\nDOI: 10.1177/1753944716669658\nPMCID: PMC5933550\nPMID: 27659287 [Indexed for MEDLINE]\n\nConflict of interest statement: Conflict of interest statement: The authors \ndeclare that there is no conflict of interest.",
+    "full_text_source": "abstract"
+  },
+  "25438492": {
+    "PMID": "25438492",
+    "OWN": "NLM",
+    "STAT": "MEDLINE",
+    "DCOM": "20150129",
+    "LR": "20181202",
+    "IS": "0004-5772 (Print) 0004-5772 (Linking)",
+    "VI": "62",
+    "IP": "5",
+    "DP": "2014 May",
+    "TI": "Slow junctional rhythm, QTc prolongation and transient torsades de-pointes following combined use of Ivabradine, Diltiazem and Ranolazine.",
+    "PG": "426-7",
+    "AB": "A case of unstable angina developed slow junctional rhythm with QTc prolongation and transient Torsades de pointes following simultaneous use of Ivabradine, Diltiazem and Ranolazine. Effect of Diltiazem on hepatic isoenzyme CYP 3A could be responsible. Such a combination should be avoided.",
+    "FAU": [
+      "Mittal, S R"
+    ],
+    "AU": [
+      "Mittal SR"
+    ],
+    "LA": [
+      "eng"
+    ],
+    "PT": [
+      "Case Reports",
+      "Journal Article"
+    ],
+    "PL": "India",
+    "TA": "J Assoc Physicians India",
+    "JT": "The Journal of the Association of Physicians of India",
+    "JID": "7505585",
+    "RN": [
+      "0 (Acetanilides)",
+      "0 (Benzazepines)",
+      "0 (Piperazines)",
+      "3H48L0LPZQ (Ivabradine)",
+      "A6IEZ5M406 (Ranolazine)",
+      "EE92BBP03H (Diltiazem)"
+    ],
+    "SB": "IM",
+    "MH": [
+      "Acetanilides/*adverse effects/therapeutic use",
+      "Aged, 80 and over",
+      "Angina, Unstable/*drug therapy",
+      "Benzazepines/*adverse effects/therapeutic use",
+      "Bradycardia/*chemically induced/diagnosis",
+      "Diltiazem/*adverse effects/therapeutic use",
+      "Drug Interactions",
+      "Drug Substitution",
+      "Drug Therapy, Combination",
+      "Electrocardiography/*drug effects",
+      "Female",
+      "Humans",
+      "Ivabradine",
+      "Long QT Syndrome/*chemically induced/diagnosis",
+      "Piperazines/*adverse effects/therapeutic use",
+      "Ranolazine",
+      "Torsades de Pointes/*chemically induced/*diagnosis"
+    ],
+    "EDAT": "2014/12/03 06:00",
+    "MHDA": "2015/01/30 06:00",
+    "CRDT": [
+      "2014/12/03 06:00"
+    ],
+    "PHST": [
+      "2014/12/03 06:00 [entrez]",
+      "2014/12/03 06:00 [pubmed]",
+      "2015/01/30 06:00 [medline]"
+    ],
+    "PST": "ppublish",
+    "SO": "J Assoc Physicians India. 2014 May;62(5):426-7.",
+    "abstract": "A case of unstable angina developed slow junctional rhythm with QTc prolongation and transient Torsades de pointes following simultaneous use of Ivabradine, Diltiazem and Ranolazine. Effect of Diltiazem on hepatic isoenzyme CYP 3A could be responsible. Such a combination should be avoided.",
+    "pmid": "25438492",
+    "year": "2014",
+    "title": "Slow junctional rhythm, QTc prolongation and transient torsades de-pointes following combined use of Ivabradine, Diltiazem and Ranolazine.",
+    "source": "pubmed",
+    "full_text": "1. J Assoc Physicians India. 2014 May;62(5):426-7.\n\nSlow junctional rhythm, QTc prolongation and transient torsades de-pointes \nfollowing combined use of Ivabradine, Diltiazem and Ranolazine.\n\nMittal SR.\n\nA case of unstable angina developed slow junctional rhythm with QTc prolongation \nand transient Torsades de pointes following simultaneous use of Ivabradine, \nDiltiazem and Ranolazine. Effect of Diltiazem on hepatic isoenzyme CYP 3A could \nbe responsible. Such a combination should be avoided.\n\nPMID: 25438492 [Indexed for MEDLINE]",
+    "full_text_source": "abstract"
+  },
+  "25158669": {
+    "PMID": "25158669",
+    "OWN": "NLM",
+    "STAT": "MEDLINE",
+    "DCOM": "20151112",
+    "LR": "20181202",
+    "IS": "1559-0259 (Electronic) 1530-7905 (Linking)",
+    "VI": "15",
+    "IP": "1",
+    "DP": "2015 Jan",
+    "TI": "Torsades de pointes induced by the concomitant use of ivabradine and azithromycin: an unexpected dangerous interaction.",
+    "PG": "104-6",
+    "LID": "10.1007/s12012-014-9274-y [doi]",
+    "AB": "A 68-year-old man had a cardiac syncope. He was known to have a long QT-interval and was treated with ivabradine for paroxysmal sinusal tachycardia. In the last 5 days, azithromycin had been prescribed for sinusitis. An electrocardiogram showed torsades de pointes (TdP). Azithromycin is known to prolong the QT-interval. Ivabradine does not affect the QT-interval but has a conditional risk of TdP when taken with other drugs that block its metabolic breakdown. This case presents the specific problem of a patient with long QT who received two medications, which may interact and prolong the QT.",
+    "FAU": [
+      "Cocco, Giuseppe",
+      "Jerie, Paul"
+    ],
+    "AU": [
+      "Cocco G",
+      "Jerie P"
+    ],
+    "AD": [
+      "Cardiology Office, Postfach 119, Marktgasse 10A, 4310, Rheinfelden, Switzerland, praxis@cocco.ch."
+    ],
+    "LA": [
+      "eng"
+    ],
+    "PT": [
+      "Case Reports",
+      "Journal Article"
+    ],
+    "PL": "United States",
+    "TA": "Cardiovasc Toxicol",
+    "JT": "Cardiovascular toxicology",
+    "JID": "101135818",
+    "RN": [
+      "0 (Anti-Bacterial Agents)",
+      "0 (Benzazepines)",
+      "0 (Cardiovascular Agents)",
+      "3H48L0LPZQ (Ivabradine)",
+      "83905-01-5 (Azithromycin)"
+    ],
+    "SB": "IM",
+    "MH": [
+      "Aged",
+      "Anti-Bacterial Agents/*adverse effects",
+      "Azithromycin/*adverse effects",
+      "Benzazepines/*adverse effects",
+      "Cardiovascular Agents/*adverse effects",
+      "Drug Interactions",
+      "Electrocardiography",
+      "Humans",
+      "Ivabradine",
+      "Male",
+      "Torsades de Pointes/*chemically induced"
+    ],
+    "EDAT": "2014/08/28 06:00",
+    "MHDA": "2015/11/13 06:00",
+    "CRDT": [
+      "2014/08/28 06:00"
+    ],
+    "PHST": [
+      "2014/08/28 06:00 [entrez]",
+      "2014/08/28 06:00 [pubmed]",
+      "2015/11/13 06:00 [medline]"
+    ],
+    "AID": [
+      "10.1007/s12012-014-9274-y [doi]"
+    ],
+    "PST": "ppublish",
+    "SO": "Cardiovasc Toxicol. 2015 Jan;15(1):104-6. doi: 10.1007/s12012-014-9274-y.",
+    "abstract": "A 68-year-old man had a cardiac syncope. He was known to have a long QT-interval and was treated with ivabradine for paroxysmal sinusal tachycardia. In the last 5 days, azithromycin had been prescribed for sinusitis. An electrocardiogram showed torsades de pointes (TdP). Azithromycin is known to prolong the QT-interval. Ivabradine does not affect the QT-interval but has a conditional risk of TdP when taken with other drugs that block its metabolic breakdown. This case presents the specific problem of a patient with long QT who received two medications, which may interact and prolong the QT.",
+    "pmid": "25158669",
+    "year": "2015",
+    "title": "Torsades de pointes induced by the concomitant use of ivabradine and azithromycin: an unexpected dangerous interaction.",
+    "source": "pubmed",
+    "full_text": "1. Cardiovasc Toxicol. 2015 Jan;15(1):104-6. doi: 10.1007/s12012-014-9274-y.\n\nTorsades de pointes induced by the concomitant use of ivabradine and \nazithromycin: an unexpected dangerous interaction.\n\nCocco G(1), Jerie P.\n\nAuthor information:\n(1)Cardiology Office, Postfach 119, Marktgasse 10A, 4310, Rheinfelden, \nSwitzerland, praxis@cocco.ch.\n\nA 68-year-old man had a cardiac syncope. He was known to have a long QT-interval \nand was treated with ivabradine for paroxysmal sinusal tachycardia. In the last \n5\u00a0days, azithromycin had been prescribed for sinusitis. An electrocardiogram \nshowed torsades de pointes (TdP). Azithromycin is known to prolong the \nQT-interval. Ivabradine does not affect the QT-interval but has a conditional \nrisk of TdP when taken with other drugs that block its metabolic breakdown. This \ncase presents the specific problem of a patient with long QT who received two \nmedications, which may interact and prolong the QT.\n\nDOI: 10.1007/s12012-014-9274-y\nPMID: 25158669 [Indexed for MEDLINE]",
+    "full_text_source": "abstract"
+  },
+  "33762277": {
+    "PMID": "33762277",
+    "OWN": "NLM",
+    "STAT": "MEDLINE",
+    "DCOM": "20210405",
+    "LR": "20221207",
+    "IS": "1757-790X (Electronic) 1757-790X (Linking)",
+    "VI": "14",
+    "IP": "3",
+    "DP": "2021 Mar 24",
+    "TI": "Torsades de pointes in SARS-CoV-2 (COVID-19) pneumonia: medicine reconciliation and careful monitoring of QTc interval may help prevent cardiac complications.",
+    "LID": "10.1136/bcr-2020-239963 [doi] e239963",
+    "AB": "Hydroxychloroquine has been widely prescribed to treat patients with COVID-19 pneumonia. A 73-year-0ld woman with COVID-19 pneumonia was treated with dexamethasone and hydroxychloroquine. Her home medications, citalopram and donepezil, were continued. The ECG prior to starting hydroxychloroquine showed normal sinus rhythm with prolonged corrected QT (QTc) of 497 ms, due to citalopram and donepezil therapy. Repeat ECG on days 3 and 4 of hydroxychloroquine therapy showed significantly prolonged QTc of 557 ms and 538 ms, respectively, despite normal serum electrolytes. All QT-prolonging medications including hydroxychloroquine were discontinued on day 4; however, she suffered a transient torsades de pointes lasting for about 15 s, which resolved before any intervention. QTc improved to 477 ms, after discontinuation of QT-prolonging medications. The patient had QTc prolongation and torsades de pointes due to therapy with multiple QT-prolonging medications. Medicine reconciliation and careful monitoring of QTc may help prevent cardiac complications in patients with COVID-19 treated with hydroxychloroquine.",
+    "CI": [
+      "(c) BMJ Publishing Group Limited 2021. No commercial re-use. See rights and",
+      "permissions. Published by BMJ."
+    ],
+    "FAU": [
+      "Aslam, Waqas",
+      "Lamb, Carla R",
+      "Ali, Nadia"
+    ],
+    "AU": [
+      "Aslam W",
+      "Lamb CR",
+      "Ali N"
+    ],
+    "AUID": [
+      "ORCID: 0000-0003-0096-5841"
+    ],
+    "AD": [
+      "Pulmonary and Critical Care Medicine, Interventional Pulmonology, University of California San Francisco, Fresno, California, USA drwaqasaslam@yahoo.com.",
+      "Pulmonary and Critical Care Medicine, Interventional Pulmonology, Lahey Hospital and Medical Center, Burlington, Massachusetts, USA.",
+      "Internal Medicine & Geriatrics, Hebrew Senior Life, Harvard Medical School Affiliate, Roslindale, Massachusetts, USA."
+    ],
+    "LA": [
+      "eng"
+    ],
+    "PT": [
+      "Case Reports",
+      "Journal Article"
+    ],
+    "DEP": "20210324",
+    "PL": "England",
+    "TA": "BMJ Case Rep",
+    "JT": "BMJ case reports",
+    "JID": "101526291",
+    "RN": [
+      "0 (Anti-Infective Agents)",
+      "0DHU5B8D6V (Citalopram)",
+      "4QWG6N8QKH (Hydroxychloroquine)",
+      "7S5I7G3JQL (Dexamethasone)",
+      "8SSC91326P (Donepezil)"
+    ],
+    "SB": "IM",
+    "MH": [
+      "Aged",
+      "Anti-Infective Agents/adverse effects/therapeutic use",
+      "Citalopram/adverse effects/therapeutic use",
+      "Dexamethasone/*adverse effects/therapeutic use",
+      "Donepezil/adverse effects/therapeutic use",
+      "Drug Therapy, Combination",
+      "Electrocardiography/methods",
+      "Female",
+      "Heart Diseases/chemically induced/prevention & control",
+      "Humans",
+      "Hydroxychloroquine/*adverse effects/therapeutic use",
+      "Long QT Syndrome/chemically induced",
+      "SARS-CoV-2",
+      "Torsades de Pointes/*chemically induced",
+      "*COVID-19 Drug Treatment"
+    ],
+    "PMC": "PMC7993211",
+    "OTO": [
+      "NOTNLM"
+    ],
+    "OT": [
+      "arrhythmias",
+      "pneumonia (infectious disease)",
+      "unwanted effects / adverse reactions"
+    ],
+    "COIS": [
+      "Competing interests: None declared."
+    ],
+    "EDAT": "2021/03/26 06:00",
+    "MHDA": "2021/04/07 06:00",
+    "PMCR": [
+      "2021/03/24"
+    ],
+    "CRDT": [
+      "2021/03/25 05:50"
+    ],
+    "PHST": [
+      "2021/03/25 05:50 [entrez]",
+      "2021/03/26 06:00 [pubmed]",
+      "2021/04/07 06:00 [medline]",
+      "2021/03/24 00:00 [pmc-release]"
+    ],
+    "AID": [
+      "14/3/e239963 [pii]",
+      "bcr-2020-239963 [pii]",
+      "10.1136/bcr-2020-239963 [doi]"
+    ],
+    "PST": "epublish",
+    "SO": "BMJ Case Rep. 2021 Mar 24;14(3):e239963. doi: 10.1136/bcr-2020-239963.",
+    "abstract": "Hydroxychloroquine has been widely prescribed to treat patients with COVID-19 pneumonia. A 73-year-0ld woman with COVID-19 pneumonia was treated with dexamethasone and hydroxychloroquine. Her home medications, citalopram and donepezil, were continued. The ECG prior to starting hydroxychloroquine showed normal sinus rhythm with prolonged corrected QT (QTc) of 497 ms, due to citalopram and donepezil therapy. Repeat ECG on days 3 and 4 of hydroxychloroquine therapy showed significantly prolonged QTc of 557 ms and 538 ms, respectively, despite normal serum electrolytes. All QT-prolonging medications including hydroxychloroquine were discontinued on day 4; however, she suffered a transient torsades de pointes lasting for about 15 s, which resolved before any intervention. QTc improved to 477 ms, after discontinuation of QT-prolonging medications. The patient had QTc prolongation and torsades de pointes due to therapy with multiple QT-prolonging medications. Medicine reconciliation and careful monitoring of QTc may help prevent cardiac complications in patients with COVID-19 treated with hydroxychloroquine.",
+    "doi": "10.1136/bcr-2020-239963",
+    "pmid": "33762277",
+    "year": "2021",
+    "title": "Torsades de pointes in SARS-CoV-2 (COVID-19) pneumonia: medicine reconciliation and careful monitoring of QTc interval may help prevent cardiac complications.",
+    "source": "pubmed",
+    "full_text": "Case report\nTorsades de pointes in SARS- CoV-2 (COVID-19)\npneumonia: medicine reconciliation and careful\nmonitoring of QTc interval may help prevent\ncardiac complications\nWaqas Aslam ,1 Carla R Lamb,2 Nadia Ali3\n1Pulmonary and Critical Care SUMMARY and rhinorrhoea for 2 days. The patient was noted\nMedicine, Interventional Hydroxychloroquine has been widely prescribed to treat to be restless with intermittent agitation in the ER.\nPulmonology, University of patients with COVID-19 pneumonia. A 73- year- 0ld On initial evaluation in the ER, she was febrile with\nCalifornia San Francisco, Fresno, woman with COVID-19 pneumonia was treated with temperature 100.2\u00b0F and hypotensive with a blood\nCalifornia, USA\ndexamethasone and hydroxychloroquine. Her home pressure of 89/53 mm Hg. Oxygen saturation was\n2Pulmonary and Critical Care\nmedications, citalopram and donepezil, were continued. 90% on room air. She responded appropriately to\nMedicine, Interventional\nThe ECG prior to starting hydroxychloroquine showed fluid resuscitation with an improved blood pressure\nPulmonology, Lahey Hospital\nand Medical Center, Burlington, normal sinus rhythm with prolonged corrected QT (QTc) of 143/65 mm Hg after administration of 2 L 0.9%\nMassachusetts, USA of 497 ms, due to citalopram and donepezil therapy. normal saline. Otherwise, the physical examination\n3Internal Medicine & Geriatrics, Repeat ECG on days 3 and 4 of hydroxychloroquine was unremarkable.\nHebrew Senior Life, Harvard therapy showed significantly prolonged QTc of\nMedical School Affiliate, 557 ms and 538 ms, respectively, despite normal\nRoslindale, Massachusetts, USA serum electrolytes. All QT- prolonging medications INVESTIGATIONS\nPertinent laboratory work-u p revealed leucopenia\nincluding hydroxychloroquine were discontinued on\nCorrespondence to (white cell count 2.94\u00d7109/L), lymphopenia (abso-\nday 4; however, she suffered a transient torsades de\nDr Waqas Aslam; lute lymphocyte count 0.71\u00d7109/L), mild throm-\npointes lasting for about 15 s, which resolved before\nd rwaqasaslam@ yahoo.c om bocytopenia (platelet count 108\u00d7109/L), elevated\nany intervention. QTc improved to 477 ms, after\nlactate (2.5 mmol/L), elevated blood glucose (185\ndiscontinuation of QT-p rolonging medications. The\nAccepted 16 February 2021\nmg/dL), elevated C reactive protein (19.5 mg/L),\npatient had QTc prolongation and torsades de pointes\nnormal troponin I, normal renal and liver tests,\ndue to therapy with multiple QT- prolonging medications.\nand a negative influenza A and B test. Chest radio- Medicine reconciliation and careful monitoring of QTc\ngraph showed few bilateral pulmonary infiltrates,\nmay help prevent cardiac complications in patients with\nsuspicious for COVID-19. Nasopharyngeal swab\nCOVID-19 treated with hydroxychloroquine.\nfor COVID-19 was obtained and she was admitted\nto the hospital with sepsis and acute hypoxic respi-\nratory failure requiring oxygen supplementation at\nBACKGROUND 2\u20133 L/min via nasal cannula. The patient\u2019s home\nHydroxychloroquine is a safe and well-t olerated medications, including citalopram 20 mg daily,\nmedication, used in the management of malaria donepezil 10 mg daily and gabapentin 300 mg three\nand connective tissue disorders including rheu- times per day, were continued. The ECG prior to\nmatoid arthritis and systemic lupus erythema- starting hydroxychloroquine showed normal sinus\ntosus for decades.1 Hydroxychloroquine has been rhythm with a prolonged QTc of 497 ms (figure 1),\nwidely prescribed in the past few months to treat due to citalopram and donepezil therapy. Coro-\npatients with COVID-19 disease due to its anti- navirus SARS- CoV-2 (COVID-19) test came back\ninflammatory and antiviral properties, especially positive and she was started on dexamethasone and\nafter Gautret et al2 showed significant reduction in hydroxychloroquine monotherapy for 5 days (800\nSARS- CoV-2 viral load with hydroxychloroquine mg for 1 day followed by 400 mg for 4 days). Azith-\ntherapy. The antiviral effect of hydroxychloroquine romycin was not started due to prolonged QTc. Her\nwas proposed to be further reinforced by adding medical condition continued to decline with wors-\nazithromycin to the regimen.2 We report an inter- ening hypoxia requiring medical intensive care unit\nesting case of corrected QT (QTc) prolongation and admission. She initially required oxygen supple-\ntorsades de pointes in a patient with SARS- CoV-2 mentation via non- rebreather and high- flow nasal\n(COVID-19) pneumonia, provoked by therapy oxygen, followed by endotracheal intubation and\n\u00a9 BMJ Publishing Group with multiple QTc-p rolonging medications. mechanical ventilation. She required fentanyl and\nLimited 2021. No commercial\nre- use. See rights and propofol infusions for sedation. Echocardiogram\npermissions. Published by BMJ. CASE PRESENTATION revealed normal left and right ventricular function.\nA 73- year-o ld woman with a medical history Repeat ECG on days 3 and 4 of hydroxychloroquine\nTo cite: Aslam W,\nof diabetes mellitus type II, hyperlipidaemia, therapy showed significantly prolonged QTc of 557\nLamb CR, Ali N. BMJ Case\nRep 2021;14:e239963. dementia, depression and gastro- oesophageal ms and 538 ms (figure 2), respectively. Electrolytes\ndoi:10.1136/bcr-2020- reflux disease was sent to the emergency room (ER) including potassium, magnesium and calcium were\n239963 from an assisted living facility with fever 101.7\u00b0F normal. All QTc-p rolonging medications including\nAslam W, et al. BMJ Case Rep 2021;14:e239963. doi:10.1136/bcr-2020-239963 1\ncopyright.\nBMJ\nCase\nRep:\nfirst\npublished\nas\n10.1136/bcr-2020-239963\non\n24\nMarch\n2021.\nDownloaded\nfrom\nhttp://casereports.bmj.com/\non\nAugust\n11,\n2021\nat\nIndia:BMJ-PG\nSponsored.\nProtected\nby\nCase report\nFigure 1 ECG with prolonged QTc of 497 ms. BPM, beats per minute; Figure 3 ECG with QTc of 477 ms after discontinuation of QT-\nQTc, corrected QT. prolonging medications. BPM, beats per minute; QTc, corrected QT.\nhydroxychloroquine were discontinued on day 4, however the\nwas transitioned to comfort care on day 18 of the intensive care\npatient suffered a transient torsades de pointes lasting for about\nunit stay after a failed extubation.\n15 s, which resolved spontaneously before any intervention.\nShe had QTc prolongation and torsades de pointes, provoked\nDISCUSSION\nby multiple QT-p rolonging medications including citalopram,\nHydroxychloroquine can cause acute and chronic toxicity.\ndonepezil, propofol and hydroxychloroquine. QTc improved to\nPotential adverse effects of hydroxychloroquine include gastro-\n477 ms (figure 3) after discontinuation of hydroxychloroquine\nintestinal disturbance, skin photosensitivity, retinopathy, cardiac\nand other QT- prolonging medications. Remdesevir was not\ntoxicity, hypoglycaemia, neuropsychiatric effects including\navailable at that time for treatment of COVID-19 pneumonia.\nagitation, confusion and psychosis, and haemolysis, especially in\npatients with glucose-6- phosphate dehydrogenase deficiency.3 4\nTREATMENT\nCardiac complications from hydroxychloroquine are rare but\nQTc improved to 477 ms after discontinuation of hydroxychlo-\ncan be severe and life-t hreatening. Hydroxychloroquine- related\nroquine and other QT-p rolonging medications. QTc was moni-\ncardiac adverse effects are conduction abnormalities, ventricular tored closely with daily ECG. Serum electrolytes were closely\nhypertrophy, restrictive cardiomyopathy, heart failure, pulmo-\nmonitored and repleted as appropriate.\nnary arterial hypertension and valvular dysfunction.5 6 Various\ncardiac conduction abnormalities include first-d egree atrioven-\nOUTCOME AND FOLLOW-UP\ntricular block, second- degree atrioventricular block, complete\nThe patient\u2019s intensive care unit course was complicated by\nheart block, prolonged QTc, torsades de pointes and other\nprolonged respiratory failure, methicillin-r esistant Staphylo- ventricular arrhythmias.5 6 Risk factors for hydroxychloroquine-\ncoccus aureus pneumonia, metabolic encephalopathy, right\nassociated cardiac arrhythmia are inherited long QT syndrome,\nlower extremity deep venous thrombus and upper gastroin-\nischaemic heart disease, cardiomyopathy, congestive heart\ntestinal bleed. She did not have any recurrence of torsades de\nfailure, history of ventricular arrhythmia, unexplained syncope,\npointes or any other ventricular arrhythmia. Unfortunately, she\nfamily history of premature sudden cardiac death, polypharmacy\nwith QTc-p rolonging medications, electrolyte abnormalities\n(hypokalaemia, hypomagnesaemia, hypocalcaemia), hepatic and\nrenal failure.7\u20139\nHospitalised patients and those with risk factors for\nhydroxychloroquine- associated cardiac arrhythmia should be\nrecommended an ECG before considering hydroxychloroquine\ntherapy, unless they had one within the last 3 months.8 Patients\nwith normal QTc and no risk factors for cardiac toxicity can be\ntreated without delay.8 9 Patients with slightly prolonged QTc\n\u2265470 ms (men) or \u2265480 ms (women) but QTc <500 ms should\nbe treated with caution; with a repeat ECG in 48 and 96 hours to\nre- evaluate QTc.8 9 Patients with prolonged QTc \u2265500 ms should\nbe reassessed after correction of electrolytes and discontinuation\nof other QT-p rolonging medications.8 9 If QTc persists \u2265500 ms,\nevaluation of benefits and risks of therapy and expert consulta-\ntion may be considered.8 9 Patients on multiple QTc-p rolonging\nmedications should have a repeat ECG in 48 hours; if QTc\nincreases by \u226560 ms or becomes \u2265500 ms, re- evaluate bene-\nFigure 2 ECG with prolonged QTc of 538 ms. BPM, beats per minute; fits and risks of therapy.8 9 Citalopram, donepezil and propofol\nQTc, corrected QT. have all been associated with QTc prolongation and ventricular\n2 Aslam W, et al. BMJ Case Rep 2021;14:e239963. doi:10.1136/bcr-2020-239963\ncopyright.\nBMJ\nCase\nRep:\nfirst\npublished\nas\n10.1136/bcr-2020-239963\non\n24\nMarch\n2021.\nDownloaded\nfrom\nhttp://casereports.bmj.com/\non\nAugust\n11,\n2021\nat\nIndia:BMJ-PG\nSponsored.\nProtected\nby\nCase report\narrhythmia.10\u201313 Our patient received multiple QTc-p rolonging determined by BMJ. You may use, download and print the article for any lawful,\nmedications including citalopram, donepezil and propofol along non- commercial purpose (including text and data mining) provided that all copyright\nnotices and trade marks are retained.\nwith hydroxychloroquine, which caused significant QTc prolon-\ngation and provoked torsades de pointes. Medicine recon- ORCID iD\nciliation and careful monitoring of QTc can prevent cardiac Waqas Aslam http://o rcid. org/0 000- 0003-0 096- 5841\ncomplications in patients with COVID-19 treated with hydroxy-\nchloroquine. The role of hydroxychloroquine in COVID-19 has\nREFERENCES\nbeen evaluated in various clinical trials and recent studies do not\n1 Costedoat-C halumeau N, Hulot J-S , Amoura Z, et al. Heart conduction disorders\nsupport any clinical benefit of hydroxychloroquine therapy in\nrelated to antimalarials toxicity: an analysis of electrocardiograms in 85 patients\nCOVID-19.14\u201317\ntreated with hydroxychloroquine for connective tissue diseases. Rheumatology\n2007;46:808\u201310.\nLearning points 2 Gautret P, Lagier J- C, Parola P, et al. Hydroxychloroquine and azithromycin as a\ntreatment of COVID-19: results of an open-l abel non- randomized clinical trial. Int J\nAntimicrob Agents 2020;56:105949.\n\u25ba Citalopram, donepezil and propofol can cause QT 3 Juurlink DN. Safety considerations with chloroquine, hydroxychloroquine\nprolongation and ventricular arrhythmia. and azithromycin in the management of SARS- CoV-2 infection. CMAJ\n\u25ba Hydroxychloroquine- associated adverse effects include 2020;192:E450\u20133.\ngastrointestinal disturbance, skin photosensitivity, 4 Sinha N, Balayla G. Hydroxychloroquine and COVID-19. Postgrad Med J\n2020;96:550\u20135.\nretinopathy, cardiac toxicity, hypoglycaemia and\n5 Chatre C, Roubille F, Vernhet H, et al. Cardiac complications attributed to\nneuropsychiatric adverse effects.\nchloroquine and hydroxychloroquine: a systematic review of the literature. Drug Saf\n\u25ba Hydroxychloroquine can cause cardiac conduction 2018;41:919\u201331.\nabnormalities including first- degree and second- degree 6 Chen C- Y, Wang F-L , Lin C- C. Chronic hydroxychloroquine use associated with QT\natrioventricular block, complete heart block, prolonged prolongation and refractory ventricular arrhythmia. Clin Toxicol 2006;44:173\u20135.\n7 Kapoor A, Pandurangi U, Arora V, et al. Cardiovascular risks of hydroxychloroquine corrected QT (QTc), torsades de pointes and other ventricular\nin treatment and prophylaxis of COVID-19 patients: a scientific statement from the\narrhythmias. Indian heart rhythm Society. Indian Pacing Electrophysiol J 2020;20:117\u201320.\n\u25ba Cardiac comorbidities, polypharmacy with QT- prolonging 8 Sapp JL, Alqarawi W, MacIntyre CJ, et al. Guidance on minimizing risk of drug- induced\nmedications, electrolyte abnormalities, hepatic and renal ventricular arrhythmia during treatment of COVID-19: a statement from the Canadian\nheart rhythm Society. Can J Cardiol 2020;36:948\u201351.\nfailure increase the risk of hydroxychloroquine- associated\n9 Giudicessi JR, Noseworthy PA, Friedman PA, et al. Urgent guidance for navigating\ncardiac complications.\nand circumventing the QTc- Prolonging and torsadogenic potential of possible\n\u25ba Medicine reconciliation and careful monitoring of QTc can pharmacotherapies for coronavirus disease 19 (COVID-19). Mayo Clin Proc\nprevent cardiac complications in patients with COVID-19 2020;95:1213\u201321.\ntreated with hydroxychloroquine. 10 Beach SR, Celano CM, Noseworthy PA, et al. QTc prolongation, torsades de pointes,\nand psychotropic medications. Psychosomatics 2013;54:1\u201313.\n\u25ba Recent studies do not support any clinical benefit of 11 Alu\u0161\u00edk \u0160tefan, Paluch Z. [Citalopram and QT prolongation]. Vnitr Lek 2018;63:952\u20136.\nhydroxychloroquine therapy in COVID-19. 12 Takaya T, Okamoto M, Yodoi K, et al. Torsades de pointes with QT prolongation\nrelated to donepezil use. J Cardiol 2009;54:507\u201311.\n13 Abrich VA, Ramakrishna H, Mehta A, et al. The possible role of propofol in drug-\nContributors WA was involved in direct patient care with full access to the patient induced torsades de pointes: a real-w orld single-c enter analysis. Int J Cardiol\ndata and drafted the initial manuscript. CRL and NA reviewed the manuscript, 2017;232:243\u20136.\nprovided feedback and helped in the final editing of the manuscript. 14 Self WH, Semler MW, Leither LM, et al. Effect of hydroxychloroquine on clinical status\nFunding The authors have not declared a specific grant for this research from any at 14 days in hospitalized patients with COVID-19. JAMA 2020;324:2165.\nfunding agency in the public, commercial or not- for- profit sectors. 15 RECOVERY Collaborative Group, Horby P, Mafham M, et al. Effect of\nhydroxychloroquine in hospitalized patients with Covid-19. N Engl J Med\nCompeting interests None declared. 2020;383:2030\u201340.\nPatient consent for publication Next of kin consent obtained. 16 Cavalcanti AB, Zampieri FG, Rosa RG. Hydroxychloroquine with or without\nazithromycin in mild-t o- moderate COVID-19. N Engl J Med 2020;383:2041\u201352.\nProvenance and peer review Not commissioned; externally peer reviewed.\n17 Boulware DR, Pullen MF, Bangdiwala AS, et al. A randomized trial of\nThis article is made freely available for use in accordance with BMJ\u2019s website hydroxychloroquine as postexposure prophylaxis for Covid-19. N Engl J Med\nterms and conditions for the duration of the covid-19 pandemic or until otherwise 2020;383:517\u201325.\nCopyright 2021 BMJ Publishing Group. All rights reserved. For permission to reuse any of this content visit\nhttps://www.bmj.com/company/products-services/rights-and-licensing/permissions/\nBMJ Case Report Fellows may re-use this article for personal use and teaching without any further permission.\nBecome a Fellow of BMJ Case Reports today and you can:\n\u25ba Submit as many cases as you like\n\u25ba Enjoy fast sympathetic peer review and rapid publication of accepted articles\n\u25ba Access all the published articles\n\u25ba Re-use any of the published material for personal use and teaching without further permission\nCustomer Service\nIf you have any further queries about your subscription, please contact our customer services team on +44 (0) 207111 1105 or via email at support@bmj.com.\nVisit casereports.bmj.com for more articles like this and to become a Fellow\nAslam W, et al. BMJ Case Rep 2021;14:e239963. doi:10.1136/bcr-2020-239963 3\ncopyright.\nBMJ\nCase\nRep:\nfirst\npublished\nas\n10.1136/bcr-2020-239963\non\n24\nMarch\n2021.\nDownloaded\nfrom\nhttp://casereports.bmj.com/\non\nAugust\n11,\n2021\nat\nIndia:BMJ-PG\nSponsored.\nProtected\nby",
+    "full_text_source": "sci-hub",
+    "full_text_available": true
+  },
+  "28668178": {
+    "PMID": "28668178",
+    "OWN": "NLM",
+    "STAT": "MEDLINE",
+    "DCOM": "20170907",
+    "LR": "20220408",
+    "IS": "1532-8171 (Electronic) 0735-6757 (Linking)",
+    "VI": "35",
+    "IP": "9",
+    "DP": "2017 Sep",
+    "TI": "Cholinergic symptoms and QTc prolongation following donepezil overdose.",
+    "PG": "1386.e1-1386.e3",
+    "LID": "S0735-6757(17)30495-3 [pii] 10.1016/j.ajem.2017.06.044 [doi]",
+    "AB": "Donepezil is the most commonly prescribed acetylcholinesterase inhibitor for the treatment of Alzheimer's disease, an ailment that affects millions of older adult patients. By inhibiting the breakdown of acetylcholine in the central nervous system, donepezil has been shown to slow cognitive decline and improve patients' functional status. While donepezil is well-tolerated and generally considered safe at therapeutic doses, taking more than the prescribed dose could result in adverse cholinergic effects that range from mild gastrointestinal distress to serious cardiac dysrhythmias. We present a case of an 84-year-old man who developed gastrointestinal and cardiac disturbances after ingesting seven-times his daily dose of donepezil. As no specific antidote is available for donepezil overdose, this case highlights the importance of supportive care with particular attention to the management of cardiac dysrhythmias in patients displaying signs of toxicity.",
+    "CI": [
+      "Copyright (c) 2017 Elsevier Inc. All rights reserved."
+    ],
+    "FAU": [
+      "Pourmand, A",
+      "Shay, C",
+      "Redha, W",
+      "Aalam, A",
+      "Mazer-Amirshahi, M"
+    ],
+    "AU": [
+      "Pourmand A",
+      "Shay C",
+      "Redha W",
+      "Aalam A",
+      "Mazer-Amirshahi M"
+    ],
+    "AD": [
+      "Department of Emergency Medicine, The George Washington University School of Medicine and Health Sciences, Washington, DC, United States. Electronic address: pourmand@email.gwu.edu.",
+      "Department of Emergency Medicine, The George Washington University School of Medicine and Health Sciences, Washington, DC, United States.",
+      "Department of Emergency Medicine, The George Washington University School of Medicine and Health Sciences, Washington, DC, United States; Department of Emergency, Faculty of Medicine, King Abdul Aziz University, Jeddah, Saudi Arabia; Department of Emergency Medicine, The George Washington University School of Medicine and Health Sciences, Washington, DC, United States.",
+      "Department of Emergency Medicine, The George Washington University School of Medicine and Health Sciences, Washington, DC, United States; Department of Emergency, Faculty of Medicine, King Abdul Aziz University, Jeddah, Saudi Arabia; Department of Emergency Medicine, The George Washington University School of Medicine and Health Sciences, Washington, DC, United States.",
+      "Department of Emergency Medicine, MedStar Washington Hospital Center, Washington, DC, United States; Georgetown University School of Medicine, Washington, DC, United States. Electronic address: pourmand@gwu.edu."
+    ],
+    "LA": [
+      "eng"
+    ],
+    "PT": [
+      "Case Reports",
+      "Journal Article"
+    ],
+    "DEP": "20170622",
+    "PL": "United States",
+    "TA": "Am J Emerg Med",
+    "JT": "The American journal of emergency medicine",
+    "JID": "8309942",
+    "RN": [
+      "0 (Cholinesterase Inhibitors)",
+      "0 (Indans)",
+      "0 (Piperidines)",
+      "8SSC91326P (Donepezil)"
+    ],
+    "SB": "IM",
+    "MH": [
+      "Aged, 80 and over",
+      "Alzheimer Disease/*drug therapy",
+      "Arrhythmias, Cardiac/*chemically induced",
+      "Cholinesterase Inhibitors/*poisoning",
+      "Donepezil",
+      "Drug Overdose/complications/diagnosis",
+      "Electrocardiography",
+      "Humans",
+      "Indans/*poisoning",
+      "Male",
+      "Piperidines/*poisoning"
+    ],
+    "OTO": [
+      "NOTNLM"
+    ],
+    "OT": [
+      "Alzheimer's disease",
+      "Bradycardia",
+      "Donepezil",
+      "QTc"
+    ],
+    "EDAT": "2017/07/03 06:00",
+    "MHDA": "2017/09/08 06:00",
+    "CRDT": [
+      "2017/07/03 06:00"
+    ],
+    "PHST": [
+      "2017/04/09 00:00 [received]",
+      "2017/06/21 00:00 [revised]",
+      "2017/06/21 00:00 [accepted]",
+      "2017/07/03 06:00 [pubmed]",
+      "2017/09/08 06:00 [medline]",
+      "2017/07/03 06:00 [entrez]"
+    ],
+    "AID": [
+      "S0735-6757(17)30495-3 [pii]",
+      "10.1016/j.ajem.2017.06.044 [doi]"
+    ],
+    "PST": "ppublish",
+    "SO": "Am J Emerg Med. 2017 Sep;35(9):1386.e1-1386.e3. doi: 10.1016/j.ajem.2017.06.044. Epub 2017 Jun 22.",
+    "abstract": "Donepezil is the most commonly prescribed acetylcholinesterase inhibitor for the treatment of Alzheimer's disease, an ailment that affects millions of older adult patients. By inhibiting the breakdown of acetylcholine in the central nervous system, donepezil has been shown to slow cognitive decline and improve patients' functional status. While donepezil is well-tolerated and generally considered safe at therapeutic doses, taking more than the prescribed dose could result in adverse cholinergic effects that range from mild gastrointestinal distress to serious cardiac dysrhythmias. We present a case of an 84-year-old man who developed gastrointestinal and cardiac disturbances after ingesting seven-times his daily dose of donepezil. As no specific antidote is available for donepezil overdose, this case highlights the importance of supportive care with particular attention to the management of cardiac dysrhythmias in patients displaying signs of toxicity.",
+    "doi": "10.1016/j",
+    "pmid": "28668178",
+    "year": "2017",
+    "title": "Cholinergic symptoms and QTc prolongation following donepezil overdose.",
+    "source": "pubmed",
+    "full_text": "Correspondence\nFaculty of Medicine, University of S\u00e3o Paulo, this location, and sediment collected\nS\u00e3o Paulo, Brazil (EM, MNB, RX); London School from the pelvic area of 26 individuals,\nof Hygiene and Tropical Medicine, London, UK\nwhere the intestines and bladder\n(EM); Faculty of Veterinarian Medicine, University\nof S\u00e3o Paulo, S\u00e3o Paulo, Brazil (MA); Paulista were during life. Control samples\nSchool of Medicine, Federal University of S\u00e3o from the head and feet were also\nPaulo, S\u00e3o Paulo, Brazil (MNB); Department of\ntaken, where parasites of abdominal\nPublic Health and Clinical Medicine, Epidemiology\nand Global Health, University of Umea, Umea, organs would not be expected. The\n901 85, Sweden (A W-S); and Lee Kong Chian sediment underwent disaggregation,\nSchool of Medicine, Nanyang University, microsieving through mesh of\nSingapore (A W-S)\n300, 160, and 20 \u03bcm, and light\n1 Lowe R, Barcellos C, Coelho CA, et al. Dengue\nmicroscopy.\noutlook for the World Cup in Brazil: an early\nwarning model framework driven by One individual had evidence for\nreal-time seasonal climate forecasts.\ninfection with a terminal spined\nLancet Infect Dis 2014; 14: 619\u201326.\n2 Massad E, Wilder-Smith A, Ximenes R, et al. schistosome. The egg (figure) dis-\nRisk of symptomatic dengue for foreign covered in the pelvic sediment had\nvisitors to the 2014 FIFA World Cup in\na curved pole, a terminal spine at\nBrazil. Mem Inst Oswaldo Cruz 2014;\n109: 394\u201397. the opposite pole, a single wall, pale\n3 Wilson ME, Chen LH. Health risks among brown colouring, and measured\ntravelers to Brazil: implications for the 2014\nFIFA World Cup and 2016 Olympic Games. 132\u00d756 \u03bcm. The central contents of\nTravel Med Infect Dis 2014; published online the egg had shrunk away from the\nApril 18. http://dx.doi.org10.1016/j.\nwall and become stained by pigments\ntmaid.2014.04.001.\n4 Wilson ME, Chen LH, Han PV, et al. Illness in from the soil. Control samples from\ntravelers returned from Brazil: the the skull and feet of the individual\nGeoSentinel experience and implications for\nthe 2014 FIFA World Cup and the 2016 did not contain schistosome 50 \u03bcm\nsummer Olympics. Clin Infect Dis 2014; eggs, which excluded any possible\n58: 1347\u201356.\ngeneralised contamination of the site\nFigure: A schistosome egg recovered from the pelvic sediment of a human\nby modern populations. individual dated 6500\u20136000 BP\nIn view of its great age, the egg The diagnostic terminal spine of the egg is oriented to the bottom right of the image.\nPrehistoric could be from either Schistosoma Dimensions of the egg=132 \u00d7 56 \u03bcm\nschistosomiasis haematobium or Schistosoma inter-\ncalatum. No pollen, spores, or snails have been recovered at\nparasite found in the\nseeds in the region have a similar archaeological excavations from\nMiddle East appearance. Although S haematobium across the Middle East, and Published Online\nis present in the Middle East ancient medical texts from Assyria June 20, 2014\nhttp://dx.doi.org/10.1016/\nSchistosomes are a group of nowadays, S intercalatum is only (corresponding to northern Iraq)\nS1473-3099(14)70794-7\nflatworms (flukes) that cause an present in central and west Africa. So have described diseases that cause\nenormous burden of morbidity in either the prehistoric species found blood-stained urine.4 The individual\ntropical regions, such as anaemia, was S haematobium, or S intercalatum who contracted the parasite at\nkidney failure, and bladder cancer. was endemic in a much larger area Tell Zeidan around 6000 years ago\nThe earliest known archaeological 6000 years ago, which included the might have done so by wading in\nexamples are in ancient Egyptian Middle East. natural freshwater, or in one of\nmummies, dated 5200 years BP Human beings contract the the man-made irrigation systems\n(before present).1 Modern genetic parasites when wading in warm that were starting to be introduced\nanalysis suggests the genus originally freshwater, when intermediate in the Middle East from 7500 BP\nevolved in Asia and spread from there forms of the parasite leave Bulinus to improve crop productivity.5\nto Africa.2 The question of when and spp water snails and burrow through Domesticated wheat and barley\nwhere schistosomes first started human skin. They develop into were farmed at Tell Zeidan despite\nto cause disease in our ancestors adult worms, position themselves its location in a climate too arid to\nis, however, still unanswered. Tell in the blood vessels of the bladder support those crops, which suggests\nZeidan was an early settlement of and kidneys (S haematobium), or the use of an irrigation system.3 Our\nfarmers (7800\u20136000 BP) in the intestines (S intercalatum), mate, findings suggest that crop irrigation\nEuphrates river valley of northern and their eggs are excreted in 6000 years ago in the Middle East\nSyria.3 Human skeletal remains dated urine (S haematobium) or faeces enabled schistosomiasis to spread to\n6500\u20136000 BP were excavated in (S intercalatum). Shells of bulinus people living there, and so triggered\nwww.thelancet.com/infection Vol 14 July 2014 553\nCorrespondence\nthe enormous disease burden that Division of Biological Anthropology, Department 2 Lawton SP, Hirai H, Ironside JE, Johnston DA,\nschistosomiasis has caused over the of Archaeology and Anthropology, University of Rollinson D. Genomes and geography:\nCambridge, The Henry Wellcome Building, genomic insights into the evolution and\npast 6000 years. Cambridge CB2 1QH, UK (EA, PDM); Science and phylogeography of the genus Schistosoma.\nThe original excavation was funded by The Technology in Archaeology Research Center Parasit Vectors 2011; 4: 131.\nNational Science Foundation, USA, and the (STARC), and The Cyprus Institute, Guy Ourisson 3 Stein GJ. Tell Zeidan 2010, Oriental Institute\n2010\u20132011 Annual report. Chicago:\nOriental Institute, Chicago, IL, USA. We are Building, Athalassa Campus, Cyprus (KOL); The\nUniversity of Chicago, 2011: 122\u201339.\ngrateful to the experts in parasitology and pollen Oriental Institute, University of Chicago, Chicago,\n4 Adamson PB. Schistosomiasis in antiquity.\nanalysis who shared their opinion about the IL, USA (GJS)\nMed Hist 1976; 20: 176\u201388.\nidentification of the egg described in this 1 Kloos H, David R, The paleoepidemiology of 5 Helbaek, H. Samarran irrigation agriculture\nCorrespondence, and helped to confirm our schistosomiasis in ancient Egypt. at Choga Mami in Iraq. Iraq 1972; 34: 25\u201348.\ndiagnosis. We declare no competing interests. Hum Ecol Rev 2002; 9: 14\u201325.\nEvilena Anastasiou, Kirsi O Lorentz,\nGil J Stein, *Piers D Mitchell\npdm39@cam.ac.uk\n554 www.thelancet.com/infection Vol 14 July 2014",
+    "full_text_source": "sci-hub",
+    "full_text_available": true
+  },
+  "26438681": {
+    "PMID": "26438681",
+    "OWN": "NLM",
+    "STAT": "MEDLINE",
+    "DCOM": "20160711",
+    "LR": "20220408",
+    "IS": "1757-790X (Electronic) 1757-790X (Linking)",
+    "VI": "2015",
+    "DP": "2015 Oct 5",
+    "TI": "A case of donepezil-related torsades de pointes.",
+    "LID": "10.1136/bcr-2015-211900 [doi] bcr2015211900",
+    "AB": "An 80-year-old woman with Alzheimer's dementia presented with diarrhoea, vomiting and worsening confusion following an increase in donepezil dose from 5 to 10 mg. The ECG revealed prolongation of QTc interval. Soon after admission, she became unresponsive with polymorphic ventricular tachycardia (VT). Cardiopulmonary resuscitation with a 200 J shock was successful in establishing cardiac output. Following the discontinuation of donepezil, the QTc interval normalised and no further arrhythmias were recorded. Treatment with anticholinesterase inhibitors may result in life-threatening VT. Vigilance is required for the identification of this condition in patients presenting with presyncope, syncope or seizures.",
+    "CI": [
+      "2015 BMJ Publishing Group Ltd."
+    ],
+    "FAU": [
+      "Kitt, Jamie",
+      "Irons, Robert",
+      "Al-Obaidi, Mohamed",
+      "Missouris, Constantinos"
+    ],
+    "AU": [
+      "Kitt J",
+      "Irons R",
+      "Al-Obaidi M",
+      "Missouris C"
+    ],
+    "AD": [
+      "Department of Cardiology, Frimley Health NHS Foundation Trust, Slough, UK.",
+      "Department of Geriatrics, Royal Berkshire Hospital, Reading, UK.",
+      "Department of Cardiology, Frimley Health NHS Foundation Trust, Slough, UK.",
+      "Department of Cardiology, Frimley Health NHS Foundation Trust, Slough, UK."
+    ],
+    "LA": [
+      "eng"
+    ],
+    "PT": [
+      "Case Reports",
+      "Journal Article"
+    ],
+    "DEP": "20151005",
+    "PL": "England",
+    "TA": "BMJ Case Rep",
+    "JT": "BMJ case reports",
+    "JID": "101526291",
+    "RN": [
+      "0 (Indans)",
+      "0 (Nootropic Agents)",
+      "0 (Piperidines)",
+      "8SSC91326P (Donepezil)"
+    ],
+    "SB": "IM",
+    "MH": [
+      "Aged, 80 and over",
+      "Alzheimer Disease/*drug therapy",
+      "Cardiopulmonary Resuscitation",
+      "Donepezil",
+      "Electrocardiography",
+      "Female",
+      "Humans",
+      "Indans/administration & dosage/*adverse effects",
+      "Long QT Syndrome/*chemically induced",
+      "Nootropic Agents/administration & dosage/*adverse effects",
+      "Piperidines/administration & dosage/*adverse effects",
+      "Seizures/chemically induced",
+      "Syncope/chemically induced/therapy",
+      "Torsades de Pointes/*chemically induced"
+    ],
+    "PMC": "PMC4600768",
+    "EDAT": "2015/10/07 06:00",
+    "MHDA": "2016/07/12 06:00",
+    "PMCR": [
+      "2017/10/05"
+    ],
+    "CRDT": [
+      "2015/10/07 06:00"
+    ],
+    "PHST": [
+      "2015/10/07 06:00 [entrez]",
+      "2015/10/07 06:00 [pubmed]",
+      "2016/07/12 06:00 [medline]",
+      "2017/10/05 00:00 [pmc-release]"
+    ],
+    "AID": [
+      "bcr-2015-211900 [pii]",
+      "10.1136/bcr-2015-211900 [doi]"
+    ],
+    "PST": "epublish",
+    "SO": "BMJ Case Rep. 2015 Oct 5;2015:bcr2015211900. doi: 10.1136/bcr-2015-211900.",
+    "abstract": "An 80-year-old woman with Alzheimer's dementia presented with diarrhoea, vomiting and worsening confusion following an increase in donepezil dose from 5 to 10 mg. The ECG revealed prolongation of QTc interval. Soon after admission, she became unresponsive with polymorphic ventricular tachycardia (VT). Cardiopulmonary resuscitation with a 200 J shock was successful in establishing cardiac output. Following the discontinuation of donepezil, the QTc interval normalised and no further arrhythmias were recorded. Treatment with anticholinesterase inhibitors may result in life-threatening VT. Vigilance is required for the identification of this condition in patients presenting with presyncope, syncope or seizures.",
+    "doi": "10.1136/bcr-2015-211900",
+    "pmid": "26438681",
+    "year": "2015",
+    "title": "A case of donepezil-related torsades de pointes.",
+    "source": "pubmed",
+    "full_text": "1. BMJ Case Rep. 2015 Oct 5;2015:bcr2015211900. doi: 10.1136/bcr-2015-211900.\n\nA case of donepezil-related torsades de pointes.\n\nKitt J(1), Irons R(2), Al-Obaidi M(1), Missouris C(1).\n\nAuthor information:\n(1)Department of Cardiology, Frimley Health NHS Foundation Trust, Slough, UK.\n(2)Department of Geriatrics, Royal Berkshire Hospital, Reading, UK.\n\nAn 80-year-old woman with Alzheimer's dementia presented with diarrhoea, \nvomiting and worsening confusion following an increase in donepezil dose from 5 \nto 10\u2005mg. The ECG revealed prolongation of QTc interval. Soon after admission, \nshe became unresponsive with polymorphic ventricular tachycardia (VT). \nCardiopulmonary resuscitation with a 200\u2005J shock was successful in establishing \ncardiac output. Following the discontinuation of donepezil, the QTc interval \nnormalised and no further arrhythmias were recorded. Treatment with \nanticholinesterase inhibitors may result in life-threatening VT. Vigilance is \nrequired for the identification of this condition in patients presenting with \npresyncope, syncope or seizures.\n\n2015 BMJ Publishing Group Ltd.\n\nDOI: 10.1136/bcr-2015-211900\nPMCID: PMC4600768\nPMID: 26438681 [Indexed for MEDLINE]",
+    "full_text_source": "sci-hub",
+    "full_text_available": true
+  },
+  "22293706": {
+    "PMID": "22293706",
+    "OWN": "NLM",
+    "STAT": "MEDLINE",
+    "DCOM": "20120725",
+    "LR": "20220408",
+    "IS": "1347-5231 (Electronic) 0031-6903 (Linking)",
+    "VI": "132",
+    "IP": "2",
+    "DP": "2012",
+    "TI": "[Shortening of donepezil-induced QTc prolongation with a change in the interacting drug, after electrocardiograph monitoring by community pharmacists: a case report].",
+    "PG": "237-41",
+    "AB": "We used a mobile electrocardiograph to manage the adverse effects and interactions of drugs, especially QT-prolonging drugs, in a community pharmacy setting. We report the case of a patient in whom the risk of drug-induced torsades de pointes (TdP) was lowered, after monitoring by community pharmacists. CASE: An 80-year-old woman was under donepezil (5 mg/d) therapy for Alzheimer's disease and also taking other drugs that interact with donepezil, namely, benidipine (8 mg/d) and atorvastatin (10 mg/d). The patient was visited almost every month, and an electrocardiogram was usually obtained. QTc prolongation (avg. 470+/-9 ms) was observed in the first to third tests. Her doctor was informed about these results and the risk factors (advanced age, gender, and drugs interactions (benidipine and atorvastatin)) associated with TdP and asked to respond promptly since several cases of donepezil-induced TdP have been reported. As a result, benidipine was replaced with amlodipine, while the remaining drugs were continued. After the change, a significant decrease in QTc values were observed in the fourth to seventh tests (avg. 441+/-9 ms, p=0.010), thereby indicating a decrease in TdP risk. The Drug Interaction Probability Scale (object drug, donepezil; precipitant drug, benidipine) score was +6 (probable). Thus, QTc shortening was a result of differences in donepezil-benidipine and donepezil-amlodipine interactions.",
+    "FAU": [
+      "Shinozaki, Kohki"
+    ],
+    "AU": [
+      "Shinozaki K"
+    ],
+    "AD": [
+      "Hikuma Pharmacy, Shizuoka, Japan. pharma4nozaki@gmail.com"
+    ],
+    "LA": [
+      "jpn"
+    ],
+    "PT": [
+      "Case Reports",
+      "Journal Article"
+    ],
+    "PL": "Japan",
+    "TA": "Yakugaku Zasshi",
+    "JT": "Yakugaku zasshi : Journal of the Pharmaceutical Society of Japan",
+    "JID": "0413613",
+    "RN": [
+      "0 (Cholinesterase Inhibitors)",
+      "0 (Dihydropyridines)",
+      "0 (Indans)",
+      "0 (Piperidines)",
+      "1J444QC288 (Amlodipine)",
+      "4G9T91JS7E (benidipine)",
+      "8SSC91326P (Donepezil)"
+    ],
+    "SB": "IM",
+    "MH": [
+      "Aged, 80 and over",
+      "Amlodipine/*administration & dosage",
+      "Cholinesterase Inhibitors/*adverse effects",
+      "*Community Pharmacy Services",
+      "Dihydropyridines/adverse effects",
+      "Donepezil",
+      "Drug Interactions",
+      "*Electrocardiography, Ambulatory",
+      "Female",
+      "Humans",
+      "Indans/*adverse effects",
+      "*Pharmacists",
+      "Piperidines/*adverse effects",
+      "Risk",
+      "Risk Management",
+      "Torsades de Pointes/*chemically induced/*prevention & control"
+    ],
+    "EDAT": "2012/02/02 06:00",
+    "MHDA": "2012/07/26 06:00",
+    "CRDT": [
+      "2012/02/02 06:00"
+    ],
+    "PHST": [
+      "2012/02/02 06:00 [entrez]",
+      "2012/02/02 06:00 [pubmed]",
+      "2012/07/26 06:00 [medline]"
+    ],
+    "AID": [
+      "JST.JSTAGE/yakushi/132.237 [pii]",
+      "10.1248/yakushi.132.237 [doi]"
+    ],
+    "PST": "ppublish",
+    "SO": "Yakugaku Zasshi. 2012;132(2):237-41. doi: 10.1248/yakushi.132.237.",
+    "abstract": "We used a mobile electrocardiograph to manage the adverse effects and interactions of drugs, especially QT-prolonging drugs, in a community pharmacy setting. We report the case of a patient in whom the risk of drug-induced torsades de pointes (TdP) was lowered, after monitoring by community pharmacists. CASE: An 80-year-old woman was under donepezil (5 mg/d) therapy for Alzheimer's disease and also taking other drugs that interact with donepezil, namely, benidipine (8 mg/d) and atorvastatin (10 mg/d). The patient was visited almost every month, and an electrocardiogram was usually obtained. QTc prolongation (avg. 470+/-9 ms) was observed in the first to third tests. Her doctor was informed about these results and the risk factors (advanced age, gender, and drugs interactions (benidipine and atorvastatin)) associated with TdP and asked to respond promptly since several cases of donepezil-induced TdP have been reported. As a result, benidipine was replaced with amlodipine, while the remaining drugs were continued. After the change, a significant decrease in QTc values were observed in the fourth to seventh tests (avg. 441+/-9 ms, p=0.010), thereby indicating a decrease in TdP risk. The Drug Interaction Probability Scale (object drug, donepezil; precipitant drug, benidipine) score was +6 (probable). Thus, QTc shortening was a result of differences in donepezil-benidipine and donepezil-amlodipine interactions.",
+    "doi": "10.1248/yakushi.132",
+    "pmid": "22293706",
+    "year": "2012",
+    "title": "[Shortening of donepezil-induced QTc prolongation with a change in the interacting drug, after electrocardiograph monitoring by community pharmacists: a case report].",
+    "source": "pubmed",
+    "full_text": "1. Yakugaku Zasshi. 2012;132(2):237-41. doi: 10.1248/yakushi.132.237.\n\n[Shortening of donepezil-induced QTc prolongation with a change in the \ninteracting drug, after electrocardiograph monitoring by community pharmacists: \na case report].\n\n[Article in Japanese]\n\nShinozaki K(1).\n\nAuthor information:\n(1)Hikuma Pharmacy, Shizuoka, Japan. pharma4nozaki@gmail.com\n\nWe used a mobile electrocardiograph to manage the adverse effects and \ninteractions of drugs, especially QT-prolonging drugs, in a community pharmacy \nsetting. We report the case of a patient in whom the risk of drug-induced \ntorsades de pointes (TdP) was lowered, after monitoring by community \npharmacists.\nCASE: An 80-year-old woman was under donepezil (5 mg/d) therapy for Alzheimer's \ndisease and also taking other drugs that interact with donepezil, namely, \nbenidipine (8 mg/d) and atorvastatin (10 mg/d). The patient was visited almost \nevery month, and an electrocardiogram was usually obtained. QTc prolongation \n(avg. 470\u00b19 ms) was observed in the first to third tests. Her doctor was \ninformed about these results and the risk factors (advanced age, gender, and \ndrugs interactions (benidipine and atorvastatin)) associated with TdP and asked \nto respond promptly since several cases of donepezil-induced TdP have been \nreported. As a result, benidipine was replaced with amlodipine, while the \nremaining drugs were continued. After the change, a significant decrease in QTc \nvalues were observed in the fourth to seventh tests (avg. 441\u00b19 ms, p=0.010), \nthereby indicating a decrease in TdP risk. The Drug Interaction Probability \nScale (object drug, donepezil; precipitant drug, benidipine) score was +6 \n(probable). Thus, QTc shortening was a result of differences in \ndonepezil-benidipine and donepezil-amlodipine interactions.\n\nDOI: 10.1248/yakushi.132.237\nPMID: 22293706 [Indexed for MEDLINE]",
+    "full_text_source": "sci-hub",
+    "full_text_available": true
+  },
+  "19944332": {
+    "PMID": "19944332",
+    "OWN": "NLM",
+    "STAT": "MEDLINE",
+    "DCOM": "20110216",
+    "LR": "20220408",
+    "IS": "1876-4738 (Electronic) 0914-5087 (Linking)",
+    "VI": "54",
+    "IP": "3",
+    "DP": "2009 Dec",
+    "TI": "Torsades de Pointes with QT prolongation related to donepezil use.",
+    "PG": "507-11",
+    "LID": "10.1016/j.jjcc.2009.03.011 [doi]",
+    "AB": "An 83-year-old female, who had a history of anterior myocardial infarction, was treated for Alzheimer's disease with donepezil. She suffered from repeated diarrhea and vomiting, and experienced syncope. She was admitted to our hospital and was diagnosed with acute colitis and syncope. On admission, her heart rate was 54 beats/min with regular rhythm. Laboratory data showed a low plasma potassium level. Electrocardiogram (ECG) showed poor R progression, ST elevation, negative T in precordial leads, and marked QT prolongation. Transthoracic echocardiogram showed the enlargement of the left atrium and aneurysmal area at the apex. Torsades de Pointes (TdP) with syncope and convulsion were confirmed on ECG monitoring twice after admission. We treated her with potassium chloride and started magnesium sulfate and lidocaine, and then added isoprenaline injection. After these treatments, her heart rate increased and we did not detect TdP again. With the aging population in Japan, prescriptions for donepezil are increasing. We have to be vigilant for syncope in patients taking donepezil, which is possibly related to QT prolongation and TdP.",
+    "FAU": [
+      "Takaya, Tomofumi",
+      "Okamoto, Masashi",
+      "Yodoi, Keiko",
+      "Hata, Katsuya",
+      "Kijima, Yoichi",
+      "Nakajima, Hideto",
+      "Nishikawa, Yuji",
+      "Kita, Tomoyuki",
+      "Ito, Mitsuaki",
+      "Seo, Toshihiko",
+      "Kawashima, Seinosuke"
+    ],
+    "AU": [
+      "Takaya T",
+      "Okamoto M",
+      "Yodoi K",
+      "Hata K",
+      "Kijima Y",
+      "Nakajima H",
+      "Nishikawa Y",
+      "Kita T",
+      "Ito M",
+      "Seo T",
+      "Kawashima S"
+    ],
+    "AD": [
+      "Department of Cardiovascular Medicine, Saiseikai Nakatsu Hospital, 2-10-39, Shibata, Kita-ku, Osaka, 530-0012, Japan. toto54@hotmail.com"
+    ],
+    "LA": [
+      "eng"
+    ],
+    "PT": [
+      "Case Reports",
+      "Journal Article"
+    ],
+    "DEP": "20090507",
+    "PL": "Netherlands",
+    "TA": "J Cardiol",
+    "JT": "Journal of cardiology",
+    "JID": "8804703",
+    "RN": [
+      "0 (Cholinesterase Inhibitors)",
+      "0 (Indans)",
+      "0 (Nootropic Agents)",
+      "0 (Piperidines)",
+      "660YQ98I10 (Potassium Chloride)",
+      "7487-88-9 (Magnesium Sulfate)",
+      "8SSC91326P (Donepezil)",
+      "98PI200987 (Lidocaine)",
+      "L628TT009W (Isoproterenol)"
+    ],
+    "SB": "IM",
+    "MH": [
+      "Aged, 80 and over",
+      "Alzheimer Disease/drug therapy",
+      "Cholinesterase Inhibitors/*adverse effects",
+      "Colitis/chemically induced",
+      "Donepezil",
+      "Electrocardiography",
+      "Female",
+      "Humans",
+      "Indans/*adverse effects",
+      "Isoproterenol/administration & dosage",
+      "Lidocaine/administration & dosage",
+      "Long QT Syndrome/*chemically induced/diagnosis/drug therapy",
+      "Magnesium Sulfate/administration & dosage",
+      "Nootropic Agents/*adverse effects",
+      "Piperidines/*adverse effects",
+      "Potassium Chloride/administration & dosage",
+      "Syncope/chemically induced/drug therapy",
+      "Torsades de Pointes/*chemically induced/diagnosis/drug therapy",
+      "Treatment Outcome"
+    ],
+    "EDAT": "2009/12/01 06:00",
+    "MHDA": "2011/02/17 06:00",
+    "CRDT": [
+      "2009/12/01 06:00"
+    ],
+    "PHST": [
+      "2009/01/24 00:00 [received]",
+      "2009/03/14 00:00 [revised]",
+      "2009/03/24 00:00 [accepted]",
+      "2009/12/01 06:00 [entrez]",
+      "2009/12/01 06:00 [pubmed]",
+      "2011/02/17 06:00 [medline]"
+    ],
+    "AID": [
+      "S0914-5087(09)00121-X [pii]",
+      "10.1016/j.jjcc.2009.03.011 [doi]"
+    ],
+    "PST": "ppublish",
+    "SO": "J Cardiol. 2009 Dec;54(3):507-11. doi: 10.1016/j.jjcc.2009.03.011. Epub 2009 May 7.",
+    "abstract": "An 83-year-old female, who had a history of anterior myocardial infarction, was treated for Alzheimer's disease with donepezil. She suffered from repeated diarrhea and vomiting, and experienced syncope. She was admitted to our hospital and was diagnosed with acute colitis and syncope. On admission, her heart rate was 54 beats/min with regular rhythm. Laboratory data showed a low plasma potassium level. Electrocardiogram (ECG) showed poor R progression, ST elevation, negative T in precordial leads, and marked QT prolongation. Transthoracic echocardiogram showed the enlargement of the left atrium and aneurysmal area at the apex. Torsades de Pointes (TdP) with syncope and convulsion were confirmed on ECG monitoring twice after admission. We treated her with potassium chloride and started magnesium sulfate and lidocaine, and then added isoprenaline injection. After these treatments, her heart rate increased and we did not detect TdP again. With the aging population in Japan, prescriptions for donepezil are increasing. We have to be vigilant for syncope in patients taking donepezil, which is possibly related to QT prolongation and TdP.",
+    "doi": "10.1016/j",
+    "pmid": "19944332",
+    "year": "2009",
+    "title": "Torsades de Pointes with QT prolongation related to donepezil use.",
+    "source": "pubmed",
+    "full_text": "Correspondence\nFaculty of Medicine, University of S\u00e3o Paulo, this location, and sediment collected\nS\u00e3o Paulo, Brazil (EM, MNB, RX); London School from the pelvic area of 26 individuals,\nof Hygiene and Tropical Medicine, London, UK\nwhere the intestines and bladder\n(EM); Faculty of Veterinarian Medicine, University\nof S\u00e3o Paulo, S\u00e3o Paulo, Brazil (MA); Paulista were during life. Control samples\nSchool of Medicine, Federal University of S\u00e3o from the head and feet were also\nPaulo, S\u00e3o Paulo, Brazil (MNB); Department of\ntaken, where parasites of abdominal\nPublic Health and Clinical Medicine, Epidemiology\nand Global Health, University of Umea, Umea, organs would not be expected. The\n901 85, Sweden (A W-S); and Lee Kong Chian sediment underwent disaggregation,\nSchool of Medicine, Nanyang University, microsieving through mesh of\nSingapore (A W-S)\n300, 160, and 20 \u03bcm, and light\n1 Lowe R, Barcellos C, Coelho CA, et al. Dengue\nmicroscopy.\noutlook for the World Cup in Brazil: an early\nwarning model framework driven by One individual had evidence for\nreal-time seasonal climate forecasts.\ninfection with a terminal spined\nLancet Infect Dis 2014; 14: 619\u201326.\n2 Massad E, Wilder-Smith A, Ximenes R, et al. schistosome. The egg (figure) dis-\nRisk of symptomatic dengue for foreign covered in the pelvic sediment had\nvisitors to the 2014 FIFA World Cup in\na curved pole, a terminal spine at\nBrazil. Mem Inst Oswaldo Cruz 2014;\n109: 394\u201397. the opposite pole, a single wall, pale\n3 Wilson ME, Chen LH. Health risks among brown colouring, and measured\ntravelers to Brazil: implications for the 2014\nFIFA World Cup and 2016 Olympic Games. 132\u00d756 \u03bcm. The central contents of\nTravel Med Infect Dis 2014; published online the egg had shrunk away from the\nApril 18. http://dx.doi.org10.1016/j.\nwall and become stained by pigments\ntmaid.2014.04.001.\n4 Wilson ME, Chen LH, Han PV, et al. Illness in from the soil. Control samples from\ntravelers returned from Brazil: the the skull and feet of the individual\nGeoSentinel experience and implications for\nthe 2014 FIFA World Cup and the 2016 did not contain schistosome 50 \u03bcm\nsummer Olympics. Clin Infect Dis 2014; eggs, which excluded any possible\n58: 1347\u201356.\ngeneralised contamination of the site\nFigure: A schistosome egg recovered from the pelvic sediment of a human\nby modern populations. individual dated 6500\u20136000 BP\nIn view of its great age, the egg The diagnostic terminal spine of the egg is oriented to the bottom right of the image.\nPrehistoric could be from either Schistosoma Dimensions of the egg=132 \u00d7 56 \u03bcm\nschistosomiasis haematobium or Schistosoma inter-\ncalatum. No pollen, spores, or snails have been recovered at\nparasite found in the\nseeds in the region have a similar archaeological excavations from\nMiddle East appearance. Although S haematobium across the Middle East, and Published Online\nis present in the Middle East ancient medical texts from Assyria June 20, 2014\nhttp://dx.doi.org/10.1016/\nSchistosomes are a group of nowadays, S intercalatum is only (corresponding to northern Iraq)\nS1473-3099(14)70794-7\nflatworms (flukes) that cause an present in central and west Africa. So have described diseases that cause\nenormous burden of morbidity in either the prehistoric species found blood-stained urine.4 The individual\ntropical regions, such as anaemia, was S haematobium, or S intercalatum who contracted the parasite at\nkidney failure, and bladder cancer. was endemic in a much larger area Tell Zeidan around 6000 years ago\nThe earliest known archaeological 6000 years ago, which included the might have done so by wading in\nexamples are in ancient Egyptian Middle East. natural freshwater, or in one of\nmummies, dated 5200 years BP Human beings contract the the man-made irrigation systems\n(before present).1 Modern genetic parasites when wading in warm that were starting to be introduced\nanalysis suggests the genus originally freshwater, when intermediate in the Middle East from 7500 BP\nevolved in Asia and spread from there forms of the parasite leave Bulinus to improve crop productivity.5\nto Africa.2 The question of when and spp water snails and burrow through Domesticated wheat and barley\nwhere schistosomes first started human skin. They develop into were farmed at Tell Zeidan despite\nto cause disease in our ancestors adult worms, position themselves its location in a climate too arid to\nis, however, still unanswered. Tell in the blood vessels of the bladder support those crops, which suggests\nZeidan was an early settlement of and kidneys (S haematobium), or the use of an irrigation system.3 Our\nfarmers (7800\u20136000 BP) in the intestines (S intercalatum), mate, findings suggest that crop irrigation\nEuphrates river valley of northern and their eggs are excreted in 6000 years ago in the Middle East\nSyria.3 Human skeletal remains dated urine (S haematobium) or faeces enabled schistosomiasis to spread to\n6500\u20136000 BP were excavated in (S intercalatum). Shells of bulinus people living there, and so triggered\nwww.thelancet.com/infection Vol 14 July 2014 553\nCorrespondence\nthe enormous disease burden that Division of Biological Anthropology, Department 2 Lawton SP, Hirai H, Ironside JE, Johnston DA,\nschistosomiasis has caused over the of Archaeology and Anthropology, University of Rollinson D. Genomes and geography:\nCambridge, The Henry Wellcome Building, genomic insights into the evolution and\npast 6000 years. Cambridge CB2 1QH, UK (EA, PDM); Science and phylogeography of the genus Schistosoma.\nThe original excavation was funded by The Technology in Archaeology Research Center Parasit Vectors 2011; 4: 131.\nNational Science Foundation, USA, and the (STARC), and The Cyprus Institute, Guy Ourisson 3 Stein GJ. Tell Zeidan 2010, Oriental Institute\n2010\u20132011 Annual report. Chicago:\nOriental Institute, Chicago, IL, USA. We are Building, Athalassa Campus, Cyprus (KOL); The\nUniversity of Chicago, 2011: 122\u201339.\ngrateful to the experts in parasitology and pollen Oriental Institute, University of Chicago, Chicago,\n4 Adamson PB. Schistosomiasis in antiquity.\nanalysis who shared their opinion about the IL, USA (GJS)\nMed Hist 1976; 20: 176\u201388.\nidentification of the egg described in this 1 Kloos H, David R, The paleoepidemiology of 5 Helbaek, H. Samarran irrigation agriculture\nCorrespondence, and helped to confirm our schistosomiasis in ancient Egypt. at Choga Mami in Iraq. Iraq 1972; 34: 25\u201348.\ndiagnosis. We declare no competing interests. Hum Ecol Rev 2002; 9: 14\u201325.\nEvilena Anastasiou, Kirsi O Lorentz,\nGil J Stein, *Piers D Mitchell\npdm39@cam.ac.uk\n554 www.thelancet.com/infection Vol 14 July 2014",
+    "full_text_source": "sci-hub",
+    "full_text_available": true
+  },
+  "19602789": {
+    "PMID": "19602789",
+    "OWN": "NLM",
+    "STAT": "MEDLINE",
+    "DCOM": "20091001",
+    "LR": "20220408",
+    "IS": "1349-7235 (Electronic) 0918-2918 (Linking)",
+    "VI": "48",
+    "IP": "14",
+    "DP": "2009",
+    "TI": "Donepezil-induced adverse side effects of cardiac rhythm: 2 cases report of atrioventricular block and Torsade de Pointes.",
+    "PG": "1219-23",
+    "AB": "Acetylcholinesterase inhibitors (AChIs) are widely used in the treatment of mild-to-moderate Alzheimer's disease (AD), but their cholinergic effects could generate adverse side effects in the cardiovascular system. This report presents the cases of 2 patients who experienced adverse side effects of cardiac rhythm with QT prolongation caused by Donepezil. Both of them improved to the original rhythm and shortened QT intervals after the discontinuation of Donepezil. The present cases suggest that the cholinergic effects of Donepezil could induce adverse side effects on cardiac rhythm and careful consideration is needed for the patients treated by Donepezil.",
+    "FAU": [
+      "Tanaka, Atsushi",
+      "Koga, Shoichi",
+      "Hiramatsu, Yoshihiro"
+    ],
+    "AU": [
+      "Tanaka A",
+      "Koga S",
+      "Hiramatsu Y"
+    ],
+    "AD": [
+      "Department of Cardiology, Koga Hospital 21, Kurume. mikechann@gmail.com"
+    ],
+    "LA": [
+      "eng"
+    ],
+    "PT": [
+      "Case Reports",
+      "Journal Article"
+    ],
+    "DEP": "20090715",
+    "PL": "Japan",
+    "TA": "Intern Med",
+    "JT": "Internal medicine (Tokyo, Japan)",
+    "JID": "9204241",
+    "RN": [
+      "0 (Cholinesterase Inhibitors)",
+      "0 (Indans)",
+      "0 (Piperidines)",
+      "8SSC91326P (Donepezil)"
+    ],
+    "SB": "IM",
+    "MH": [
+      "Aged, 80 and over",
+      "Atrioventricular Block/*chemically induced",
+      "Cholinesterase Inhibitors/*adverse effects",
+      "Donepezil",
+      "Female",
+      "Humans",
+      "Indans/*adverse effects",
+      "Male",
+      "Piperidines/*adverse effects",
+      "Torsades de Pointes/*chemically induced"
+    ],
+    "EDAT": "2009/07/16 09:00",
+    "MHDA": "2009/10/02 06:00",
+    "CRDT": [
+      "2009/07/16 09:00"
+    ],
+    "PHST": [
+      "2009/07/16 09:00 [entrez]",
+      "2009/07/16 09:00 [pubmed]",
+      "2009/10/02 06:00 [medline]"
+    ],
+    "AID": [
+      "JST.JSTAGE/internalmedicine/48.2181 [pii]",
+      "10.2169/internalmedicine.48.2181 [doi]"
+    ],
+    "PST": "ppublish",
+    "SO": "Intern Med. 2009;48(14):1219-23. doi: 10.2169/internalmedicine.48.2181. Epub 2009 Jul 15.",
+    "abstract": "Acetylcholinesterase inhibitors (AChIs) are widely used in the treatment of mild-to-moderate Alzheimer's disease (AD), but their cholinergic effects could generate adverse side effects in the cardiovascular system. This report presents the cases of 2 patients who experienced adverse side effects of cardiac rhythm with QT prolongation caused by Donepezil. Both of them improved to the original rhythm and shortened QT intervals after the discontinuation of Donepezil. The present cases suggest that the cholinergic effects of Donepezil could induce adverse side effects on cardiac rhythm and careful consideration is needed for the patients treated by Donepezil.",
+    "doi": "10.2169/internalmedicine.48",
+    "pmid": "19602789",
+    "year": "2009",
+    "title": "Donepezil-induced adverse side effects of cardiac rhythm: 2 cases report of atrioventricular block and Torsade de Pointes.",
+    "source": "pubmed",
+    "full_text": "1. Intern Med. 2009;48(14):1219-23. doi: 10.2169/internalmedicine.48.2181. Epub \n2009 Jul 15.\n\nDonepezil-induced adverse side effects of cardiac rhythm: 2 cases report of \natrioventricular block and Torsade de Pointes.\n\nTanaka A(1), Koga S, Hiramatsu Y.\n\nAuthor information:\n(1)Department of Cardiology, Koga Hospital 21, Kurume. mikechann@gmail.com\n\nAcetylcholinesterase inhibitors (AChIs) are widely used in the treatment of \nmild-to-moderate Alzheimer's disease (AD), but their cholinergic effects could \ngenerate adverse side effects in the cardiovascular system. This report presents \nthe cases of 2 patients who experienced adverse side effects of cardiac rhythm \nwith QT prolongation caused by Donepezil. Both of them improved to the original \nrhythm and shortened QT intervals after the discontinuation of Donepezil. The \npresent cases suggest that the cholinergic effects of Donepezil could induce \nadverse side effects on cardiac rhythm and careful consideration is needed for \nthe patients treated by Donepezil.\n\nDOI: 10.2169/internalmedicine.48.2181\nPMID: 19602789 [Indexed for MEDLINE]",
+    "full_text_source": "abstract"
+  },
+  "16426108": {
+    "PMID": "16426108",
+    "OWN": "NLM",
+    "STAT": "MEDLINE",
+    "DCOM": "20060328",
+    "LR": "20190902",
+    "IS": "0160-6689 (Print) 0160-6689 (Linking)",
+    "VI": "67",
+    "IP": "1",
+    "DP": "2006 Jan",
+    "TI": "Galantamine-induced QTc prolongation.",
+    "PG": "166-7",
+    "FAU": [
+      "Nelson, Matthew W",
+      "Buchanan, Robert W"
+    ],
+    "AU": [
+      "Nelson MW",
+      "Buchanan RW"
+    ],
+    "LA": [
+      "eng"
+    ],
+    "PT": [
+      "Case Reports",
+      "Letter"
+    ],
+    "PL": "United States",
+    "TA": "J Clin Psychiatry",
+    "JT": "The Journal of clinical psychiatry",
+    "JID": "7801243",
+    "RN": [
+      "0 (Cholinesterase Inhibitors)",
+      "0D3Q044KCA (Galantamine)"
+    ],
+    "SB": "IM",
+    "CIN": [
+      "J Clin Psychiatry. 2007 Jan;68(1):169; author reply 169-70. doi:",
+      "10.4088/jcp.v68n0123d. PMID: 17284150"
+    ],
+    "MH": [
+      "Cholinesterase Inhibitors/*adverse effects/therapeutic use",
+      "Galantamine/*adverse effects/therapeutic use",
+      "Humans",
+      "Long QT Syndrome/*chemically induced",
+      "Male",
+      "Middle Aged",
+      "Schizophrenia/*drug therapy"
+    ],
+    "EDAT": "2006/01/24 09:00",
+    "MHDA": "2006/03/29 09:00",
+    "CRDT": [
+      "2006/01/24 09:00"
+    ],
+    "PHST": [
+      "2006/01/24 09:00 [pubmed]",
+      "2006/03/29 09:00 [medline]",
+      "2006/01/24 09:00 [entrez]"
+    ],
+    "AID": [
+      "10.4088/jcp.v67n0123f [doi]"
+    ],
+    "PST": "ppublish",
+    "SO": "J Clin Psychiatry. 2006 Jan;67(1):166-7. doi: 10.4088/jcp.v67n0123f.",
+    "doi": "10.4088/jcp",
+    "pmid": "16426108",
+    "year": "2006",
+    "title": "Galantamine-induced QTc prolongation.",
+    "source": "pubmed",
+    "full_text": "1. J Clin Psychiatry. 2006 Jan;67(1):166-7. doi: 10.4088/jcp.v67n0123f.\n\nGalantamine-induced QTc prolongation.\n\nNelson MW, Buchanan RW.\n\nComment in\n    J Clin Psychiatry. 2007 Jan;68(1):169; author reply 169-70. doi: \n10.4088/jcp.v68n0123d.\n\nDOI: 10.4088/jcp.v67n0123f\nPMID: 16426108 [Indexed for MEDLINE]",
+    "full_text_source": "abstract"
+  }
+}

@@ -1,37 +1,271 @@
 import os
-import plotly.graph_objects as go
-import plotly.subplots as sp
-import numpy as np
-import PyPDF2
-import spacy
-import re
+import sys
 import csv
-from pathlib import Path
-from Bio import Entrez
-import requests
+import re
 import time
-from urllib.parse import urlencode
-import json
-import argparse
-from io import StringIO
-from Bio import Medline
-import logging
+import requests
+import plotly.graph_objects as go
+from Bio import Entrez, Medline
+from typing import Dict, List, Optional, Tuple, Union
+import xml.etree.ElementTree as ET
 
-# Set your email for PubMed API
-Entrez.email = "ghhercock@gmail.com"  # Replace with your email
+# Configure PubMed API
+Entrez.email = "ghhercock@gmail.com"
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+def search_pubmed(drug_name: str) -> List[Dict[str, str]]:
+    """Search PubMed for QT/HR related papers about a drug."""
+    query = f'({drug_name}[Title/Abstract]) AND ("QT"[Title/Abstract] OR "heart rate"[Title/Abstract] OR "torsade"[Title/Abstract])'
+    print(f"\nSearching PubMed with query: {query}")
+    
+    try:
+        # First search
+        handle = Entrez.esearch(db="pubmed", term=query, retmax=50)
+        record = Entrez.read(handle)
+        handle.close()
+        
+        papers = []
+        if record['IdList']:
+            print(f"Found {len(record['IdList'])} papers")
+            print(f"Paper IDs found: {record['IdList']}")
+            
+            # Get paper details
+            handle = Entrez.efetch(db="pubmed", id=record['IdList'], rettype="medline", retmode="text")
+            records = list(Medline.parse(handle))
+            handle.close()
+            
+            print(f"Successfully retrieved {len(records)} paper details\n")
+            
+            for record in records:
+                if 'TI' in record:
+                    # Try to get full text
+                    full_text = get_paper_full_text(record)
+                    text_length = len(record.get('AB', '')) if record.get('AB') else 0
+                    
+                    print(f"\nFound paper: {record.get('TI', '')[:100]}...")
+                    print(f"Text length: {text_length} characters")
+                    
+                    papers.append({
+                        'title': record.get('TI', ''),
+                        'abstract': record.get('AB', ''),
+                        'full_text': full_text,
+                        'pmid': record.get('PMID', ''),
+                        'doi': record.get('DOI', ''),
+                        'year': record.get('DP', '')[:4] if record.get('DP') else ''
+                    })
+        
+        return papers
+    except Exception as e:
+        print(f"PubMed search error: {e}")
+        return []
 
-try:
-    nlp = spacy.load('en_core_web_sm')
-except OSError:
-    import subprocess
-    subprocess.run(['python', '-m', 'spacy', 'download', 'en_core_web_sm'])
-    nlp = spacy.load('en_core_web_sm')
+def get_paper_full_text(paper_info):
+    """Try to get full text from multiple sources."""
+    pmid = paper_info.get('PMID', '')
+    doi = paper_info.get('DOI', '')
+    title = paper_info.get('TI', '')
+    
+    # 1. Try PubMed Central first
+    try:
+        if pmid:
+            handle = Entrez.elink(dbfrom="pubmed", db="pmc", id=pmid)
+            record = Entrez.read(handle)
+            handle.close()
+            
+            if record[0].get('LinkSetDb', []):
+                pmc_id = record[0]['LinkSetDb'][0]['Link'][0]['Id']
+                print(f"Found PMC ID: {pmc_id}")
+                
+                try:
+                    # Try to get XML format first for better parsing
+                    handle = Entrez.efetch(db="pmc", id=pmc_id, rettype="xml", retmode="xml")
+                    xml_content = handle.read()
+                    handle.close()
+                    
+                    # Extract text from XML, focusing on methods, results, and discussion sections
+                    text_content = []
+                    xml_root = ET.fromstring(xml_content)
+                    
+                    # Extract abstract
+                    abstract = xml_root.find(".//abstract")
+                    if abstract is not None:
+                        text_content.append(ET.tostring(abstract, encoding='unicode', method='text'))
+                    
+                    # Extract main sections
+                    for section in xml_root.findall(".//sec"):
+                        title_elem = section.find("title")
+                        if title_elem is not None:
+                            title_text = title_elem.text.lower()
+                            if any(word in title_text for word in ['method', 'result', 'discussion', 'case', 'observation']):
+                                text_content.append(ET.tostring(section, encoding='unicode', method='text'))
+                    
+                    if text_content:
+                        return ' '.join(text_content)
+                    
+                    # If XML parsing fails, fall back to text format
+                    handle = Entrez.efetch(db="pmc", id=pmc_id, rettype="full", retmode="text")
+                    full_text = handle.read()
+                    handle.close()
+                    return full_text
+                    
+                except Exception as e:
+                    print(f"Error getting full text: {e}")
+    except Exception as e:
+        print(f"PMC retrieval error: {e}")
+    
+    # 2. Try bioRxiv/medRxiv
+    try:
+        if doi:
+            biorxiv_url = f"https://api.biorxiv.org/details/biorxiv/{doi}"
+            medrxiv_url = f"https://api.biorxiv.org/details/medrxiv/{doi}"
+            
+            for url in [biorxiv_url, medrxiv_url]:
+                response = requests.get(url)
+                if response.ok:
+                    data = response.json()
+                    if data.get('collection', []):
+                        pdf_url = data['collection'][0].get('pdf_url')
+                        if pdf_url:
+                            print(f"Found preprint PDF: {pdf_url}")
+                            return f"PDF available at: {pdf_url}"
+    except Exception as e:
+        print(f"Preprint retrieval error: {e}")
+    
+    return None
 
-def calculate_naranjo_score(text):
+def get_herg_ic50(drug_name: str) -> Optional[float]:
+    """Get hERG IC50 from CSV."""
+    try:
+        with open('hergic50valueschembl.csv', 'r') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if row['Drug'].lower() == drug_name.lower():
+                    return float(row['hERG IC50 (μM)'])
+    except Exception as e:
+        print(f"Error reading hERG IC50: {e}")
+    return None
+
+def calculate_concentrations(dose_mg, molecular_weight=427.5, volume_of_distribution=252, bioavailability=0.4):
+    """Calculate theoretical and bioavailable concentrations."""
+    try:
+        # Convert dose from mg to μmol
+        dose_umol = (dose_mg / molecular_weight) * 1000
+        
+        # Calculate theoretical concentration (μM)
+        theoretical_conc = dose_umol / volume_of_distribution
+        
+        # Calculate bioavailable concentration (μM)
+        bioavailable_conc = theoretical_conc * bioavailability
+        
+        return {
+            'theoretical_conc': round(theoretical_conc, 3),
+            'bioavailable_conc': round(bioavailable_conc, 3)
+        }
+    except Exception as e:
+        print(f"Error calculating concentrations: {e}")
+        return {
+            'theoretical_conc': 0,
+            'bioavailable_conc': 0
+        }
+
+def fetch_pubchem_data(drug_name: str) -> Optional[Dict[str, str]]:
+    """
+    Fetch molecular weight and other properties from PubChem.
+    Returns None if data not found or error occurs.
+    """
+    url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{drug_name}/property/MolecularWeight,XLogP/JSON"
+    
+    try:
+        print(f"Fetching PubChem data for {drug_name}...")
+        response = requests.get(url)
+        response.raise_for_status()
+        
+        data = response.json()['PropertyTable']['Properties'][0]
+        print(f"Found PubChem CID: {data.get('CID')}")
+        print(f"Molecular Weight: {data.get('MolecularWeight')} g/mol")
+        print(f"XLogP: {data.get('XLogP')}")
+        
+        return data
+        
+    except Exception as e:
+        print(f"Error fetching PubChem data: {e}")
+        return None
+
+def calculate_drug_concentrations(drug_name: str, dose_mg: float) -> Dict[str, Union[float, str]]:
+    """Calculate drug concentrations and hERG ratios using PubChem data and known hERG values."""
+    if not dose_mg:
+        return {
+            'theoretical_conc': 'N/A',
+            'bioavailable_conc': 'N/A',
+            'herg_theoretical_ratio': 'N/A',
+            'herg_bioavailable_ratio': 'N/A'
+        }
+    
+    print(f"\nCalculating concentrations for {dose_mg}mg dose of {drug_name}...")
+    
+    # Fetch drug data from PubChem
+    pubchem_data = fetch_pubchem_data(drug_name)
+    if not pubchem_data:
+        return {
+            'theoretical_conc': 'Unknown',
+            'bioavailable_conc': 'Unknown',
+            'herg_theoretical_ratio': 'Unknown',
+            'herg_bioavailable_ratio': 'Unknown'
+        }
+    
+    # Get hERG IC50 value from CSV
+    herg_ic50 = get_herg_ic50(drug_name)
+    
+    # Use PubChem data
+    params = {
+        'molecular_weight': float(pubchem_data['MolecularWeight']),  # Convert to float
+        'herg_ic50': herg_ic50,  # Will be None if not found
+        'bioavailability': 0.5  # Default to 50% if not available
+    }
+    
+    # Estimate bioavailability based on XLogP (lipophilicity)
+    # Higher XLogP generally correlates with better oral bioavailability
+    xlogp = pubchem_data.get('XLogP')
+    if xlogp is not None:
+        if xlogp < 0:
+            params['bioavailability'] = 0.2  # Poor absorption
+        elif xlogp < 2:
+            params['bioavailability'] = 0.4  # Moderate absorption
+        elif xlogp < 4:
+            params['bioavailability'] = 0.6  # Good absorption
+        else:
+            params['bioavailability'] = 0.8  # Excellent absorption
+        print(f"Estimated bioavailability: {params['bioavailability']*100:.0f}% based on XLogP of {xlogp}")
+    
+    # Calculate concentrations
+    dose_mmol = dose_mg / params['molecular_weight'] * 1000  # Convert to mmol
+    theoretical_conc_um = dose_mmol * 1000  # Convert to μM
+    bioavailable_conc_um = theoretical_conc_um * params['bioavailability']
+    
+    print(f"Dose in mmol: {dose_mmol:.3f}")
+    print(f"Theoretical concentration: {theoretical_conc_um:.2f} μM")
+    print(f"Bioavailable concentration: {bioavailable_conc_um:.2f} μM")
+    
+    # Calculate ratios if hERG IC50 is available
+    if params['herg_ic50'] is not None:
+        herg_theoretical_ratio = params['herg_ic50'] / theoretical_conc_um
+        herg_bioavailable_ratio = params['herg_ic50'] / bioavailable_conc_um
+        herg_theoretical_ratio_str = f"{herg_theoretical_ratio:.3f}"
+        herg_bioavailable_ratio_str = f"{herg_bioavailable_ratio:.3f}"
+        print(f"hERG IC50/Theoretical Ratio: {herg_theoretical_ratio_str}")
+        print(f"hERG IC50/Bioavailable Ratio: {herg_bioavailable_ratio_str}")
+    else:
+        herg_theoretical_ratio_str = 'N/A'
+        herg_bioavailable_ratio_str = 'N/A'
+        print("No hERG IC50 value available for ratio calculations")
+    
+    return {
+        'theoretical_conc': f"{theoretical_conc_um:.2f}",
+        'bioavailable_conc': f"{bioavailable_conc_um:.2f}",
+        'herg_theoretical_ratio': herg_theoretical_ratio_str,
+        'herg_bioavailable_ratio': herg_bioavailable_ratio_str
+    }
+
+def calculate_naranjo_score(text: str) -> int:
     """Calculate Naranjo adverse drug reaction probability score."""
     score = 0
     
@@ -77,7 +311,7 @@ def calculate_naranjo_score(text):
     
     return score
 
-def calculate_tisdale_score(text):
+def calculate_tisdale_score(text: str) -> int:
     """Calculate Tisdale risk score for QT prolongation."""
     score = 0
     
@@ -123,7 +357,7 @@ def calculate_tisdale_score(text):
     
     return score
 
-def assess_who_umc(text):
+def assess_who_umc(text: str) -> str:
     """Assess WHO-UMC causality categories."""
     # Certain
     if (re.search(r'rechallenge.*positive|readministration.*recur', text, re.I) and
@@ -154,7 +388,7 @@ def assess_who_umc(text):
     else:
         return "Unassessable"
 
-def save_to_csv(data, filepath):
+def save_to_csv(data: List[Dict[str, str]], filepath: str) -> None:
     """Save list of dictionaries to CSV file."""
     if not data:
         return
@@ -165,7 +399,7 @@ def save_to_csv(data, filepath):
         writer.writeheader()
         writer.writerows(data)
 
-def process_excel_data(excel_path):
+def process_excel_data(excel_path: str) -> List[Dict[str, float]]:
     """Process data from CSV file instead of Excel."""
     data_points = []
     
@@ -184,7 +418,7 @@ def process_excel_data(excel_path):
     print(f"\nTotal points processed: {len(data_points)}")
     return data_points
 
-def extract_values_from_text(text):
+def extract_values_from_text(text: str) -> List[Dict[str, float]]:
     """Extract QT intervals and heart rates from text using NLP."""
     # Load English language model
     nlp = spacy.load("en_core_web_sm")
@@ -234,7 +468,7 @@ def extract_values_from_text(text):
     
     return data_points
 
-def process_pdf(pdf_path):
+def process_pdf(pdf_path: str) -> List[Dict[str, float]]:
     """Process a PDF file and extract QT and HR values."""
     data_points = []
     
@@ -257,7 +491,7 @@ def process_pdf(pdf_path):
     
     return data_points
 
-def process_multiple_pdfs(pdf_directory):
+def process_multiple_pdfs(pdf_directory: str) -> List[Dict[str, float]]:
     """Process all PDFs in a directory."""
     all_data_points = []
     pdf_files = list(Path(pdf_directory).glob('*.pdf'))
@@ -271,7 +505,7 @@ def process_multiple_pdfs(pdf_directory):
     
     return all_data_points
 
-def extract_case_details(text):
+def extract_case_details(text: str) -> Dict[str, Union[str, int, float, None]]:
     """Extract detailed case information using NLP patterns."""
     # Load English language model
     nlp = spacy.load("en_core_web_sm")
@@ -364,7 +598,7 @@ def extract_case_details(text):
     
     return case
 
-def process_pdf_for_cases(pdf_path):
+def process_pdf_for_cases(pdf_path: str) -> List[Dict[str, Union[str, int, float, None]]]:
     """Process a PDF file and extract case report details."""
     cases = []
     
@@ -388,7 +622,7 @@ def process_pdf_for_cases(pdf_path):
     
     return cases
 
-def process_multiple_pdfs_for_cases(pdf_directory):
+def process_multiple_pdfs_for_cases(pdf_directory: str) -> List[Dict[str, Union[str, int, float, None]]]:
     """Process all PDFs in a directory and compile case details."""
     all_cases = []
     pdf_files = list(Path(pdf_directory).glob('*.pdf'))
@@ -402,7 +636,7 @@ def process_multiple_pdfs_for_cases(pdf_directory):
     
     return all_cases
 
-def get_reference_lines():
+def get_reference_lines() -> List[Dict[str, Union[str, List[Dict[str, float]], str]]]:
     """Get reference lines for QT nomogram."""
     # Solid line coordinates
     nomogram_line_solid = [
@@ -423,7 +657,7 @@ def get_reference_lines():
         {'data': nomogram_line_dashed, 'name': 'Normal Upper Limit', 'color': 'blue', 'dash': 'dash'}
     ]
 
-def plot_qt_nomogram(data_points):
+def plot_qt_nomogram(data_points: List[Dict[str, float]]) -> go.Figure:
     """Plot QT nomogram using Plotly."""
     # Create reference lines
     ref_lines = get_reference_lines()
@@ -466,56 +700,7 @@ def plot_qt_nomogram(data_points):
     
     return fig
 
-def calculate_drug_concentrations(drug_name, dose_mg):
-    """Calculate drug concentrations and hERG ratios."""
-    if not dose_mg:
-        return {
-            'theoretical_conc': 'N/A',
-            'bioavailable_conc': 'N/A',
-            'herg_theoretical_ratio': 'N/A',
-            'herg_bioavailable_ratio': 'N/A'
-        }
-    
-    # Drug-specific parameters
-    drug_params = {
-        'Ivabradine': {
-            'molecular_weight': 468.593,  # g/mol
-            'herg_ic50': 3.0,  # μM
-            'bioavailability': 0.40  # 40%
-        },
-        'Citalopram': {
-            'molecular_weight': 324.39,  # g/mol
-            'herg_ic50': 1.5,  # μM
-            'bioavailability': 0.80  # 80%
-        }
-    }
-    
-    params = drug_params.get(drug_name)
-    if not params:
-        return {
-            'theoretical_conc': 'Unknown',
-            'bioavailable_conc': 'Unknown',
-            'herg_theoretical_ratio': 'Unknown',
-            'herg_bioavailable_ratio': 'Unknown'
-        }
-    
-    # Calculate concentrations
-    dose_mmol = dose_mg / params['molecular_weight'] * 1000  # Convert to mmol
-    theoretical_conc_um = dose_mmol * 1000  # Convert to μM
-    bioavailable_conc_um = theoretical_conc_um * params['bioavailability']
-    
-    # Calculate ratios
-    herg_theoretical_ratio = params['herg_ic50'] / theoretical_conc_um
-    herg_bioavailable_ratio = params['herg_ic50'] / bioavailable_conc_um
-    
-    return {
-        'theoretical_conc': f"{theoretical_conc_um:.2f}",
-        'bioavailable_conc': f"{bioavailable_conc_um:.2f}",
-        'herg_theoretical_ratio': f"{herg_theoretical_ratio:.3f}",
-        'herg_bioavailable_ratio': f"{herg_bioavailable_ratio:.3f}"
-    }
-
-def extract_dose(text):
+def extract_dose(text: str) -> Optional[float]:
     """Extract drug dose from text."""
     # Look for dose patterns like "5 mg", "5mg", "5-10mg", etc.
     dose_pattern = r'(\d+(?:\.\d+)?)\s*(?:mg|milligrams?)(?:\s*oral)?'
@@ -524,55 +709,84 @@ def extract_dose(text):
         return float(match.group(1))
     return None
 
-def plot_papers_table(papers, drug_name):
-    """Create a table showing paper details and causality scores."""
-    # Extract relevant data
+def plot_papers_table(papers: List[Dict[str, str]]) -> go.Figure:
+    """Create a table showing paper details and QT/HR data."""
+    # Prepare table headers
+    headers = ['Case Report Title', 'Age', 'Sex', 'Oral Dose (mg)', 
+              'theoretical max concentration (μM)', '40% bioavailability Plasma concentration μM',
+              'Theoretical HERG IC50 / Concentration μM', '40% Plasma concentration/HERG IC50',
+              'Uncorrected QT (ms)', 'QTc', 'QTB', 'QTF', 'Heart Rate (bpm)',
+              'Torsades de Pointes?', 'Blood Pressure (mmHg)', 'Medical History',
+              'Medication History', 'Course of Treatment', 'Outcome', 'Naranjo', 'Tisdale', 'WHO-UMC']
+    
+    # Extract and analyze data
+    analyzed_data = analyze_papers_for_qt_hr(papers)
+    
+    # Prepare table data
     data = []
-    columns = ['Title', 'Year', 'Dose (mg)', 'Theoretical Conc (μM)', 
-              'Bioavailable Conc (μM)', 'hERG IC50/Theoretical', 
-              'hERG IC50/Bioavailable', 'QTc (ms)', 'HR (bpm)',
-              'Naranjo', 'Tisdale', 'WHO-UMC']
+    seen_papers = set()
     
-    for paper in papers:
-        # Extract dose from title and abstract
-        text = paper['title'] + ' ' + paper['abstract']
-        
-        # Calculate drug concentrations
-        conc_data = calculate_drug_concentrations(drug_name, extract_dose(text))
-        
-        # Extract QTc and HR
-        qtc_match = re.search(r'(?:QTc|QT).*?(\d+)\s*(?:ms|msec)', text)
-        hr_match = re.search(r'(?:HR|heart rate).*?(\d+)\s*(?:bpm|beats)', text)
-        
-        row = [
-            paper['title'][:50] + '...' if len(paper['title']) > 50 else paper['title'],
-            paper['year'],
-            str(extract_dose(text)) if extract_dose(text) else 'N/A',
-            conc_data['theoretical_conc'],
-            conc_data['bioavailable_conc'],
-            conc_data['herg_theoretical_ratio'],
-            conc_data['herg_bioavailable_ratio'],
-            qtc_match.group(1) if qtc_match else 'N/A',
-            hr_match.group(1) if hr_match else 'N/A',
-            str(paper['naranjo_score']),
-            str(paper['tisdale_score']),
-            paper['who_umc']
-        ]
-        data.append(row)
+    for point in analyzed_data:
+        if point['title'] not in seen_papers:
+            row = [
+                point['title'],  # Case Report Title
+                '',  # Age
+                '',  # Sex
+                '',  # Oral Dose
+                '',  # Theoretical max concentration
+                '',  # 40% bioavailability
+                '',  # Theoretical HERG IC50
+                '',  # 40% Plasma concentration/HERG IC50
+                point['qt'],  # Uncorrected QT
+                '',  # QTc
+                '',  # QTB
+                '',  # QTF
+                point['hr'],  # Heart Rate
+                '',  # Torsades
+                '',  # Blood Pressure
+                '',  # Medical History
+                '',  # Medication History
+                '',  # Course Treatment
+                point['naranjo_score'],  # Naranjo Score
+                point['who_umc'],  # WHO-UMC
+                point['tisdale_score']  # Tisdale Score
+            ]
+            data.append(row)
+            seen_papers.add(point['title'])
     
-    # Create figure and axis
-    fig = go.Figure(data=[go.Table(header=dict(values=columns),
-                                   cells=dict(values=data))])
+    # Create table with updated styling
+    fig = go.Figure(data=[go.Table(
+        header=dict(
+            values=headers,
+            font=dict(size=11, color='white'),
+            fill_color='royalblue',
+            align=['left'] * len(headers),
+            height=40
+        ),
+        cells=dict(
+            values=list(zip(*data)) if data else [[] for _ in headers],
+            align=['left'] * len(headers),
+            font=dict(size=10),
+            height=30,
+            fill=dict(color=['rgb(245, 245, 245)', 'white'])
+        )
+    )])
     
-    # Update layout
-    fig.update_layout(title=f'{drug_name} Case Reports Analysis')
+    # Update layout with better sizing
+    fig.update_layout(
+        title=dict(
+            text=f"Literature Analysis Results for {papers[0]['drug_name'] if papers else 'Unknown Drug'}",
+            x=0.5,
+            font=dict(size=20)
+        ),
+        width=1500,  # Increased width to accommodate more columns
+        height=max(len(data) * 40 + 100, 400),  # Dynamic height based on rows
+        margin=dict(t=50, l=20, r=20, b=20)
+    )
     
-    # Save figure
-    fig.write_html(f'{drug_name.lower()}_analysis_table.html')
-    fig.write_pdf(f'{drug_name.lower()}_analysis_table.pdf')
     return fig
 
-def get_paper_abstract(pmid):
+def get_paper_abstract(pmid: str) -> Optional[str]:
     """Get paper abstract from PubMed."""
     try:
         handle = Entrez.efetch(db="pubmed", id=pmid, rettype="abstract", retmode="text")
@@ -582,196 +796,7 @@ def get_paper_abstract(pmid):
         print(f"Error fetching abstract for {pmid}: {e}")
         return None
 
-def search_pubmed(mesh_terms, title_abs_terms):
-    """Search PubMed for papers matching the terms."""
-    papers = []
-    try:
-        # Search using MeSH terms
-        handle = Entrez.esearch(db="pubmed", term=mesh_terms)
-        record = Entrez.read(handle)
-        mesh_ids = record["IdList"]
-        
-        # Search using title/abstract terms
-        handle = Entrez.esearch(db="pubmed", term=title_abs_terms)
-        record = Entrez.read(handle)
-        title_abs_ids = record["IdList"]
-        
-        # Combine and deduplicate IDs
-        pmids = list(set(mesh_ids + title_abs_ids))
-        
-        # Fetch details for each paper
-        for pmid in pmids:
-            try:
-                handle = Entrez.efetch(db="pubmed", id=pmid, rettype="medline", retmode="text")
-                records = list(Medline.parse(handle))
-                if records:
-                    record = records[0]
-                    if 'TI' in record:  # Title exists
-                        # Clean up DOI - it might be in different fields
-                        doi = None
-                        if 'LID' in record:
-                            doi_match = re.search(r'(10\.\d{4,}/\S+)', record['LID'])
-                            if doi_match:
-                                doi = doi_match.group(1)
-                        if not doi and 'AID' in record:
-                            for id in record['AID']:
-                                if '[doi]' in id:
-                                    doi = id.replace(' [doi]', '')
-                                    break
-                        
-                        paper = {
-                            'title': record.get('TI', ''),
-                            'abstract': record.get('AB', ''),
-                            'authors': ', '.join(record.get('AU', [])),
-                            'journal': record.get('JT', ''),
-                            'year': record.get('DP', '').split()[0] if record.get('DP') else '',
-                            'doi': doi or 'N/A',
-                            'naranjo_score': calculate_naranjo_score(record.get('AB', '')),
-                            'tisdale_score': calculate_tisdale_score(record.get('AB', '')),
-                            'who_umc': assess_who_umc(record.get('AB', ''))
-                        }
-                        papers.append(paper)
-                        print(f"\nFound paper: {paper['title']}")
-                        print(f"DOI: {paper['doi']}")
-                        print("Causality Assessment:")
-                        print(f"- Naranjo Score: {paper['naranjo_score']}")
-                        print(f"- Tisdale Score: {paper['tisdale_score']}")
-                        print(f"- WHO-UMC: {paper['who_umc']}\n")
-            except Exception as e:
-                print(f"Error processing paper {pmid}: {e}")
-                continue
-                
-    except Exception as e:
-        print(f"Error searching PubMed: {e}")
-    
-    return papers
-
-def save_to_csv(papers, output_path):
-    """Save paper analysis to CSV file."""
-    headers = ['Title', 'Year', 'DOI', 'Authors', 'Age', 'Sex', 'Dose (mg)', 
-              'QT (ms)', 'QTc (ms)', 'QTB (ms)', 'QTF (ms)', 'HR (bpm)', 
-              'TdP?', 'Medical History', 'Medication History',
-              'Course of Treatment', 'Outcome', 'Naranjo', 'Tisdale', 'WHO-UMC']
-    
-    with open(output_path, 'w', newline='', encoding='utf-8') as f:
-        writer = csv.DictWriter(f, fieldnames=headers)
-        writer.writeheader()
-        
-        for paper in papers:
-            text = paper['title'] + ' ' + paper['abstract']
-            
-            # Extract age and sex
-            age_match = re.search(r'(\d+)[\s-]*(?:year|yr)', text, re.IGNORECASE)
-            sex_match = re.search(r'(male|female|man|woman|boy|girl)', text, re.IGNORECASE)
-            
-            row = {
-                'Title': paper['title'],
-                'Year': paper['year'],
-                'DOI': paper.get('doi', 'N/A'),
-                'Authors': paper['authors'],
-                'Age': age_match.group(1) if age_match else 'N/A',
-                'Sex': sex_match.group(1).title() if sex_match else 'N/A',
-                'Dose (mg)': extract_dose(text) or 'N/A',
-                'QT (ms)': extract_qt_hr_values(text)['qt_values'][0] if extract_qt_hr_values(text)['qt_values'] else 'N/A',
-                'QTc (ms)': extract_qt_hr_values(text)['qt_values'][1] if len(extract_qt_hr_values(text)['qt_values']) > 1 else 'N/A',
-                'QTB (ms)': extract_qt_hr_values(text)['qt_values'][2] if len(extract_qt_hr_values(text)['qt_values']) > 2 else 'N/A',
-                'QTF (ms)': extract_qt_hr_values(text)['qt_values'][3] if len(extract_qt_hr_values(text)['qt_values']) > 3 else 'N/A',
-                'HR (bpm)': extract_qt_hr_values(text)['hr_values'][0] if extract_qt_hr_values(text)['hr_values'] else 'N/A',
-                'TdP?': 'Yes' if 'torsade' in text.lower() else 'N/A',
-                'Medical History': extract_medical_history(text),
-                'Medication History': extract_medications(text),
-                'Course of Treatment': extract_treatment_course(text),
-                'Outcome': extract_outcome(text),
-                'Naranjo': str(paper['naranjo_score']),
-                'Tisdale': str(paper['tisdale_score']),
-                'WHO-UMC': paper['who_umc']
-            }
-            writer.writerow(row)
-
-def search_pubmed_papers(drug_name):
-    """Search PubMed for case reports of TdP with the specified drug."""
-    # MESH term query - replace drug names
-    mesh_query = f'((hERG) OR (QT) OR (QTc) OR (torsad*)) AND ({drug_name})'
-    
-    # Additional title/abstract terms
-    title_abs_query = f'({drug_name}[Title/Abstract]) AND (("torsades de pointes"[Title/Abstract]) OR (tdp[Title/Abstract]) OR (torsades[Title/Abstract]))'
-    
-    # Combine queries with case report filter
-    query = f'({mesh_query} OR {title_abs_query}) AND (case reports[Publication Type])'
-    
-    print(f"\nSearching PubMed using:")
-    print(f"MESH terms: {mesh_query}")
-    print(f"Title/Abstract terms: {title_abs_query}")
-    
-    # Search PubMed
-    handle = Entrez.esearch(db="pubmed", term=query, retmax=100)
-    record = Entrez.read(handle)
-    handle.close()
-    
-    if not record["IdList"]:
-        print("No papers found matching the criteria.")
-        return []
-    
-    print(f"\nFound {len(record['IdList'])} matching papers")
-    
-    # Fetch details for each paper
-    handle = Entrez.efetch(db="pubmed", id=record["IdList"], rettype="xml", retmode="xml")
-    papers = Entrez.read(handle)
-    handle.close()
-    
-    paper_details = []
-    for paper in papers['PubmedArticle']:
-        try:
-            article = paper['MedlineCitation']['Article']
-            
-            # Get DOI if available
-            doi = None
-            if 'ELocationID' in article:
-                for id in article['ELocationID']:
-                    if id.attributes['EIdType'] == 'doi':
-                        doi = str(id)
-                        break
-            
-            # Get full text if available
-            full_text = ""
-            if 'Abstract' in article:
-                if isinstance(article['Abstract']['AbstractText'], list):
-                    full_text = ' '.join([str(text) for text in article['Abstract']['AbstractText']])
-                else:
-                    full_text = str(article['Abstract']['AbstractText'])
-            
-            paper_info = {
-                'pmid': paper['MedlineCitation']['PMID'],
-                'title': article['ArticleTitle'],
-                'authors': ', '.join([author['LastName'] + ' ' + author['ForeName'] for author in article['AuthorList']]),
-                'journal': article['Journal']['Title'],
-                'year': article['Journal']['JournalIssue']['PubDate'].get('Year', ''),
-                'abstract': full_text,
-                'doi': doi
-            }
-            
-            # Calculate causality scores
-            combined_text = f"{paper_info['title']} {paper_info['abstract']}"
-            paper_info['naranjo_score'] = calculate_naranjo_score(combined_text)
-            paper_info['tisdale_score'] = calculate_tisdale_score(combined_text)
-            paper_info['who_umc'] = assess_who_umc(combined_text)
-            
-            # Print detailed information
-            print(f"\nFound paper: {paper_info['title']}")
-            print(f"DOI: {paper_info['doi'] if paper_info['doi'] else 'N/A'}")
-            print(f"Causality Assessment:")
-            print(f"- Naranjo Score: {paper_info['naranjo_score']}")
-            print(f"- Tisdale Score: {paper_info['tisdale_score']}")
-            print(f"- WHO-UMC: {paper_info['who_umc']}")
-            
-            paper_details.append(paper_info)
-            
-        except Exception as e:
-            print(f"Error processing paper: {str(e)}")
-    
-    return paper_details
-
-def plot_combined_analysis(papers, drug_name, qt_data):
+def plot_combined_analysis(papers: List[Dict[str, str]], drug_name: str, qt_data: List[Dict[str, float]]) -> None:
     """Create a combined figure with QT nomogram and analysis table."""
     # Create subplots with more space for the table
     fig = sp.make_subplots(
@@ -794,10 +819,8 @@ def plot_combined_analysis(papers, drug_name, qt_data):
                 y=qt_values,
                 mode='lines',
                 name=line['name'],
-                line=dict(
-                    color=line['color'],
-                    dash=line['dash']
-                )
+                line=dict(color=line['color'], dash=line['dash']),
+                showlegend=True
             ),
             row=1, col=1
         )
@@ -812,11 +835,7 @@ def plot_combined_analysis(papers, drug_name, qt_data):
                 y=qt_values,
                 mode='markers',
                 name='Data Points',
-                marker=dict(
-                    size=10,
-                    color='red',
-                    symbol='circle'
-                )
+                marker=dict(color='red')
             ),
             row=1, col=1
         )
@@ -870,309 +889,9 @@ def plot_combined_analysis(papers, drug_name, qt_data):
         plot_bgcolor='aliceblue'
     )
 
-    return fig
+    fig.show()
 
-def get_paper_abstract(pmid):
-    """Get paper abstract from PubMed."""
-    try:
-        handle = Entrez.efetch(db="pubmed", id=pmid, rettype="abstract", retmode="text")
-        abstract = handle.read()
-        return abstract
-    except Exception as e:
-        print(f"Error fetching abstract for {pmid}: {e}")
-        return None
-
-def search_pubmed(mesh_terms, title_abs_terms):
-    """Search PubMed for papers matching the terms."""
-    papers = []
-    try:
-        # Search using MeSH terms
-        handle = Entrez.esearch(db="pubmed", term=mesh_terms)
-        record = Entrez.read(handle)
-        mesh_ids = record["IdList"]
-        
-        # Search using title/abstract terms
-        handle = Entrez.esearch(db="pubmed", term=title_abs_terms)
-        record = Entrez.read(handle)
-        title_abs_ids = record["IdList"]
-        
-        # Combine and deduplicate IDs
-        pmids = list(set(mesh_ids + title_abs_ids))
-        
-        # Fetch details for each paper
-        for pmid in pmids:
-            try:
-                handle = Entrez.efetch(db="pubmed", id=pmid, rettype="medline", retmode="text")
-                records = list(Medline.parse(handle))
-                if records:
-                    record = records[0]
-                    if 'TI' in record:  # Title exists
-                        # Clean up DOI - it might be in different fields
-                        doi = None
-                        if 'LID' in record:
-                            doi_match = re.search(r'(10\.\d{4,}/\S+)', record['LID'])
-                            if doi_match:
-                                doi = doi_match.group(1)
-                        if not doi and 'AID' in record:
-                            for id in record['AID']:
-                                if '[doi]' in id:
-                                    doi = id.replace(' [doi]', '')
-                                    break
-                        
-                        paper = {
-                            'title': record.get('TI', ''),
-                            'abstract': record.get('AB', ''),
-                            'authors': ', '.join(record.get('AU', [])),
-                            'journal': record.get('JT', ''),
-                            'year': record.get('DP', '').split()[0] if record.get('DP') else '',
-                            'doi': doi or 'N/A',
-                            'naranjo_score': calculate_naranjo_score(record.get('AB', '')),
-                            'tisdale_score': calculate_tisdale_score(record.get('AB', '')),
-                            'who_umc': assess_who_umc(record.get('AB', ''))
-                        }
-                        papers.append(paper)
-                        print(f"\nFound paper: {paper['title']}")
-                        print(f"DOI: {paper['doi']}")
-                        print("Causality Assessment:")
-                        print(f"- Naranjo Score: {paper['naranjo_score']}")
-                        print(f"- Tisdale Score: {paper['tisdale_score']}")
-                        print(f"- WHO-UMC: {paper['who_umc']}\n")
-            except Exception as e:
-                print(f"Error processing paper {pmid}: {e}")
-                continue
-                
-    except Exception as e:
-        print(f"Error searching PubMed: {e}")
-    
-    return papers
-
-def save_to_csv(papers, output_path):
-    """Save paper analysis to CSV file."""
-    headers = ['Title', 'Year', 'DOI', 'Authors', 'Age', 'Sex', 'Dose (mg)', 
-              'QT (ms)', 'QTc (ms)', 'QTB (ms)', 'QTF (ms)', 'HR (bpm)', 
-              'TdP?', 'Medical History', 'Medication History',
-              'Course of Treatment', 'Outcome', 'Naranjo', 'Tisdale', 'WHO-UMC']
-    
-    with open(output_path, 'w', newline='', encoding='utf-8') as f:
-        writer = csv.DictWriter(f, fieldnames=headers)
-        writer.writeheader()
-        
-        for paper in papers:
-            text = paper['title'] + ' ' + paper['abstract']
-            
-            # Extract age and sex
-            age_match = re.search(r'(\d+)[\s-]*(?:year|yr)', text, re.IGNORECASE)
-            sex_match = re.search(r'(male|female|man|woman|boy|girl)', text, re.IGNORECASE)
-            
-            row = {
-                'Title': paper['title'],
-                'Year': paper['year'],
-                'DOI': paper.get('doi', 'N/A'),
-                'Authors': paper['authors'],
-                'Age': age_match.group(1) if age_match else 'N/A',
-                'Sex': sex_match.group(1).title() if sex_match else 'N/A',
-                'Dose (mg)': extract_dose(text) or 'N/A',
-                'QT (ms)': extract_qt_hr_values(text)['qt_values'][0] if extract_qt_hr_values(text)['qt_values'] else 'N/A',
-                'QTc (ms)': extract_qt_hr_values(text)['qt_values'][1] if len(extract_qt_hr_values(text)['qt_values']) > 1 else 'N/A',
-                'QTB (ms)': extract_qt_hr_values(text)['qt_values'][2] if len(extract_qt_hr_values(text)['qt_values']) > 2 else 'N/A',
-                'QTF (ms)': extract_qt_hr_values(text)['qt_values'][3] if len(extract_qt_hr_values(text)['qt_values']) > 3 else 'N/A',
-                'HR (bpm)': extract_qt_hr_values(text)['hr_values'][0] if extract_qt_hr_values(text)['hr_values'] else 'N/A',
-                'TdP?': 'Yes' if 'torsade' in text.lower() else 'N/A',
-                'Medical History': extract_medical_history(text),
-                'Medication History': extract_medications(text),
-                'Course of Treatment': extract_treatment_course(text),
-                'Outcome': extract_outcome(text),
-                'Naranjo': str(paper['naranjo_score']),
-                'Tisdale': str(paper['tisdale_score']),
-                'WHO-UMC': paper['who_umc']
-            }
-            writer.writerow(row)
-
-def search_pubmed_papers(drug_name):
-    """Search PubMed for case reports of TdP with the specified drug."""
-    # MESH term query - replace drug names
-    mesh_query = f'((hERG) OR (QT) OR (QTc) OR (torsad*)) AND ({drug_name})'
-    
-    # Additional title/abstract terms
-    title_abs_query = f'({drug_name}[Title/Abstract]) AND (("torsades de pointes"[Title/Abstract]) OR (tdp[Title/Abstract]) OR (torsades[Title/Abstract]))'
-    
-    # Combine queries with case report filter
-    query = f'({mesh_query} OR {title_abs_query}) AND (case reports[Publication Type])'
-    
-    print(f"\nSearching PubMed using:")
-    print(f"MESH terms: {mesh_query}")
-    print(f"Title/Abstract terms: {title_abs_query}")
-    
-    # Search PubMed
-    handle = Entrez.esearch(db="pubmed", term=query, retmax=100)
-    record = Entrez.read(handle)
-    handle.close()
-    
-    if not record["IdList"]:
-        print("No papers found matching the criteria.")
-        return []
-    
-    print(f"\nFound {len(record['IdList'])} matching papers")
-    
-    # Fetch details for each paper
-    handle = Entrez.efetch(db="pubmed", id=record["IdList"], rettype="xml", retmode="xml")
-    papers = Entrez.read(handle)
-    handle.close()
-    
-    paper_details = []
-    for paper in papers['PubmedArticle']:
-        try:
-            article = paper['MedlineCitation']['Article']
-            
-            # Get DOI if available
-            doi = None
-            if 'ELocationID' in article:
-                for id in article['ELocationID']:
-                    if id.attributes['EIdType'] == 'doi':
-                        doi = str(id)
-                        break
-            
-            # Get full text if available
-            full_text = ""
-            if 'Abstract' in article:
-                if isinstance(article['Abstract']['AbstractText'], list):
-                    full_text = ' '.join([str(text) for text in article['Abstract']['AbstractText']])
-                else:
-                    full_text = str(article['Abstract']['AbstractText'])
-            
-            paper_info = {
-                'pmid': paper['MedlineCitation']['PMID'],
-                'title': article['ArticleTitle'],
-                'authors': ', '.join([author['LastName'] + ' ' + author['ForeName'] for author in article['AuthorList']]),
-                'journal': article['Journal']['Title'],
-                'year': article['Journal']['JournalIssue']['PubDate'].get('Year', ''),
-                'abstract': full_text,
-                'doi': doi
-            }
-            
-            # Calculate causality scores
-            combined_text = f"{paper_info['title']} {paper_info['abstract']}"
-            paper_info['naranjo_score'] = calculate_naranjo_score(combined_text)
-            paper_info['tisdale_score'] = calculate_tisdale_score(combined_text)
-            paper_info['who_umc'] = assess_who_umc(combined_text)
-            
-            # Print detailed information
-            print(f"\nFound paper: {paper_info['title']}")
-            print(f"DOI: {paper_info['doi'] if paper_info['doi'] else 'N/A'}")
-            print(f"Causality Assessment:")
-            print(f"- Naranjo Score: {paper_info['naranjo_score']}")
-            print(f"- Tisdale Score: {paper_info['tisdale_score']}")
-            print(f"- WHO-UMC: {paper_info['who_umc']}")
-            
-            paper_details.append(paper_info)
-            
-        except Exception as e:
-            print(f"Error processing paper: {str(e)}")
-    
-    return paper_details
-
-def plot_combined_analysis(papers, drug_name, qt_data):
-    """Create a combined figure with QT nomogram and analysis table."""
-    # Create subplots with more space for the table
-    fig = sp.make_subplots(
-        rows=2, cols=1,
-        row_heights=[0.6, 0.4],  # Give more height to the table
-        specs=[[{"type": "scatter"}],
-               [{"type": "table"}]],
-        vertical_spacing=0.1,
-        subplot_titles=(f"QT Nomogram for {drug_name}", f"Literature Analysis for {drug_name}")
-    )
-
-    # Add reference lines
-    ref_lines = get_reference_lines()
-    for line in ref_lines:
-        hr_values = [point['hr'] for point in line['data']]
-        qt_values = [point['qt'] for point in line['data']]
-        fig.add_trace(
-            go.Scatter(
-                x=hr_values,
-                y=qt_values,
-                mode='lines',
-                name=line['name'],
-                line=dict(
-                    color=line['color'],
-                    dash=line['dash']
-                )
-            ),
-            row=1, col=1
-        )
-
-    # Add data points
-    if qt_data:
-        hr_values = [point['hr'] for point in qt_data]
-        qt_values = [point['qt'] for point in qt_data]
-        fig.add_trace(
-            go.Scatter(
-                x=hr_values,
-                y=qt_values,
-                mode='markers',
-                name='Data Points',
-                marker=dict(
-                    size=10,
-                    color='red',
-                    symbol='circle'
-                )
-            ),
-            row=1, col=1
-        )
-
-    # Update nomogram layout
-    fig.update_xaxes(title_text='Heart Rate (bpm)', range=[0, 300], row=1, col=1)
-    fig.update_yaxes(title_text='QT Interval (ms)', range=[200, 800], row=1, col=1)
-
-    # Create table data with more columns
-    table_data = {
-        'Title': [paper['Title'] for paper in papers],
-        'DOI': [paper['DOI'] for paper in papers],
-        'Year': [paper.get('Year', 'N/A') for paper in papers],
-        'QT Values': [paper.get('QT_values', 'N/A') for paper in papers],
-        'HR Values': [paper.get('HR_values', 'N/A') for paper in papers],
-        'Naranjo': [paper.get('Naranjo_Score', 'N/A') for paper in papers],
-        'Tisdale': [paper.get('Tisdale_Score', 'N/A') for paper in papers],
-        'WHO-UMC': [paper.get('WHO_UMC', 'N/A') for paper in papers]
-    }
-
-    # Add table with improved formatting
-    fig.add_trace(
-        go.Table(
-            header=dict(
-                values=list(table_data.keys()),
-                fill_color='paleturquoise',
-                align='left',
-                font=dict(size=12, color='black'),
-                height=40
-            ),
-            cells=dict(
-                values=list(table_data.values()),
-                fill_color='lavender',
-                align='left',
-                font=dict(size=11),
-                height=30,
-                line_color='darkslategray',
-                line_width=1
-            )
-        ),
-        row=2, col=1
-    )
-
-    # Update layout
-    fig.update_layout(
-        height=1500,  # Increased height to accommodate table
-        showlegend=True,
-        title_text=f"Combined Analysis for {drug_name}",
-        title_x=0.5,
-        paper_bgcolor='white',
-        plot_bgcolor='aliceblue'
-    )
-
-    return fig
-
-def process_paper(paper):
+def process_paper(paper: Dict[str, str]) -> Dict[str, Union[str, int, float, None]]:
     """Process a single paper and extract all relevant information."""
     paper_info = {
         'Title': paper.get('title', 'N/A'),
@@ -1260,7 +979,7 @@ def process_paper(paper):
     
     return paper_info
 
-def save_to_csv(papers, filepath):
+def save_to_csv(papers: List[Dict[str, str]], filepath: str) -> None:
     """Save paper analysis to CSV file with all extracted information."""
     if not papers:
         return
@@ -1288,104 +1007,90 @@ def save_to_csv(papers, filepath):
         writer.writeheader()
         writer.writerows(processed_papers)
 
-def extract_qt_hr_values(text):
-    """Extract QT and HR values from text."""
+def extract_qt_hr_values(text: str) -> Dict[str, List[Union[int, Tuple[int, str, str]]]]:
+    """
+    Extract QT, QTc, and HR values from text with context.
+    Returns a dictionary containing:
+    - qt_values: List of tuples (value, method, context)
+    - qtc_values: List of tuples (value, formula, context)
+    - hr_values: List of tuples (value, method, context)
+    """
     values = {
         'qt_values': [],
+        'qtc_values': [],
         'hr_values': [],
         'bp_values': []
     }
     
-    # QT interval patterns
+    # QT interval patterns with improved context capture
     qt_patterns = [
-        r'QT\s*(?:interval)?\s*(?:of|was|is|=|:)?\s*(\d{2,3})(?:\s*(?:ms|msec|milliseconds))?',
-        r'QT\s*(?:interval)?\s*(?:prolonged|increased|decreased|measured)\s*(?:to|at)?\s*(\d{2,3})(?:\s*(?:ms|msec|milliseconds))?'
+        r'(?P<pre>[^.]{0,100})QT\s*(?:interval)?\s*(?:of|was|is|=|:|measured|prolonged|increased|decreased)\s*(?:to|at|as)?\s*(?P<value>\d{2,3})\s*(?:±\s*\d+)?\s*(?:ms|msec|milliseconds)(?P<post>[^.]{0,100})',
+        r'(?P<pre>[^.]{0,100})QT\s*(?:interval)?\s*(?:duration|measurement|value)\s*(?:was|is|=|:|of)?\s*(?P<value>\d{2,3})\s*(?:±\s*\d+)?\s*(?:ms|msec|milliseconds)(?P<post>[^.]{0,100})',
+        r'(?P<pre>[^.]{0,100})(?:baseline\s+)?QT\s+interval\s+(?:range|varied|ranging|from)?\s*(?P<value>\d{2,3})\s*(?:±\s*\d+)?\s*(?:ms|msec|milliseconds)(?P<post>[^.]{0,100})',
+        r'(?P<pre>[^.]{0,100})QT\s*(?:interval)?\s*(?:prolongation|increase|decrease)\s*(?:to|of|by)?\s*(?P<value>\d{2,3})\s*(?:±\s*\d+)?\s*(?:ms|msec|milliseconds)(?P<post>[^.]{0,100})'
     ]
     
-    # Heart rate patterns
+    # QTc patterns with formula detection
+    qtc_patterns = [
+        r'(?P<pre>[^.]{0,100})QTc\s*(?:\((?P<formula>Bazett|Fridericia|Framingham|Hodges)\))?\s*(?:of|was|is|=|:|measured)\s*(?:to|at|as)?\s*(?P<value>\d{2,3})\s*(?:±\s*\d+)?\s*(?:ms|msec|milliseconds)(?P<post>[^.]{0,100})',
+        r'(?P<pre>[^.]{0,100})QTc\s*(?:\((?P<formula>Bazett|Fridericia|Framingham|Hodges)\))?\s*(?:interval|duration|measurement|value)\s*(?:was|is|=|:|of)?\s*(?P<value>\d{2,3})\s*(?:±\s*\d+)?\s*(?:ms|msec|milliseconds)(?P<post>[^.]{0,100})',
+        r'(?P<pre>[^.]{0,100})(?:corrected|heart[\s-]rate[\s-]corrected)\s+QT\s*(?:\((?P<formula>Bazett|Fridericia|Framingham|Hodges)\))?\s*(?:was|is|=|:|of)?\s*(?P<value>\d{2,3})\s*(?:±\s*\d+)?\s*(?:ms|msec|milliseconds)(?P<post>[^.]{0,100})',
+        r'(?P<pre>[^.]{0,100})QTc\s*(?:\((?P<formula>Bazett|Fridericia|Framingham|Hodges)\))?\s*(?:prolongation|increase|decrease)\s*(?:to|of|by)?\s*(?P<value>\d{2,3})\s*(?:±\s*\d+)?\s*(?:ms|msec|milliseconds)(?P<post>[^.]{0,100})'
+    ]
+    
+    # Heart rate patterns with improved context
     hr_patterns = [
-        r'(?:heart rate|HR|pulse|rate)\s*(?:of|was|is|=|:)?\s*(\d{1,3})(?:\s*(?:bpm|beats per minute|beats/min))?',
-        r'(?:heart rate|HR|pulse|rate)\s*(?:increased|decreased|measured)\s*(?:to|at)?\s*(\d{1,3})(?:\s*(?:bpm|beats per minute|beats/min))?'
+        r'(?P<pre>[^.]{0,100})(?:heart\s+rate|HR|pulse(?:\s+rate)?)\s*(?:of|was|is|=|:|measured)\s*(?:to|at|as)?\s*(?P<value>\d{1,3})\s*(?:±\s*\d+)?\s*(?:bpm|beats\s*(?:per|\/)?\s*min(?:ute)?)(?P<post>[^.]{0,100})',
+        r'(?P<pre>[^.]{0,100})(?:heart\s+rate|HR|pulse(?:\s+rate)?)\s*(?:increased|decreased|changed)\s*(?:to|at)?\s*(?P<value>\d{1,3})\s*(?:±\s*\d+)?\s*(?:bpm|beats\s*(?:per|\/)?\s*min(?:ute)?)(?P<post>[^.]{0,100})',
+        r'(?P<pre>[^.]{0,100})(?:baseline\s+)?(?:heart\s+rate|HR|pulse(?:\s+rate)?)\s*(?:range|varied|ranging|from)?\s*(?P<value>\d{1,3})\s*(?:±\s*\d+)?\s*(?:bpm|beats\s*(?:per|\/)?\s*min(?:ute)?)(?P<post>[^.]{0,100})',
+        r'(?P<pre>[^.]{0,100})(?:mean|average)\s+(?:heart\s+rate|HR|pulse(?:\s+rate)?)\s*(?:was|is|=|:|of)?\s*(?P<value>\d{1,3})\s*(?:±\s*\d+)?\s*(?:bpm|beats\s*(?:per|\/)?\s*min(?:ute)?)(?P<post>[^.]{0,100})'
     ]
     
-    # Blood pressure patterns
-    bp_patterns = [
-        r'(?:blood pressure|BP)\s*(?:of|was|is|=|:)?\s*(\d{2,3})/(\d{2,3})(?:\s*(?:mmHg))?',
-        r'(?:blood pressure|BP)\s*(?:increased|decreased|measured)\s*(?:to|at)?\s*(\d{2,3})/(\d{2,3})(?:\s*(?:mmHg))?',
-        r'(\w+\s+kidney\s+disease)',
-        r'(coronary\s+artery\s+disease)',
-        r'(atrial\s+fibrillation)',
-        r'((?:type\s+[12]|gestational)\s+diabetes)',
-        r'(hypertension)',
-        r'(myocardial\s+infarction)',
-        r'(cardiac\s+arrest)',
-        r'((?:tachy|brady)(?:cardia|arrhythmia))',
-        r'((?:prolonged|long)\s+QT[a-z]*\s+(?:syndrome)?)',
-        r'(asthma|copd|bronchitis)',
-        r'(respiratory\s+(?:failure|distress|infection))',
-        r'(pneumonia)',
-        r'(seizure|epilepsy)',
-        r'(stroke|tia)',
-        r'(parkinson)',
-        r'(depression)',
-        r'(anxiety)',
-        r'(bipolar\s+disorder)',
-        r'(schizophrenia)',
-        r'(diabetes(?:\s+mellitus)?)',
-        r'(renal\s+(?:failure|insufficiency))',
-        r'(liver\s+(?:failure|disease|cirrhosis))',
-        r'(cancer|malignancy)',
-        r'(sepsis|infection)',
-        r'(covid-19|coronavirus)',
-        r'((?:low|high)\s+(?:potassium|magnesium|calcium))',
-        r'(electrolyte\s+(?:imbalance|abnormality))',
-    ]
-    
-    for pattern in qt_patterns:
-        matches = re.finditer(pattern, text, re.IGNORECASE)
-        for match in matches:
-            try:
-                qt = int(match.group(1))
-                if 200 <= qt <= 1000:  # Reasonable QT range
-                    values['qt_values'].append(qt)
-            except ValueError:
-                continue
+    def extract_with_context(patterns, text, value_range, value_type):
+        results = []
+        for pattern in patterns:
+            matches = re.finditer(pattern, text, re.IGNORECASE | re.MULTILINE | re.DOTALL)
+            for match in matches:
+                try:
+                    value = int(match.group('value'))
+                    min_val, max_val = value_range
+                    
+                    if min_val <= value <= max_val:
+                        pre_context = match.group('pre').strip()
+                        post_context = match.group('post').strip()
+                        
+                        # Clean up the context
+                        context = f"{pre_context} [...] {post_context}"
+                        context = re.sub(r'\s+', ' ', context).strip()
+                        context = context.replace('[...] [...]', '[...]')
+                        
+                        # Remove any incomplete sentences
+                        context = re.sub(r'^[a-z].*?\.\.\.', '', context)
+                        context = re.sub(r'\.\.\.[a-z].*$', '', context)
+                        
+                        if value_type == 'qtc' and 'formula' in match.groupdict():
+                            formula = match.group('formula') or 'unspecified'
+                            results.append((value, formula, context))
+                        else:
+                            method = 'measured' if any(word in pre_context.lower() for word in ['measured', 'recorded', 'observed', 'mean', 'average']) else 'reported'
+                            results.append((value, method, context))
+                except (ValueError, IndexError):
+                    continue
+        return results
 
-    for pattern in hr_patterns:
-        matches = re.finditer(pattern, text, re.IGNORECASE)
-        for match in matches:
-            try:
-                hr = int(match.group(1))
-                if 20 <= hr <= 300:  # Reasonable HR range
-                    values['hr_values'].append(hr)
-            except ValueError:
-                continue
+    # Extract values with context
+    values['qt_values'] = extract_with_context(qt_patterns, text, (200, 1000), 'qt')
+    values['qtc_values'] = extract_with_context(qtc_patterns, text, (200, 1000), 'qtc')
+    values['hr_values'] = extract_with_context(hr_patterns, text, (20, 300), 'hr')
     
-    # Blood pressure extraction
-    for pattern in bp_patterns:
-        matches = re.finditer(pattern, text, re.IGNORECASE)
-        for match in matches:
-            try:
-                if len(match.groups()) == 2:
-                    sbp = int(match.group(1))
-                    dbp = int(match.group(2))
-                    if 60 <= sbp <= 250 and 30 <= dbp <= 150:  # Reasonable BP ranges
-                        values['bp_values'].append((sbp, dbp))
-                else:
-                    sbp = int(match.group(1))
-                    if 60 <= sbp <= 250:  # Reasonable systolic BP range
-                        values['bp_values'].append(sbp)
-            except ValueError:
-                continue
-    
-    # Remove duplicates while preserving order
+    # Remove duplicates while preserving context
     values['qt_values'] = list(dict.fromkeys(values['qt_values']))
+    values['qtc_values'] = list(dict.fromkeys(values['qtc_values']))
     values['hr_values'] = list(dict.fromkeys(values['hr_values']))
-    values['bp_values'] = list(dict.fromkeys(values['bp_values']))
     
     return values
 
-def extract_dose(text):
+def extract_dose(text: str) -> Optional[float]:
     """Extract drug dose from text."""
     dose_patterns = [
         r"(\d+)\s*mg(?:\s*of\s*\w+)?",
@@ -1402,7 +1107,7 @@ def extract_dose(text):
                 continue
     return None
 
-def extract_medical_history(text):
+def extract_medical_history(text: str) -> str:
     """Extract medical history from text."""
     conditions = []
     
@@ -1454,7 +1159,7 @@ def extract_medical_history(text):
     conditions = list(dict.fromkeys(conditions))
     return '; '.join(conditions) if conditions else 'N/A'
 
-def extract_medications(text):
+def extract_medications(text: str) -> str:
     """Extract medication history from text."""
     medications = []
     
@@ -1503,7 +1208,7 @@ def extract_medications(text):
     medications = list(dict.fromkeys(medications))
     return '; '.join(medications) if medications else 'N/A'
 
-def extract_treatment_course(text):
+def extract_treatment_course(text: str) -> str:
     """Extract treatment course from text."""
     treatments = []
     
@@ -1547,146 +1252,332 @@ def extract_treatment_course(text):
     treatments = list(dict.fromkeys(treatments))
     return '; '.join(treatments) if treatments else 'N/A'
 
-def main():
+def extract_qt_hr_with_context(text: str) -> List[Dict[str, Union[int, str]]]:
+    """Extract QT and HR values with their surrounding context."""
+    qt_data = []
+    
+    # Split text into sentences for better context
+    sentences = text.split('.')
+    for sentence in sentences:
+        qt, qt_match = extract_qtc(sentence)
+        hr, hr_match = extract_hr(sentence)
+        
+        if qt and hr:
+            # Basic physiological validation
+            if 200 <= qt <= 800 and 20 <= hr <= 300:
+                qt_data.append({
+                    'qt': qt,
+                    'hr': hr,
+                    'context': sentence.strip(),
+                    'qt_match': qt_match,
+                    'hr_match': hr_match
+                })
+    return qt_data
+
+def analyze_papers_for_qt_hr(papers: List[Dict[str, str]]) -> List[Dict[str, Union[int, str]]]:
+    """Analyze papers to extract QT/HR data with context."""
+    analyzed_data = []
+    
+    for paper in papers:
+        text = paper['title'] + ' ' + paper['abstract']
+        qt_hr_points = extract_qt_hr_with_context(text)
+        
+        if qt_hr_points:
+            for point in qt_hr_points:
+                analyzed_data.append({
+                    'title': paper['title'],
+                    'doi': paper.get('doi', 'N/A'),
+                    'qt': point['qt'],
+                    'hr': point['hr'],
+                    'context': point['context'],
+                    'qt_match': point['qt_match'],
+                    'hr_match': point['hr_match'],
+                    'naranjo_score': paper['naranjo_score'],
+                    'tisdale_score': paper['tisdale_score'],
+                    'who_umc': paper['who_umc']
+                })
+                print(f"\nFound QT/HR data point in paper:")
+                print(f"Title: {paper['title']}")
+                print(f"QT: {point['qt']} ms (matched: {point['qt_match']})")
+                print(f"HR: {point['hr']} bpm (matched: {point['hr_match']})")
+                print(f"Context: {point['context']}")
+    
+    return analyzed_data
+
+def create_qt_nomogram(drug_name: str) -> go.Figure:
+    """Create QT nomogram using data points from analyzed papers."""
+    # Create figure with white background
+    fig = go.Figure(layout=dict(
+        plot_bgcolor='white',
+        paper_bgcolor='white'
+    ))
+    
+    # Get papers and analyze for QT/HR data
+    papers = search_pubmed(drug_name)
+    analyzed_data = analyze_papers_for_qt_hr(papers)
+    
+    print(f"\nFound {len(analyzed_data)} QT/HR data points from papers")
+    
+    # Add data points from papers
+    if analyzed_data:
+        hr_values = [point['hr'] for point in analyzed_data]
+        qt_values = [point['qt'] for point in analyzed_data]
+        hover_texts = [
+            f"Paper: {point['title']}<br>"
+            f"QT: {point['qt']} ms<br>"
+            f"HR: {point['hr']} bpm<br>"
+            f"Context: {point['context']}"
+            for point in analyzed_data
+        ]
+        
+        fig.add_trace(go.Scatter(
+            x=hr_values,
+            y=qt_values,
+            mode='markers',
+            name='Data Points',
+            text=hover_texts,
+            hoverinfo='text'
+        ))
+    
+    # Add nomogram lines
+    hr_range = list(range(30, 121, 1))
+    
+    # Upper line (high risk)
+    upper_qt = [440 + 0.675 * (60 - hr) for hr in hr_range]
+    fig.add_trace(go.Scatter(
+        x=hr_range,
+        y=upper_qt,
+        mode='lines',
+        name='High Risk',
+        line=dict(color='red', dash='solid', width=2)
+    ))
+    
+    # Lower line (normal)
+    lower_qt = [400 + 0.675 * (60 - hr) for hr in hr_range]
+    fig.add_trace(go.Scatter(
+        x=hr_range,
+        y=lower_qt,
+        mode='lines',
+        name='Normal Limit',
+        line=dict(color='blue', dash='dash', width=2)
+    ))
+    
+    # Update layout with grid and better styling
+    fig.update_layout(
+        title=dict(
+            text=f"QT Nomogram for {drug_name}",
+            x=0.5,
+            font=dict(size=20)
+        ),
+        xaxis=dict(
+            title="Heart Rate (bpm)",
+            gridcolor='lightgray',
+            showgrid=True,
+            zeroline=False,
+            range=[0, 300]
+        ),
+        yaxis=dict(
+            title="QT Interval (ms)",
+            gridcolor='lightgray',
+            showgrid=True,
+            zeroline=False,
+            range=[200, 800]
+        ),
+        showlegend=True,
+        legend=dict(
+            yanchor="top",
+            y=0.99,
+            xanchor="right",
+            x=0.99
+        ),
+        width=1000,
+        height=800,
+        hovermode='closest'
+    )
+    
+    return fig
+
+def plot_papers_table(papers: List[Dict[str, str]]) -> go.Figure:
+    """Create a table showing paper details and QT/HR data."""
+    # Prepare table headers
+    headers = [
+        'Case Report Title', 'Age', 'Sex', 'Oral Dose (mg)', 
+        'theoretical max concentration (μM)', '40% bioavailability Plasma concentration μM',
+        'Theoretical HERG IC50 / Concentration μM', '40% Plasma concentration/HERG IC50',
+        'Uncorrected QT (ms)', 'QTc', 'QTB', 'QTF', 'Heart Rate (bpm)',
+        'Torsades de Pointes?', 'Blood Pressure (mmHg)', 'Medical History',
+        'Medication History', 'Course of Treatment', 'Outcome', 'Naranjo', 'Tisdale', 'WHO-UMC'
+    ]
+    
+    # Extract and analyze data
+    analyzed_data = analyze_papers_for_qt_hr(papers)
+    
+    # Prepare table data
+    data = []
+    seen_papers = set()
+    
+    for point in analyzed_data:
+        if point['title'] not in seen_papers:
+            row = [
+                point['title'],  # Case Report Title
+                '',  # Age
+                '',  # Sex
+                '',  # Oral Dose
+                '',  # Theoretical max concentration
+                '',  # 40% bioavailability
+                '',  # Theoretical HERG IC50
+                '',  # 40% Plasma concentration/HERG IC50
+                point['qt'],  # Uncorrected QT
+                '',  # QTc
+                '',  # QTB
+                '',  # QTF
+                point['hr'],  # Heart Rate
+                '',  # Torsades
+                '',  # Blood Pressure
+                '',  # Medical History
+                '',  # Medication History
+                '',  # Course Treatment
+                point['naranjo_score'],  # Naranjo Score
+                point['who_umc'],  # WHO-UMC
+                point['tisdale_score']  # Tisdale Score
+            ]
+            data.append(row)
+            seen_papers.add(point['title'])
+    
+    # Create table with updated styling
+    fig = go.Figure(data=[go.Table(
+        header=dict(
+            values=headers,
+            font=dict(size=11, color='white'),
+            fill_color='royalblue',
+            align=['left'] * len(headers),
+            height=40
+        ),
+        cells=dict(
+            values=list(zip(*data)) if data else [[] for _ in headers],
+            align=['left'] * len(headers),
+            font=dict(size=10),
+            height=30,
+            fill=dict(color=['rgb(245, 245, 245)', 'white'])
+        )
+    )])
+    
+    # Update layout with better sizing
+    fig.update_layout(
+        title=dict(
+            text=f"Literature Analysis Results for {papers[0]['drug_name'] if papers else 'Unknown Drug'}",
+            x=0.5,
+            font=dict(size=20)
+        ),
+        width=1500,  # Increased width to accommodate more columns
+        height=max(len(data) * 40 + 100, 400),  # Dynamic height based on rows
+        margin=dict(t=50, l=20, r=20, b=20)
+    )
+    
+    return fig
+
+def create_analysis(drug_name: str) -> None:
+    """Create combined analysis with table and nomogram."""
+    # Get papers and extract data
+    papers = search_pubmed(drug_name)
+    data_points = []
+    
+    for paper in papers:
+        values = extract_qt_hr(paper['abstract'])
+        if values['qt'] and values['hr']:
+            data_points.append({
+                'title': paper['title'],
+                'qt': values['qt'],
+                'hr': values['hr']
+            })
+    
+    print(f"\nFound {len(data_points)} QT/HR data points from papers")
+    
+    # Create table
+    table = go.Figure(data=[go.Table(
+        header=dict(
+            values=['Case Report Title', 'QT (ms)', 'Heart Rate (bpm)'],
+            font=dict(size=12, color='white'),
+            fill_color='royalblue',
+            align='left'
+        ),
+        cells=dict(
+            values=[
+                [p['title'] for p in data_points],
+                [p['qt'] for p in data_points],
+                [p['hr'] for p in data_points]
+            ],
+            font=dict(size=11),
+            align='left'
+        )
+    )])
+    
+    # Create nomogram
+    nomogram = go.Figure()
+    if data_points:
+        nomogram.add_trace(go.Scatter(
+            x=[p['hr'] for p in data_points],
+            y=[p['qt'] for p in data_points],
+            mode='markers',
+            name='Data Points',
+            text=[p['title'] for p in data_points],
+            hoverinfo='text'
+        ))
+    nomogram.update_layout(
+        title=f"QT-HR Nomogram for {drug_name}",
+        xaxis_title="Heart Rate (bpm)",
+        yaxis_title="QT Interval (ms)"
+    )
+    
+    # Save to HTML
+    output_file = f"{drug_name}_analysis.html"
+    with open(output_file, 'w') as f:
+        f.write("<html><body>")
+        f.write(table.to_html(full_html=False))
+        f.write(nomogram.to_html(full_html=False))
+        f.write("</body></html>")
+    print(f"Saved combined analysis to: {os.path.abspath(output_file)}")
+
+def extract_qt_hr(text: str) -> Dict[str, Optional[int]]:
+    """Extract QT and HR values from text."""
+    qt_pattern = r"QT[c\s]*[\s:]+(\d{2,3})"
+    hr_pattern = r"heart rate[\s:]+(\d{2,3})"
+    
+    qt = re.search(qt_pattern, text.lower())
+    hr = re.search(hr_pattern, text.lower())
+    
+    return {
+        'qt': int(qt.group(1)) if qt else None,
+        'hr': int(hr.group(1)) if hr else None
+    }
+
+def main(drug_name: Optional[str] = None) -> None:
     """Main function to run the TdP risk analysis."""
-    import argparse
+    if drug_name is None:
+        if len(sys.argv) < 2:
+            print("Please provide a drug name as argument")
+            sys.exit(1)
+        drug_name = sys.argv[1]
     
-    # Set up command line arguments
-    parser = argparse.ArgumentParser(description='Analyze TdP risk for a given drug')
-    parser.add_argument('drug_name', help='Name of the drug to analyze')
-    parser.add_argument('--csv', help='Path to CSV file with QT/HR data', default='qt_data.csv')
-    parser.add_argument('--output', help='Output directory', default='output')
-    args = parser.parse_args()
+    print(f"\nAnalyzing {drug_name.title()}...")
+    print("--------------------------------\n")
     
-    drug_name = args.drug_name
-    csv_file = args.csv
-    output_dir = args.output
+    # Test concentration calculations with a standard dose
+    test_doses = [25, 50]  # Common doses in mg
+    for dose in test_doses:
+        print(f"\nCalculating concentrations for {dose}mg dose:")
+        results = calculate_concentrations(dose)
+        print(f"Theoretical concentration: {results['theoretical_conc']} μM")
+        print(f"Bioavailable concentration: {results['bioavailable_conc']} μM")
     
     # Create output directory
+    output_dir = os.path.join(os.path.dirname(__file__), 'output')
     os.makedirs(output_dir, exist_ok=True)
     
-    # Save to docs directory for GitHub Pages
-    output_dir = os.path.join(os.path.dirname(__file__), 'docs')
-    os.makedirs(output_dir, exist_ok=True)
-    
-    # Search for hERG and bioavailability data
-    print(f"\nSearching for {drug_name} properties...")
-    herg_query = f"({drug_name}[Title]) AND (hERG OR IC50 OR potassium channel)"
-    bio_query = f"({drug_name}[Title]) AND (bioavailability OR absorption)"
-    
-    # Initialize properties
-    herg_ic50 = None
-    bioavailability = None
-    
-    try:
-        # Search PubMed for hERG data
-        handle = Entrez.esearch(db="pubmed", term=herg_query)
-        record = Entrez.read(handle)
-        if record["Count"] != "0":
-            for pmid in record["IdList"][:5]:  # Check first 5 papers
-                abstract = get_paper_abstract(pmid)
-                if abstract:
-                    # Look for IC50 values
-                    ic50_match = re.search(r'IC50\s*[=:]\s*(\d+\.?\d*)\s*(?:n[Mm]|µ[Mm]|microM)', abstract)
-                    if ic50_match:
-                        herg_ic50 = float(ic50_match.group(1))
-                        break
-        
-        # Search for bioavailability
-        handle = Entrez.esearch(db="pubmed", term=bio_query)
-        record = Entrez.read(handle)
-        if record["Count"] != "0":
-            for pmid in record["IdList"][:5]:
-                abstract = get_paper_abstract(pmid)
-                if abstract:
-                    # Look for bioavailability percentage
-                    bio_match = re.search(r'(?:oral\s+)?bioavailability\s*(?:of|was|is)?\s*(\d+\.?\d*)%?', abstract, re.IGNORECASE)
-                    if bio_match:
-                        bioavailability = float(bio_match.group(1))
-                        break
-    
-    except Exception as e:
-        print(f"Error searching for drug properties: {e}")
-    
-    if herg_ic50:
-        print(f"Found hERG IC50: {herg_ic50} nM")
-    if bioavailability:
-        print(f"Found oral bioavailability: {bioavailability}%")
-    
-    # Process CSV data
-    qt_data = []
-    if os.path.exists(csv_file):
-        print(f"\nProcessing data from {csv_file}...")
-        with open(csv_file, 'r') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                try:
-                    hr = float(row['HR'])
-                    qt = float(row['QT'])
-                    qt_data.append({'hr': hr, 'qt': qt})
-                    print(f"Successfully added point: HR={hr}, QT={qt}")
-                except (ValueError, KeyError) as e:
-                    print(f"Error processing row: {row}, Error: {str(e)}")
-        print(f"\nTotal points processed: {len(qt_data)}")
-    
-    # Search PubMed for TdP cases
-    mesh_terms = f"((hERG) OR (QT) OR (QTc) OR (torsad*)) AND ({drug_name})"
-    title_abs_terms = f"({drug_name}[Title/Abstract]) AND ((\"torsades de pointes\"[Title/Abstract]) OR (tdp[Title/Abstract]) OR (torsades[Title/Abstract]))"
-    
-    print(f"\nSearching PubMed using:")
-    print(f"MESH terms: {mesh_terms}")
-    print(f"Title/Abstract terms: {title_abs_terms}")
-    
-    papers = search_pubmed(mesh_terms, title_abs_terms)
-    print(f"\nFound {len(papers)} matching papers\n")
-    
-    # Process each paper to extract detailed information
-    processed_papers = []
-    for paper in papers:
-        processed_paper = process_paper(paper)
-        
-        # Extract QT/HR values from the processed paper
-        if processed_paper['QT_values'] != 'N/A' and processed_paper['HR_values'] != 'N/A':
-            # Convert string values to lists if they're not already
-            qt_values = processed_paper['QT_values'] if isinstance(processed_paper['QT_values'], list) else [processed_paper['QT_values']]
-            hr_values = processed_paper['HR_values'] if isinstance(processed_paper['HR_values'], list) else [processed_paper['HR_values']]
-            
-            # Add each QT/HR pair to qt_data
-            for qt, hr in zip(qt_values, hr_values):
-                try:
-                    qt_val = float(qt)
-                    hr_val = float(hr)
-                    if 0 < hr_val < 300 and 200 < qt_val < 800:  # Basic validation
-                        qt_data.append({'hr': hr_val, 'qt': qt_val})
-                        print(f"Added QT/HR point from paper: HR={hr_val}, QT={qt_val}")
-                except (ValueError, TypeError):
-                    continue
-    
-    # Save papers to CSV
-    csv_path = os.path.join(output_dir, f"{drug_name}_analysis.csv")
-    save_to_csv(processed_papers, csv_path)
-    print(f"Saved analysis to: {csv_path}")
-    
-    # Create and save the combined plot
-    fig = plot_combined_analysis(processed_papers, drug_name, qt_data)
-    html_path = os.path.join(output_dir, f"{drug_name}_analysis.html")
-    fig.write_html(html_path)
-    print(f"Saved combined analysis to: {html_path}")
-    
-    # Create index.html that redirects to the analysis
-    index_path = os.path.join(output_dir, 'index.html')
-    with open(index_path, 'w') as f:
-        f.write(f"""<!DOCTYPE html>
-<html>
-<head>
-    <title>QT Nomogram Analysis</title>
-    <meta http-equiv="refresh" content="0; url=./{drug_name.lower()}_analysis.html">
-</head>
-<body>
-    <p>Redirecting to <a href="./{drug_name.lower()}_analysis.html">QT Nomogram Analysis</a>...</p>
-</body>
-</html>
-""")
+    # Create combined analysis
+    print("\nCreating combined analysis...")
+    create_analysis(drug_name)
+    print(f"\nAnalysis complete! Open {drug_name}_analysis.html to view results.")
 
 if __name__ == "__main__":
     main()

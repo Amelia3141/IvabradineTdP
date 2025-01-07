@@ -1,0 +1,72 @@
+{
+  "PMID": "16426108",
+  "OWN": "NLM",
+  "STAT": "MEDLINE",
+  "DCOM": "20060328",
+  "LR": "20190902",
+  "IS": "0160-6689 (Print) 0160-6689 (Linking)",
+  "VI": "67",
+  "IP": "1",
+  "DP": "2006 Jan",
+  "TI": "Galantamine-induced QTc prolongation.",
+  "PG": "166-7",
+  "FAU": [
+    "Nelson, Matthew W",
+    "Buchanan, Robert W"
+  ],
+  "AU": [
+    "Nelson MW",
+    "Buchanan RW"
+  ],
+  "LA": [
+    "eng"
+  ],
+  "PT": [
+    "Case Reports",
+    "Letter"
+  ],
+  "PL": "United States",
+  "TA": "J Clin Psychiatry",
+  "JT": "The Journal of clinical psychiatry",
+  "JID": "7801243",
+  "RN": [
+    "0 (Cholinesterase Inhibitors)",
+    "0D3Q044KCA (Galantamine)"
+  ],
+  "SB": "IM",
+  "CIN": [
+    "J Clin Psychiatry. 2007 Jan;68(1):169; author reply 169-70. doi:",
+    "10.4088/jcp.v68n0123d. PMID: 17284150"
+  ],
+  "MH": [
+    "Cholinesterase Inhibitors/*adverse effects/therapeutic use",
+    "Galantamine/*adverse effects/therapeutic use",
+    "Humans",
+    "Long QT Syndrome/*chemically induced",
+    "Male",
+    "Middle Aged",
+    "Schizophrenia/*drug therapy"
+  ],
+  "EDAT": "2006/01/24 09:00",
+  "MHDA": "2006/03/29 09:00",
+  "CRDT": [
+    "2006/01/24 09:00"
+  ],
+  "PHST": [
+    "2006/01/24 09:00 [pubmed]",
+    "2006/03/29 09:00 [medline]",
+    "2006/01/24 09:00 [entrez]"
+  ],
+  "AID": [
+    "10.4088/jcp.v67n0123f [doi]"
+  ],
+  "PST": "ppublish",
+  "SO": "J Clin Psychiatry. 2006 Jan;67(1):166-7. doi: 10.4088/jcp.v67n0123f.",
+  "doi": "10.4088/jcp",
+  "pmid": "16426108",
+  "year": "2006",
+  "title": "Galantamine-induced QTc prolongation.",
+  "source": "pubmed",
+  "full_text": "1. J Clin Psychiatry. 2006 Jan;67(1):166-7. doi: 10.4088/jcp.v67n0123f.\n\nGalantamine-induced QTc prolongation.\n\nNelson MW, Buchanan RW.\n\nComment in\n    J Clin Psychiatry. 2007 Jan;68(1):169; author reply 169-70. doi: \n10.4088/jcp.v68n0123d.\n\nDOI: 10.4088/jcp.v67n0123f\nPMID: 16426108 [Indexed for MEDLINE]",
+  "full_text_source": "abstract"
+}

@@ -1,0 +1,82 @@
+{
+  "PMID": "19602789",
+  "OWN": "NLM",
+  "STAT": "MEDLINE",
+  "DCOM": "20091001",
+  "LR": "20220408",
+  "IS": "1349-7235 (Electronic) 0918-2918 (Linking)",
+  "VI": "48",
+  "IP": "14",
+  "DP": "2009",
+  "TI": "Donepezil-induced adverse side effects of cardiac rhythm: 2 cases report of atrioventricular block and Torsade de Pointes.",
+  "PG": "1219-23",
+  "AB": "Acetylcholinesterase inhibitors (AChIs) are widely used in the treatment of mild-to-moderate Alzheimer's disease (AD), but their cholinergic effects could generate adverse side effects in the cardiovascular system. This report presents the cases of 2 patients who experienced adverse side effects of cardiac rhythm with QT prolongation caused by Donepezil. Both of them improved to the original rhythm and shortened QT intervals after the discontinuation of Donepezil. The present cases suggest that the cholinergic effects of Donepezil could induce adverse side effects on cardiac rhythm and careful consideration is needed for the patients treated by Donepezil.",
+  "FAU": [
+    "Tanaka, Atsushi",
+    "Koga, Shoichi",
+    "Hiramatsu, Yoshihiro"
+  ],
+  "AU": [
+    "Tanaka A",
+    "Koga S",
+    "Hiramatsu Y"
+  ],
+  "AD": [
+    "Department of Cardiology, Koga Hospital 21, Kurume. mikechann@gmail.com"
+  ],
+  "LA": [
+    "eng"
+  ],
+  "PT": [
+    "Case Reports",
+    "Journal Article"
+  ],
+  "DEP": "20090715",
+  "PL": "Japan",
+  "TA": "Intern Med",
+  "JT": "Internal medicine (Tokyo, Japan)",
+  "JID": "9204241",
+  "RN": [
+    "0 (Cholinesterase Inhibitors)",
+    "0 (Indans)",
+    "0 (Piperidines)",
+    "8SSC91326P (Donepezil)"
+  ],
+  "SB": "IM",
+  "MH": [
+    "Aged, 80 and over",
+    "Atrioventricular Block/*chemically induced",
+    "Cholinesterase Inhibitors/*adverse effects",
+    "Donepezil",
+    "Female",
+    "Humans",
+    "Indans/*adverse effects",
+    "Male",
+    "Piperidines/*adverse effects",
+    "Torsades de Pointes/*chemically induced"
+  ],
+  "EDAT": "2009/07/16 09:00",
+  "MHDA": "2009/10/02 06:00",
+  "CRDT": [
+    "2009/07/16 09:00"
+  ],
+  "PHST": [
+    "2009/07/16 09:00 [entrez]",
+    "2009/07/16 09:00 [pubmed]",
+    "2009/10/02 06:00 [medline]"
+  ],
+  "AID": [
+    "JST.JSTAGE/internalmedicine/48.2181 [pii]",
+    "10.2169/internalmedicine.48.2181 [doi]"
+  ],
+  "PST": "ppublish",
+  "SO": "Intern Med. 2009;48(14):1219-23. doi: 10.2169/internalmedicine.48.2181. Epub 2009 Jul 15.",
+  "abstract": "Acetylcholinesterase inhibitors (AChIs) are widely used in the treatment of mild-to-moderate Alzheimer's disease (AD), but their cholinergic effects could generate adverse side effects in the cardiovascular system. This report presents the cases of 2 patients who experienced adverse side effects of cardiac rhythm with QT prolongation caused by Donepezil. Both of them improved to the original rhythm and shortened QT intervals after the discontinuation of Donepezil. The present cases suggest that the cholinergic effects of Donepezil could induce adverse side effects on cardiac rhythm and careful consideration is needed for the patients treated by Donepezil.",
+  "doi": "10.2169/internalmedicine.48",
+  "pmid": "19602789",
+  "year": "2009",
+  "title": "Donepezil-induced adverse side effects of cardiac rhythm: 2 cases report of atrioventricular block and Torsade de Pointes.",
+  "source": "pubmed",
+  "full_text": "1. Intern Med. 2009;48(14):1219-23. doi: 10.2169/internalmedicine.48.2181. Epub \n2009 Jul 15.\n\nDonepezil-induced adverse side effects of cardiac rhythm: 2 cases report of \natrioventricular block and Torsade de Pointes.\n\nTanaka A(1), Koga S, Hiramatsu Y.\n\nAuthor information:\n(1)Department of Cardiology, Koga Hospital 21, Kurume. mikechann@gmail.com\n\nAcetylcholinesterase inhibitors (AChIs) are widely used in the treatment of \nmild-to-moderate Alzheimer's disease (AD), but their cholinergic effects could \ngenerate adverse side effects in the cardiovascular system. This report presents \nthe cases of 2 patients who experienced adverse side effects of cardiac rhythm \nwith QT prolongation caused by Donepezil. Both of them improved to the original \nrhythm and shortened QT intervals after the discontinuation of Donepezil. The \npresent cases suggest that the cholinergic effects of Donepezil could induce \nadverse side effects on cardiac rhythm and careful consideration is needed for \nthe patients treated by Donepezil.\n\nDOI: 10.2169/internalmedicine.48.2181\nPMID: 19602789 [Indexed for MEDLINE]",
+  "full_text_source": "abstract"
+}

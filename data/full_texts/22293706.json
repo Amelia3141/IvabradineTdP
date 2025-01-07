@@ -1,0 +1,86 @@
+{
+  "PMID": "22293706",
+  "OWN": "NLM",
+  "STAT": "MEDLINE",
+  "DCOM": "20120725",
+  "LR": "20220408",
+  "IS": "1347-5231 (Electronic) 0031-6903 (Linking)",
+  "VI": "132",
+  "IP": "2",
+  "DP": "2012",
+  "TI": "[Shortening of donepezil-induced QTc prolongation with a change in the interacting drug, after electrocardiograph monitoring by community pharmacists: a case report].",
+  "PG": "237-41",
+  "AB": "We used a mobile electrocardiograph to manage the adverse effects and interactions of drugs, especially QT-prolonging drugs, in a community pharmacy setting. We report the case of a patient in whom the risk of drug-induced torsades de pointes (TdP) was lowered, after monitoring by community pharmacists. CASE: An 80-year-old woman was under donepezil (5 mg/d) therapy for Alzheimer's disease and also taking other drugs that interact with donepezil, namely, benidipine (8 mg/d) and atorvastatin (10 mg/d). The patient was visited almost every month, and an electrocardiogram was usually obtained. QTc prolongation (avg. 470+/-9 ms) was observed in the first to third tests. Her doctor was informed about these results and the risk factors (advanced age, gender, and drugs interactions (benidipine and atorvastatin)) associated with TdP and asked to respond promptly since several cases of donepezil-induced TdP have been reported. As a result, benidipine was replaced with amlodipine, while the remaining drugs were continued. After the change, a significant decrease in QTc values were observed in the fourth to seventh tests (avg. 441+/-9 ms, p=0.010), thereby indicating a decrease in TdP risk. The Drug Interaction Probability Scale (object drug, donepezil; precipitant drug, benidipine) score was +6 (probable). Thus, QTc shortening was a result of differences in donepezil-benidipine and donepezil-amlodipine interactions.",
+  "FAU": [
+    "Shinozaki, Kohki"
+  ],
+  "AU": [
+    "Shinozaki K"
+  ],
+  "AD": [
+    "Hikuma Pharmacy, Shizuoka, Japan. pharma4nozaki@gmail.com"
+  ],
+  "LA": [
+    "jpn"
+  ],
+  "PT": [
+    "Case Reports",
+    "Journal Article"
+  ],
+  "PL": "Japan",
+  "TA": "Yakugaku Zasshi",
+  "JT": "Yakugaku zasshi : Journal of the Pharmaceutical Society of Japan",
+  "JID": "0413613",
+  "RN": [
+    "0 (Cholinesterase Inhibitors)",
+    "0 (Dihydropyridines)",
+    "0 (Indans)",
+    "0 (Piperidines)",
+    "1J444QC288 (Amlodipine)",
+    "4G9T91JS7E (benidipine)",
+    "8SSC91326P (Donepezil)"
+  ],
+  "SB": "IM",
+  "MH": [
+    "Aged, 80 and over",
+    "Amlodipine/*administration & dosage",
+    "Cholinesterase Inhibitors/*adverse effects",
+    "*Community Pharmacy Services",
+    "Dihydropyridines/adverse effects",
+    "Donepezil",
+    "Drug Interactions",
+    "*Electrocardiography, Ambulatory",
+    "Female",
+    "Humans",
+    "Indans/*adverse effects",
+    "*Pharmacists",
+    "Piperidines/*adverse effects",
+    "Risk",
+    "Risk Management",
+    "Torsades de Pointes/*chemically induced/*prevention & control"
+  ],
+  "EDAT": "2012/02/02 06:00",
+  "MHDA": "2012/07/26 06:00",
+  "CRDT": [
+    "2012/02/02 06:00"
+  ],
+  "PHST": [
+    "2012/02/02 06:00 [entrez]",
+    "2012/02/02 06:00 [pubmed]",
+    "2012/07/26 06:00 [medline]"
+  ],
+  "AID": [
+    "JST.JSTAGE/yakushi/132.237 [pii]",
+    "10.1248/yakushi.132.237 [doi]"
+  ],
+  "PST": "ppublish",
+  "SO": "Yakugaku Zasshi. 2012;132(2):237-41. doi: 10.1248/yakushi.132.237.",
+  "abstract": "We used a mobile electrocardiograph to manage the adverse effects and interactions of drugs, especially QT-prolonging drugs, in a community pharmacy setting. We report the case of a patient in whom the risk of drug-induced torsades de pointes (TdP) was lowered, after monitoring by community pharmacists. CASE: An 80-year-old woman was under donepezil (5 mg/d) therapy for Alzheimer's disease and also taking other drugs that interact with donepezil, namely, benidipine (8 mg/d) and atorvastatin (10 mg/d). The patient was visited almost every month, and an electrocardiogram was usually obtained. QTc prolongation (avg. 470+/-9 ms) was observed in the first to third tests. Her doctor was informed about these results and the risk factors (advanced age, gender, and drugs interactions (benidipine and atorvastatin)) associated with TdP and asked to respond promptly since several cases of donepezil-induced TdP have been reported. As a result, benidipine was replaced with amlodipine, while the remaining drugs were continued. After the change, a significant decrease in QTc values were observed in the fourth to seventh tests (avg. 441+/-9 ms, p=0.010), thereby indicating a decrease in TdP risk. The Drug Interaction Probability Scale (object drug, donepezil; precipitant drug, benidipine) score was +6 (probable). Thus, QTc shortening was a result of differences in donepezil-benidipine and donepezil-amlodipine interactions.",
+  "doi": "10.1248/yakushi.132",
+  "pmid": "22293706",
+  "year": "2012",
+  "title": "[Shortening of donepezil-induced QTc prolongation with a change in the interacting drug, after electrocardiograph monitoring by community pharmacists: a case report].",
+  "source": "pubmed",
+  "full_text": "1. Yakugaku Zasshi. 2012;132(2):237-41. doi: 10.1248/yakushi.132.237.\n\n[Shortening of donepezil-induced QTc prolongation with a change in the \ninteracting drug, after electrocardiograph monitoring by community pharmacists: \na case report].\n\n[Article in Japanese]\n\nShinozaki K(1).\n\nAuthor information:\n(1)Hikuma Pharmacy, Shizuoka, Japan. pharma4nozaki@gmail.com\n\nWe used a mobile electrocardiograph to manage the adverse effects and \ninteractions of drugs, especially QT-prolonging drugs, in a community pharmacy \nsetting. We report the case of a patient in whom the risk of drug-induced \ntorsades de pointes (TdP) was lowered, after monitoring by community \npharmacists.\nCASE: An 80-year-old woman was under donepezil (5 mg/d) therapy for Alzheimer's \ndisease and also taking other drugs that interact with donepezil, namely, \nbenidipine (8 mg/d) and atorvastatin (10 mg/d). The patient was visited almost \nevery month, and an electrocardiogram was usually obtained. QTc prolongation \n(avg. 470\u00b19 ms) was observed in the first to third tests. Her doctor was \ninformed about these results and the risk factors (advanced age, gender, and \ndrugs interactions (benidipine and atorvastatin)) associated with TdP and asked \nto respond promptly since several cases of donepezil-induced TdP have been \nreported. As a result, benidipine was replaced with amlodipine, while the \nremaining drugs were continued. After the change, a significant decrease in QTc \nvalues were observed in the fourth to seventh tests (avg. 441\u00b19 ms, p=0.010), \nthereby indicating a decrease in TdP risk. The Drug Interaction Probability \nScale (object drug, donepezil; precipitant drug, benidipine) score was +6 \n(probable). Thus, QTc shortening was a result of differences in \ndonepezil-benidipine and donepezil-amlodipine interactions.\n\nDOI: 10.1248/yakushi.132.237\nPMID: 22293706 [Indexed for MEDLINE]",
+  "full_text_source": "abstract"
+}

@@ -1,0 +1,80 @@
+{
+  "PMID": "25158669",
+  "OWN": "NLM",
+  "STAT": "MEDLINE",
+  "DCOM": "20151112",
+  "LR": "20181202",
+  "IS": "1559-0259 (Electronic) 1530-7905 (Linking)",
+  "VI": "15",
+  "IP": "1",
+  "DP": "2015 Jan",
+  "TI": "Torsades de pointes induced by the concomitant use of ivabradine and azithromycin: an unexpected dangerous interaction.",
+  "PG": "104-6",
+  "LID": "10.1007/s12012-014-9274-y [doi]",
+  "AB": "A 68-year-old man had a cardiac syncope. He was known to have a long QT-interval and was treated with ivabradine for paroxysmal sinusal tachycardia. In the last 5 days, azithromycin had been prescribed for sinusitis. An electrocardiogram showed torsades de pointes (TdP). Azithromycin is known to prolong the QT-interval. Ivabradine does not affect the QT-interval but has a conditional risk of TdP when taken with other drugs that block its metabolic breakdown. This case presents the specific problem of a patient with long QT who received two medications, which may interact and prolong the QT.",
+  "FAU": [
+    "Cocco, Giuseppe",
+    "Jerie, Paul"
+  ],
+  "AU": [
+    "Cocco G",
+    "Jerie P"
+  ],
+  "AD": [
+    "Cardiology Office, Postfach 119, Marktgasse 10A, 4310, Rheinfelden, Switzerland, praxis@cocco.ch."
+  ],
+  "LA": [
+    "eng"
+  ],
+  "PT": [
+    "Case Reports",
+    "Journal Article"
+  ],
+  "PL": "United States",
+  "TA": "Cardiovasc Toxicol",
+  "JT": "Cardiovascular toxicology",
+  "JID": "101135818",
+  "RN": [
+    "0 (Anti-Bacterial Agents)",
+    "0 (Benzazepines)",
+    "0 (Cardiovascular Agents)",
+    "3H48L0LPZQ (Ivabradine)",
+    "83905-01-5 (Azithromycin)"
+  ],
+  "SB": "IM",
+  "MH": [
+    "Aged",
+    "Anti-Bacterial Agents/*adverse effects",
+    "Azithromycin/*adverse effects",
+    "Benzazepines/*adverse effects",
+    "Cardiovascular Agents/*adverse effects",
+    "Drug Interactions",
+    "Electrocardiography",
+    "Humans",
+    "Ivabradine",
+    "Male",
+    "Torsades de Pointes/*chemically induced"
+  ],
+  "EDAT": "2014/08/28 06:00",
+  "MHDA": "2015/11/13 06:00",
+  "CRDT": [
+    "2014/08/28 06:00"
+  ],
+  "PHST": [
+    "2014/08/28 06:00 [entrez]",
+    "2014/08/28 06:00 [pubmed]",
+    "2015/11/13 06:00 [medline]"
+  ],
+  "AID": [
+    "10.1007/s12012-014-9274-y [doi]"
+  ],
+  "PST": "ppublish",
+  "SO": "Cardiovasc Toxicol. 2015 Jan;15(1):104-6. doi: 10.1007/s12012-014-9274-y.",
+  "abstract": "A 68-year-old man had a cardiac syncope. He was known to have a long QT-interval and was treated with ivabradine for paroxysmal sinusal tachycardia. In the last 5 days, azithromycin had been prescribed for sinusitis. An electrocardiogram showed torsades de pointes (TdP). Azithromycin is known to prolong the QT-interval. Ivabradine does not affect the QT-interval but has a conditional risk of TdP when taken with other drugs that block its metabolic breakdown. This case presents the specific problem of a patient with long QT who received two medications, which may interact and prolong the QT.",
+  "pmid": "25158669",
+  "year": "2015",
+  "title": "Torsades de pointes induced by the concomitant use of ivabradine and azithromycin: an unexpected dangerous interaction.",
+  "source": "pubmed",
+  "full_text": "1. Cardiovasc Toxicol. 2015 Jan;15(1):104-6. doi: 10.1007/s12012-014-9274-y.\n\nTorsades de pointes induced by the concomitant use of ivabradine and \nazithromycin: an unexpected dangerous interaction.\n\nCocco G(1), Jerie P.\n\nAuthor information:\n(1)Cardiology Office, Postfach 119, Marktgasse 10A, 4310, Rheinfelden, \nSwitzerland, praxis@cocco.ch.\n\nA 68-year-old man had a cardiac syncope. He was known to have a long QT-interval \nand was treated with ivabradine for paroxysmal sinusal tachycardia. In the last \n5\u00a0days, azithromycin had been prescribed for sinusitis. An electrocardiogram \nshowed torsades de pointes (TdP). Azithromycin is known to prolong the \nQT-interval. Ivabradine does not affect the QT-interval but has a conditional \nrisk of TdP when taken with other drugs that block its metabolic breakdown. This \ncase presents the specific problem of a patient with long QT who received two \nmedications, which may interact and prolong the QT.\n\nDOI: 10.1007/s12012-014-9274-y\nPMID: 25158669 [Indexed for MEDLINE]",
+  "full_text_source": "abstract"
+}
