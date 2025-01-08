@@ -1,12 +1,11 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, current_app
 from flask_cors import CORS
 import os
 from dotenv import load_dotenv
 import logging
 from Bio import Entrez, Medline
 import time
-from ivablib.case_report_analyzer import CaseReportAnalyzer
-import sys
+from Bio import Entrez
 
 # Set up logging
 logging.basicConfig(
@@ -22,11 +21,50 @@ load_dotenv()
 Entrez.email = os.environ.get('NCBI_EMAIL')
 Entrez.api_key = os.environ.get('NCBI_API_KEY')
 
-# Initialize analyzer
-analyzer = CaseReportAnalyzer()
-
+# Initialize Flask app
 app = Flask(__name__)
 CORS(app)
+
+# Lazy loading of heavy components
+def get_analyzer():
+    if not hasattr(current_app, 'analyzer'):
+        logger.info("Initializing CaseReportAnalyzer...")
+        from ivablib.case_report_analyzer import CaseReportAnalyzer
+        current_app.analyzer = CaseReportAnalyzer()
+        logger.info("CaseReportAnalyzer initialized successfully")
+    return current_app.analyzer
+
+def safe_pubmed_search(query, max_results=5):
+    """Safely search PubMed and handle errors"""
+    try:
+        # First try searching
+        logger.info(f"Searching PubMed for: {query}")
+        handle = Entrez.esearch(db="pubmed", term=query, retmax=max_results)
+        results = Entrez.read(handle, validate=False)
+        handle.close()
+        
+        if not results.get('IdList'):
+            logger.warning("No results found")
+            return []
+            
+        # Then fetch the papers
+        logger.info(f"Found {len(results['IdList'])} papers, fetching details")
+        handle = Entrez.efetch(
+            db="pubmed", 
+            id=results['IdList'],
+            rettype="medline",
+            retmode="text"
+        )
+        
+        # Use Medline parser for text format
+        records = list(Medline.parse(handle))
+        handle.close()
+        
+        return records
+        
+    except Exception as e:
+        logger.error(f"Error in PubMed search: {str(e)}")
+        raise
 
 @app.route('/')
 def home():
@@ -59,7 +97,7 @@ def health():
         }
         
         # Check if analyzer is initialized
-        analyzer_status = "healthy" if analyzer else "not initialized"
+        analyzer_status = "healthy" if hasattr(current_app, 'analyzer') else "not initialized"
         
         # Basic NCBI connection test (only in non-testing env)
         ncbi_status = "skipped"
@@ -95,38 +133,6 @@ def health():
             "timestamp": time.time()
         }), 500
 
-def safe_pubmed_search(query, max_results=5):
-    """Safely search PubMed and handle errors"""
-    try:
-        # First try searching
-        logger.info(f"Searching PubMed for: {query}")
-        handle = Entrez.esearch(db="pubmed", term=query, retmax=max_results)
-        results = Entrez.read(handle, validate=False)
-        handle.close()
-        
-        if not results.get('IdList'):
-            logger.warning("No results found")
-            return []
-            
-        # Then fetch the papers
-        logger.info(f"Found {len(results['IdList'])} papers, fetching details")
-        handle = Entrez.efetch(
-            db="pubmed", 
-            id=results['IdList'],
-            rettype="medline",
-            retmode="text"
-        )
-        
-        # Use Medline parser for text format
-        records = list(Medline.parse(handle))
-        handle.close()
-        
-        return records
-        
-    except Exception as e:
-        logger.error(f"Error in PubMed search: {str(e)}")
-        raise
-
 @app.route('/analyze/<drug_name>', methods=['GET'])
 def analyze(drug_name):
     try:
@@ -142,6 +148,9 @@ def analyze(drug_name):
             }), 500
             
         logger.info(f'Starting search for drug: {drug_name}')
+        
+        # Lazy load the analyzer only when needed
+        analyzer = get_analyzer()
         
         # Construct search query
         query = f"{drug_name} AND (torsades de pointes OR QT prolongation OR arrhythmia OR case report)"
@@ -215,5 +224,6 @@ def analyze(drug_name):
         }), 500
 
 if __name__ == '__main__':
+    import sys
     port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port)
