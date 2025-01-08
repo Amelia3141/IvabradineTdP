@@ -18,6 +18,7 @@ dash>=2.14.2
 selenium==4.15.2
 webdriver_manager==4.0.1
 unpywall==0.2.3
-flask==3.0.0
+flask==2.3.3
 flask-cors==4.0.0
 gunicorn==21.2.0
+python-dotenv==1.0.0
