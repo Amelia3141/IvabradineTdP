@@ -13,6 +13,10 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/Amelia3141/TdPRiskPredictor",
     packages=find_packages(),
+    include_package_data=True,
+    package_data={
+        'ivablib': ['*.py', '*.json', '*.txt', 'data/*.csv'],
+    },
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Science/Research",
@@ -48,8 +52,4 @@ setup(
         "gunicorn>=21.2.0",
         "python-dotenv>=1.0.0"
     ],
-    include_package_data=True,
-    package_data={
-        "ivablib": ["data/*.csv"],
-    },
 )
