@@ -5,7 +5,7 @@ import importlib
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,  # Set to DEBUG for more detailed logs
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(sys.stdout)
@@ -42,22 +42,17 @@ def initialize_app():
         logger.info(f"Python version: {sys.version}")
         logger.info(f"Current working directory: {os.getcwd()}")
         
+        # Check environment variables
+        port = os.environ.get('PORT')
+        logger.info(f"PORT environment variable: {port}")
+        
         # Check imports first
         module_status = check_imports()
         
         # Only import app if critical modules are available
         if all(v != None for v in module_status.values()):
             from api_server import app
-            
-            # Check environment configuration
-            required_vars = ['NCBI_EMAIL', 'NCBI_API_KEY']
-            missing_vars = [var for var in required_vars if not os.environ.get(var)]
-            
-            if missing_vars:
-                logger.warning(f"Missing environment variables: {', '.join(missing_vars)}")
-            else:
-                logger.info("All required environment variables are set")
-            
+            logger.info("Successfully imported api_server")
             return app
         else:
             raise ImportError("Failed to import required modules")
@@ -80,7 +75,9 @@ if __name__ == "__main__":
     else:
         app = initialize_app()
         port = int(os.environ.get('PORT', 10000))
+        logger.info(f"Starting server on port {port}")
         app.run(host='0.0.0.0', port=port)
 else:
     # For gunicorn
+    logger.info("Initializing application for gunicorn")
     app = initialize_app()
