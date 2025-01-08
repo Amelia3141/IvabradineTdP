@@ -43,7 +43,6 @@ def health():
         # Check if we can import all required modules
         import flask
         import flask_cors
-        import dotenv
         import Bio
         
         # Check environment variables
@@ -58,9 +57,8 @@ def health():
             "timestamp": time.time(),
             "environment": env_vars,
             "dependencies": {
-                "flask": flask.__version__,
-                "flask_cors": flask_cors.__version__,
-                "python_dotenv": dotenv.__version__,
+                "flask": getattr(flask, '__version__', 'unknown'),
+                "flask_cors": getattr(flask_cors, '__version__', 'unknown'),
                 "biopython": Bio.__version__
             }
         })
@@ -76,8 +74,10 @@ def safe_pubmed_search(query, max_results=10):
     try:
         # First try searching
         logger.info(f"Searching PubMed for: {query}")
-        handle = Entrez.esearch(db="pubmed", term=query, retmax=max_results, retmode="xml")
-        results = Entrez.read(handle)
+        handle = Entrez.esearch(db="pubmed", term=query, retmax=max_results)
+        
+        # Read in binary mode
+        results = Entrez.read(handle, validate=False)
         handle.close()
         
         if not results.get('IdList'):
@@ -86,12 +86,18 @@ def safe_pubmed_search(query, max_results=10):
             
         # Then fetch the papers
         logger.info(f"Found {len(results['IdList'])} papers, fetching details")
-        handle = Entrez.efetch(db="pubmed", id=results['IdList'], rettype="medline", retmode="text")
-        records = Medline.parse(handle)
-        papers = list(records)
+        handle = Entrez.efetch(
+            db="pubmed", 
+            id=results['IdList'],
+            rettype="medline",
+            retmode="text"
+        )
+        
+        # Use Medline parser for text format
+        records = list(Medline.parse(handle))
         handle.close()
         
-        return papers
+        return records
         
     except Exception as e:
         logger.error(f"Error in PubMed search: {str(e)}")
