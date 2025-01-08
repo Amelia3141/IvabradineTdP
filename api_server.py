@@ -52,21 +52,32 @@ def health():
             "PORT": os.environ.get('PORT', 10000)
         }
         
+        # Test PubMed connection
+        test_query = "ivabradine"
+        handle = Entrez.esearch(db="pubmed", term=test_query, retmax=1)
+        results = Entrez.read(handle, validate=False)
+        handle.close()
+        pubmed_ok = len(results.get('IdList', [])) > 0
+        
         return jsonify({
             "status": "healthy",
             "timestamp": time.time(),
             "environment": env_vars,
-            "dependencies": {
-                "flask": getattr(flask, '__version__', 'unknown'),
-                "flask_cors": getattr(flask_cors, '__version__', 'unknown'),
-                "biopython": Bio.__version__
+            "dependencies_loaded": {
+                "flask": True,
+                "flask_cors": True,
+                "biopython": True
+            },
+            "services": {
+                "pubmed_api": pubmed_ok
             }
         })
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}")
         return jsonify({
             "status": "unhealthy",
-            "error": str(e)
+            "error": str(e),
+            "timestamp": time.time()
         }), 500
 
 def safe_pubmed_search(query, max_results=10):
