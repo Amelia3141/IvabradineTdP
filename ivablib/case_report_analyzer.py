@@ -6,7 +6,7 @@ using a language model.
 import os
 import logging
 import re
-from typing import List, Dict, Optional
+from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, asdict
 import pandas as pd
 import torch
@@ -14,7 +14,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 import warnings
 warnings.filterwarnings('ignore')
 
-# Set up logging
+# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 

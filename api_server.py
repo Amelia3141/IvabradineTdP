@@ -133,14 +133,24 @@ def analyze(drug_name):
         logger.info(f'Starting search for drug: {drug_name}')
         
         # Construct search query
-        query = f"{drug_name} AND (torsades de pointes OR QT prolongation OR arrhythmia)"
+        query = f"{drug_name} AND (torsades de pointes OR QT prolongation OR arrhythmia OR case report)"
         
         # Search PubMed
         papers = safe_pubmed_search(query)
         
         if not papers:
             logger.warning(f"No papers found for {drug_name}")
-            return jsonify({'message': f"No papers found for {drug_name}"})
+            return jsonify({
+                'drug_name': drug_name,
+                'message': f"No papers found for {drug_name}",
+                'papers': [],
+                'case_reports': [],
+                'statistics': {
+                    'total_papers': 0,
+                    'case_reports_found': 0,
+                    'tdp_cases': 0
+                }
+            })
         
         # Process papers
         results = []
@@ -186,6 +196,7 @@ def analyze(drug_name):
         logger.error(f'Error analyzing drug {drug_name}: {str(e)}')
         return jsonify({
             'error': str(e),
+            'drug_name': drug_name,
             'environment': {
                 'NCBI_EMAIL': bool(os.environ.get('NCBI_EMAIL')),
                 'NCBI_API_KEY': bool(os.environ.get('NCBI_API_KEY'))
