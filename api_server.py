@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 import logging
 from Bio import Entrez, Medline
 import time
+from ivablib.case_report_analyzer import CaseReportAnalyzer
 
 # Set up logging
 logging.basicConfig(
@@ -19,6 +20,9 @@ load_dotenv()
 # Configure NCBI credentials
 Entrez.email = os.environ.get('NCBI_EMAIL')
 Entrez.api_key = os.environ.get('NCBI_API_KEY')
+
+# Initialize analyzer
+analyzer = CaseReportAnalyzer()
 
 app = Flask(__name__)
 CORS(app)
@@ -86,8 +90,6 @@ def safe_pubmed_search(query, max_results=10):
         # First try searching
         logger.info(f"Searching PubMed for: {query}")
         handle = Entrez.esearch(db="pubmed", term=query, retmax=max_results)
-        
-        # Read in binary mode
         results = Entrez.read(handle, validate=False)
         handle.close()
         
@@ -158,11 +160,26 @@ def analyze(drug_name):
                 logger.error(f"Error processing paper: {str(e)}")
                 continue
         
-        logger.info(f"Successfully found {len(results)} papers")
+        # Analyze papers for case reports
+        logger.info("Analyzing papers for case reports")
+        df = analyzer.analyze_papers(results, drug_name)
+        
+        # Convert DataFrame to dictionary format
+        case_reports = df.to_dict('records') if not df.empty else []
+        
+        # Calculate statistics
+        stats = {
+            'total_papers': len(results),
+            'case_reports_found': len(case_reports),
+            'tdp_cases': len([c for c in case_reports if c.get('had_tdp') == 'Yes'])
+        }
+        
+        logger.info(f"Successfully analyzed {len(results)} papers")
         return jsonify({
             'drug_name': drug_name,
-            'paper_count': len(results),
-            'papers': results
+            'statistics': stats,
+            'papers': results,
+            'case_reports': case_reports
         })
         
     except Exception as e:
