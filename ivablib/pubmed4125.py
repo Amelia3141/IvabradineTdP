@@ -22,9 +22,9 @@ urllib3.disable_warnings()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Set your email for NCBI
-Entrez.email = "codeium@example.com"  # Using a placeholder email for the API
-Entrez.api_key = "8b8c00d3f10945e1e98c1f3b0f6d71cca708"  # Adding an API key to avoid rate limits
+# Set your email and API key for NCBI from environment variables
+Entrez.email = os.environ.get('NCBI_EMAIL', 'your@email.com')
+Entrez.api_key = os.environ.get('NCBI_API_KEY')
 
 def get_from_scihub(url: str, output_dir: str, filename: str) -> Optional[str]:
     """Try to download a paper from Sci-Hub"""
