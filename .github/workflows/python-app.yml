@@ -38,9 +38,37 @@ jobs:
       run: |
         pip install -e .
         
+    - name: Verify environment
+      run: |
+        python -c "import sys; print(f'Python {sys.version}')"
+        python -c "import flask; print(f'Flask {flask.__version__}')"
+        python -c "import Bio; print(f'Biopython {Bio.__version__}')"
+        
     - name: Test API server
       env:
         NCBI_EMAIL: ${{ secrets.NCBI_EMAIL }}
         NCBI_API_KEY: ${{ secrets.NCBI_API_KEY }}
+        FLASK_ENV: testing
       run: |
-        python -c "from api_server import app; print('API server imports successfully')"
+        # Test module imports
+        python -c "import api_server; print('API server imports successfully')"
+        
+        # Test server initialization
+        python wsgi.py --test-only
+        
+        # Test API health endpoint
+        python -c "
+import requests
+import time
+import sys
+
+def test_health():
+    server = api_server.app.test_client()
+    response = server.get('/health')
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data['status'] == 'healthy'
+    sys.exit(0)
+
+test_health()
+"

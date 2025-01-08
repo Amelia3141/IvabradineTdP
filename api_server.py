@@ -6,6 +6,7 @@ import logging
 from Bio import Entrez, Medline
 import time
 from ivablib.case_report_analyzer import CaseReportAnalyzer
+import sys
 
 # Set up logging
 logging.basicConfig(
@@ -48,36 +49,46 @@ def health():
         import flask
         import flask_cors
         import Bio
+        from Bio import Entrez
         
-        # Check environment variables
-        env_vars = {
+        # Check environment configuration
+        env_status = {
             "NCBI_EMAIL": bool(os.environ.get('NCBI_EMAIL')),
             "NCBI_API_KEY": bool(os.environ.get('NCBI_API_KEY')),
-            "PORT": os.environ.get('PORT', 10000)
+            "FLASK_ENV": os.environ.get('FLASK_ENV', 'production')
         }
         
-        # Test PubMed connection
-        test_query = "ivabradine"
-        handle = Entrez.esearch(db="pubmed", term=test_query, retmax=1)
-        results = Entrez.read(handle, validate=False)
-        handle.close()
-        pubmed_ok = len(results.get('IdList', [])) > 0
+        # Check if analyzer is initialized
+        analyzer_status = "healthy" if analyzer else "not initialized"
+        
+        # Basic NCBI connection test (only in non-testing env)
+        ncbi_status = "skipped"
+        if os.environ.get('FLASK_ENV') != 'testing' and env_status["NCBI_EMAIL"] and env_status["NCBI_API_KEY"]:
+            try:
+                Entrez.email = os.environ.get('NCBI_EMAIL')
+                Entrez.api_key = os.environ.get('NCBI_API_KEY')
+                handle = Entrez.einfo()
+                result = Entrez.read(handle)
+                handle.close()
+                ncbi_status = "connected" if result else "error"
+            except Exception as e:
+                ncbi_status = f"error: {str(e)}"
         
         return jsonify({
             "status": "healthy",
             "timestamp": time.time(),
-            "environment": env_vars,
-            "dependencies_loaded": {
-                "flask": True,
-                "flask_cors": True,
-                "biopython": True
+            "environment": env_status,
+            "components": {
+                "analyzer": analyzer_status,
+                "ncbi_api": ncbi_status
             },
-            "services": {
-                "pubmed_api": pubmed_ok
+            "versions": {
+                "python": ".".join(map(str, sys.version_info[:3])),
+                "flask": flask.__version__,
+                "biopython": Bio.__version__
             }
         })
     except Exception as e:
-        logger.error(f"Health check failed: {str(e)}")
         return jsonify({
             "status": "unhealthy",
             "error": str(e),
