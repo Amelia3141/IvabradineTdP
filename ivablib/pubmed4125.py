@@ -23,7 +23,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Set your email for NCBI
-Entrez.email = "your@email.com"
+Entrez.email = "codeium@example.com"  # Using a placeholder email for the API
+Entrez.api_key = "8b8c00d3f10945e1e98c1f3b0f6d71cca708"  # Adding an API key to avoid rate limits
 
 def get_from_scihub(url: str, output_dir: str, filename: str) -> Optional[str]:
     """Try to download a paper from Sci-Hub"""
@@ -334,18 +335,39 @@ def search_papers(drug_name: str, output_dir: Optional[str] = None) -> List[Dict
     query = build_pubmed_query(drug_names)
     logger.info(f"Searching PubMed: {query}")
     
-    handle = Entrez.esearch(db="pubmed", term=query, retmax=100)
-    record = Entrez.read(handle)
-    handle.close()
+    max_retries = 3
+    retry_delay = 1  # seconds
+    
+    for attempt in range(max_retries):
+        try:
+            handle = Entrez.esearch(db="pubmed", term=query, retmax=100)
+            record = Entrez.read(handle)
+            handle.close()
+            break
+        except Exception as e:
+            if attempt == max_retries - 1:
+                logger.error(f"Failed to search PubMed after {max_retries} attempts: {e}")
+                return []
+            time.sleep(retry_delay)
+            retry_delay *= 2  # exponential backoff
     
     if not record["IdList"]:
         logger.warning("No papers found")
         return []
     
     # Get paper details
-    handle = Entrez.efetch(db="pubmed", id=record["IdList"], rettype="medline", retmode="text")
-    papers = list(Medline.parse(handle))
-    handle.close()
+    for attempt in range(max_retries):
+        try:
+            handle = Entrez.efetch(db="pubmed", id=record["IdList"], rettype="medline", retmode="text")
+            papers = list(Medline.parse(handle))
+            handle.close()
+            break
+        except Exception as e:
+            if attempt == max_retries - 1:
+                logger.error(f"Failed to fetch paper details after {max_retries} attempts: {e}")
+                return []
+            time.sleep(retry_delay)
+            retry_delay *= 2
     
     # Add PDF paths
     results = []

@@ -1,0 +1,121 @@
+{
+  "drug_name": "diphenhydramine",
+  "paper_count": 6,
+  "analysis": {
+    "age_stats": {
+      "mean": 37.666666666666664,
+      "std": 0,
+      "min": 26.0,
+      "max": 49.0
+    },
+    "sex_distribution": {
+      "male": 0,
+      "female": 0
+    },
+    "risk_factors": {},
+    "case_reports": [
+      {
+        "title": "Diphenhydramine dependence through deep intramuscular injection resulting in myonecrosis and prolonged QT interval.",
+        "authors": "",
+        "year": null,
+        "journal": "",
+        "doi": "",
+        "age": 49.0,
+        "sex": "woman",
+        "qtc": null,
+        "qt_uncorrected": null,
+        "heart_rate": null,
+        "blood_pressure": "",
+        "medical_history": null,
+        "medication_history": null,
+        "treatment_course": null,
+        "outcome": "Unknown"
+      },
+      {
+        "title": "Torsades de pointes in congenital long QT syndrome following low-dose orphenadrine.",
+        "authors": "",
+        "year": null,
+        "journal": "",
+        "doi": "",
+        "age": null,
+        "sex": "woman",
+        "qtc": 537.0,
+        "qt_uncorrected": null,
+        "heart_rate": null,
+        "blood_pressure": "",
+        "medical_history": null,
+        "medication_history": null,
+        "treatment_course": null,
+        "outcome": "Unknown"
+      },
+      {
+        "title": "Prolonged QT interval with markedly abnormal ventricular repolarization in diphenhydramine overdose.",
+        "authors": "",
+        "year": null,
+        "journal": "",
+        "doi": "",
+        "age": null,
+        "sex": "woman",
+        "qtc": 625.0,
+        "qt_uncorrected": null,
+        "heart_rate": null,
+        "blood_pressure": "",
+        "medical_history": null,
+        "medication_history": null,
+        "treatment_course": null,
+        "outcome": "Unknown"
+      },
+      {
+        "title": "QT interval prolongation in diphenhydramine toxicity.",
+        "authors": "",
+        "year": null,
+        "journal": "",
+        "doi": "",
+        "age": null,
+        "sex": "man",
+        "qtc": null,
+        "qt_uncorrected": null,
+        "heart_rate": null,
+        "blood_pressure": "",
+        "medical_history": null,
+        "medication_history": null,
+        "treatment_course": null,
+        "outcome": "Unknown"
+      },
+      {
+        "title": "Case of polymorphic ventricular tachycardia in diphenhydramine poisoning.",
+        "authors": "",
+        "year": null,
+        "journal": "",
+        "doi": "",
+        "age": 26.0,
+        "sex": "man",
+        "qtc": null,
+        "qt_uncorrected": null,
+        "heart_rate": null,
+        "blood_pressure": "",
+        "medical_history": null,
+        "medication_history": null,
+        "treatment_course": null,
+        "outcome": "Unknown"
+      },
+      {
+        "title": "Death by paint thinner.",
+        "authors": "",
+        "year": null,
+        "journal": "",
+        "doi": "",
+        "age": 38.0,
+        "sex": "man",
+        "qtc": null,
+        "qt_uncorrected": null,
+        "heart_rate": null,
+        "blood_pressure": "",
+        "medical_history": null,
+        "medication_history": null,
+        "treatment_course": null,
+        "outcome": "Unknown"
+      }
+    ]
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "drug_name": "ranolazine",
+  "paper_count": 4,
+  "analysis": {
+    "age_stats": {
+      "mean": 0,
+      "std": 0,
+      "min": 0,
+      "max": 0
+    },
+    "sex_distribution": {
+      "male": 0,
+      "female": 0
+    },
+    "risk_factors": {},
+    "case_reports": [
+      {
+        "title": "Characterization of a novel LQT3 variant with a selective efficacy of mexiletine treatment.",
+        "authors": "",
+        "year": null,
+        "journal": "",
+        "doi": "",
+        "age": null,
+        "sex": "man",
+        "qtc": null,
+        "qt_uncorrected": null,
+        "heart_rate": 165.0,
+        "blood_pressure": "",
+        "medical_history": null,
+        "medication_history": null,
+        "treatment_course": null,
+        "outcome": "Unknown"
+      },
+      {
+        "title": "Specific Therapy Based on the Genotype in a Malignant Form of Long QT3, Carrying the V411M Mutation.",
+        "authors": "",
+        "year": null,
+        "journal": "",
+        "doi": "",
+        "age": null,
+        "sex": "",
+        "qtc": 411.0,
+        "qt_uncorrected": null,
+        "heart_rate": null,
+        "blood_pressure": "",
+        "medical_history": null,
+        "medication_history": null,
+        "treatment_course": null,
+        "outcome": "Unknown"
+      },
+      {
+        "title": "Multiple arrhythmic syndromes in a newborn, owing to a novel mutation in SCN5A.",
+        "authors": "",
+        "year": null,
+        "journal": "",
+        "doi": "",
+        "age": null,
+        "sex": "",
+        "qtc": null,
+        "qt_uncorrected": null,
+        "heart_rate": null,
+        "blood_pressure": "",
+        "medical_history": null,
+        "medication_history": null,
+        "treatment_course": null,
+        "outcome": "Unknown"
+      },
+      {
+        "title": "Ranolazine safely decreases ventricular and atrial fibrillation in Timothy syndrome (LQT8).",
+        "authors": "",
+        "year": null,
+        "journal": "",
+        "doi": "",
+        "age": null,
+        "sex": "man",
+        "qtc": null,
+        "qt_uncorrected": null,
+        "heart_rate": null,
+        "blood_pressure": "",
+        "medical_history": null,
+        "medication_history": null,
+        "treatment_course": null,
+        "outcome": "Unknown"
+      }
+    ]
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "drug_name": "aripiprazole",
+  "paper_count": 4,
+  "analysis": {
+    "age_stats": {
+      "mean": 29.25,
+      "std": 0,
+      "min": 14.0,
+      "max": 42.0
+    },
+    "sex_distribution": {
+      "male": 0,
+      "female": 0
+    },
+    "risk_factors": {},
+    "case_reports": [
+      {
+        "title": "Prolonged QRS Widening After Aripiprazole Overdose.",
+        "authors": "",
+        "year": null,
+        "journal": "",
+        "doi": "",
+        "age": 14.0,
+        "sex": "man",
+        "qtc": 444.0,
+        "qt_uncorrected": null,
+        "heart_rate": 138.0,
+        "blood_pressure": "138/98",
+        "medical_history": null,
+        "medication_history": null,
+        "treatment_course": null,
+        "outcome": "Unknown"
+      },
+      {
+        "title": "Bipolar Disorder and Heart Transplantation: A Case Report.",
+        "authors": "",
+        "year": null,
+        "journal": "",
+        "doi": "",
+        "age": 34.0,
+        "sex": "woman",
+        "qtc": null,
+        "qt_uncorrected": null,
+        "heart_rate": null,
+        "blood_pressure": "",
+        "medical_history": null,
+        "medication_history": null,
+        "treatment_course": null,
+        "outcome": "Unknown"
+      },
+      {
+        "title": "Torsades de pointes after administration of low-dose aripiprazole.",
+        "authors": "",
+        "year": null,
+        "journal": "",
+        "doi": "",
+        "age": 42.0,
+        "sex": "man",
+        "qtc": 414.0,
+        "qt_uncorrected": null,
+        "heart_rate": null,
+        "blood_pressure": "",
+        "medical_history": null,
+        "medication_history": null,
+        "treatment_course": null,
+        "outcome": "Unknown"
+      },
+      {
+        "title": "Overdose of aripiprazole, a new type of antipsychotic.",
+        "authors": "",
+        "year": null,
+        "journal": "",
+        "doi": "",
+        "age": 27.0,
+        "sex": "woman",
+        "qtc": 330.0,
+        "qt_uncorrected": null,
+        "heart_rate": null,
+        "blood_pressure": "",
+        "medical_history": null,
+        "medication_history": null,
+        "treatment_course": null,
+        "outcome": "Unknown"
+      }
+    ]
+  }
+}
