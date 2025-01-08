@@ -18,6 +18,10 @@ warnings.filterwarnings('ignore')
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Set cache directory for models
+os.environ['TRANSFORMERS_CACHE'] = '/opt/render/project/src/.cache/huggingface'
+os.environ['HF_HOME'] = '/opt/render/project/src/.cache/huggingface'
+
 @dataclass
 class CaseReport:
     """Data class for storing case report information."""
@@ -39,35 +43,24 @@ class CaseReport:
 class CaseReportAnalyzer:
     """Class for analyzing medical case reports using language models."""
     
-    def __init__(self, model_name: str = "google/flan-t5-small"):
+    def __init__(self, model_name: str = "distilbert-base-cased-distilled-squad"):
         """Initialize the case report analyzer.
         
         Args:
             model_name: Name of the model to use
         """
-        self.qa_pipeline = pipeline(
-            "question-answering",
-            model=model_name,
-            tokenizer=model_name
-        )
-        
-        # Define prompts for each field
-        self.prompts = {
-            'title': 'What is the title of this case report?',
-            'doi': 'What is the DOI of this paper?',
-            'authors': 'Who are the authors of this case report?',
-            'age': 'What is the age of the patient?',
-            'sex': 'What is the sex/gender of the patient?',
-            'oral_dose': 'What was the oral dose of medication given?',
-            'qt_uncorrected': 'What was the uncorrected QT interval?',
-            'qtc': 'What was the QTc interval?',
-            'heart_rate': 'What was the heart rate?',
-            'had_tdp': 'Did the patient have Torsades de Pointes (TdP)?',
-            'blood_pressure': 'What was the blood pressure?',
-            'medical_history': 'What was the medical history?',
-            'medication_history': 'What medications was the patient taking?',
-            'treatment_course': 'What treatments were given?'
-        }
+        try:
+            logger.info(f"Loading model {model_name}")
+            self.qa_pipeline = pipeline(
+                "question-answering",
+                model=model_name,
+                tokenizer=model_name,
+                device=-1  # Force CPU
+            )
+            logger.info("Model loaded successfully")
+        except Exception as e:
+            logger.error(f"Error loading model: {str(e)}")
+            raise
 
     def extract_answer(self, question: str, text: str) -> str:
         """Extract answer from text using question-answering pipeline.
