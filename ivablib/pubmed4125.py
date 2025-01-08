@@ -23,8 +23,11 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Set your email and API key for NCBI from environment variables
+logger.info("Setting up NCBI credentials")
 Entrez.email = os.environ.get('NCBI_EMAIL', 'your@email.com')
 Entrez.api_key = os.environ.get('NCBI_API_KEY')
+logger.info(f"Using email: {Entrez.email}")
+logger.info("NCBI credentials set up")
 
 def get_from_scihub(url: str, output_dir: str, filename: str) -> Optional[str]:
     """Try to download a paper from Sci-Hub"""

@@ -1,76 +1,92 @@
 import json
 import os
+import logging
 import pandas as pd
 from ivablib.case_report_analyzer import CaseReportAnalyzer
 from ivablib.pubmed4125 import search_papers
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 def analyze_drug(drug_name):
-    # Initialize analyzer
-    analyzer = CaseReportAnalyzer()
-    
-    # Fetch papers for the drug
-    papers = search_papers(drug_name)
-    
-    # Analyze papers
-    case_reports_df = analyzer.analyze_papers(papers, drug_name)
-    
-    # Convert DataFrame to desired JSON structure
-    case_reports = []
-    for _, row in case_reports_df.iterrows():
-        report = {
-            "title": row.get("title", ""),
-            "authors": row.get("authors", ""),
-            "year": int(row.get("year", 0)) if pd.notna(row.get("year")) else None,
-            "journal": row.get("journal", ""),
-            "doi": row.get("doi", ""),
-            "age": float(row.get("age")) if pd.notna(row.get("age")) else None,
-            "sex": row.get("sex"),
-            "qtc": float(row.get("qtc")) if pd.notna(row.get("qtc")) else None,
-            "qt_uncorrected": float(row.get("qt_uncorrected")) if pd.notna(row.get("qt_uncorrected")) else None,
-            "heart_rate": float(row.get("heart_rate")) if pd.notna(row.get("heart_rate")) else None,
-            "blood_pressure": row.get("blood_pressure"),
-            "medical_history": row.get("medical_history"),
-            "medication_history": row.get("medication_history"),
-            "treatment_course": row.get("treatment_course"),
-            "outcome": "TdP" if row.get("had_tdp") == "Yes" else "Unknown"
+    """Analyze a drug and return results in JSON format."""
+    try:
+        logger.info(f"Starting analysis for {drug_name}")
+        
+        # Initialize analyzer
+        logger.info("Initializing CaseReportAnalyzer")
+        analyzer = CaseReportAnalyzer()
+        
+        # Fetch papers for the drug
+        logger.info(f"Searching for papers about {drug_name}")
+        papers = search_papers(drug_name)
+        if not papers:
+            logger.warning(f"No papers found for {drug_name}")
+            return {"error": f"No papers found for {drug_name}"}
+            
+        logger.info(f"Found {len(papers)} papers")
+        
+        # Analyze papers
+        logger.info("Analyzing papers")
+        case_reports_df = analyzer.analyze_papers(papers, drug_name)
+        
+        # Convert DataFrame to desired JSON structure
+        case_reports = []
+        for _, row in case_reports_df.iterrows():
+            try:
+                report = {
+                    "title": row.get("title", ""),
+                    "authors": row.get("authors", ""),
+                    "year": int(row.get("year", 0)) if pd.notna(row.get("year")) else None,
+                    "journal": row.get("journal", ""),
+                    "doi": row.get("doi", ""),
+                    "age": float(row.get("age")) if pd.notna(row.get("age")) else None,
+                    "sex": row.get("sex"),
+                    "qtc": float(row.get("qtc")) if pd.notna(row.get("qtc")) else None,
+                    "qt_uncorrected": float(row.get("qt_uncorrected")) if pd.notna(row.get("qt_uncorrected")) else None,
+                    "heart_rate": float(row.get("heart_rate")) if pd.notna(row.get("heart_rate")) else None,
+                    "blood_pressure": row.get("blood_pressure"),
+                    "medical_history": row.get("medical_history"),
+                    "medication_history": row.get("medication_history"),
+                    "treatment_course": row.get("treatment_course"),
+                    "outcome": "TdP" if row.get("had_tdp") == "Yes" else "Unknown"
+                }
+                case_reports.append(report)
+            except Exception as e:
+                logger.error(f"Error processing row: {str(e)}")
+                continue
+        
+        # Calculate statistics
+        logger.info("Calculating statistics")
+        ages = [r["age"] for r in case_reports if r["age"] is not None]
+        age_stats = {
+            "mean": sum(ages) / len(ages) if ages else 0,
+            "std": 0,  # TODO: Calculate standard deviation
+            "min": min(ages) if ages else 0,
+            "max": max(ages) if ages else 0
         }
-        case_reports.append(report)
-    
-    # Calculate statistics
-    ages = [r["age"] for r in case_reports if r["age"] is not None]
-    age_stats = {
-        "mean": sum(ages) / len(ages) if ages else 0,
-        "std": 0,  # TODO: Calculate standard deviation
-        "min": min(ages) if ages else 0,
-        "max": max(ages) if ages else 0
-    }
-    
-    sex_counts = {"male": 0, "female": 0}
-    for report in case_reports:
-        if report["sex"] and report["sex"].lower() in ["male", "female"]:
-            sex_counts[report["sex"].lower()] += 1
-    
-    # Count risk factors (using medical history as risk factors)
-    risk_factors = {}
-    for _, row in case_reports_df.iterrows():
-        if pd.notna(row.get("medical_history")):
-            conditions = [c.strip() for c in str(row["medical_history"]).split(",")]
-            for condition in conditions:
-                if condition:
-                    risk_factors[condition] = risk_factors.get(condition, 0) + 1
-    
-    analysis = {
-        "drug_name": drug_name,
-        "paper_count": len(case_reports),
-        "analysis": {
-            "age_stats": age_stats,
+        
+        sex_counts = {"male": 0, "female": 0}
+        for report in case_reports:
+            if report["sex"] and report["sex"].lower() in ["male", "female"]:
+                sex_counts[report["sex"].lower()] += 1
+                
+        # Prepare final response
+        response = {
+            "drug_name": drug_name,
+            "total_cases": len(case_reports),
+            "age_statistics": age_stats,
             "sex_distribution": sex_counts,
-            "risk_factors": risk_factors,
             "case_reports": case_reports
         }
-    }
-    
-    return analysis
+        
+        logger.info("Analysis completed successfully")
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error in analyze_drug: {str(e)}")
+        return {"error": str(e)}
 
 def main():
     # Create data directory if it doesn't exist
