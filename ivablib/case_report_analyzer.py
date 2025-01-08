@@ -601,3 +601,95 @@ def convert_pdf_to_text(pdf_path: str) -> Optional[str]:
     except Exception as e:
         logger.error(f"Error converting PDF to text: {e}")
         return None
+
+class CaseReportAnalyzer:
+    """Analyzes medical case reports for relevant information."""
+    
+    def __init__(self):
+        """Initialize the analyzer with regex patterns."""
+        # Compile regex patterns for better performance
+        self.patterns = {
+            'age': re.compile(r'(\d+)[\s-]*(year|yr|y)[s\s-]*old', re.IGNORECASE),
+            'sex': re.compile(r'\b(male|female)\b', re.IGNORECASE),
+            'qtc': re.compile(r'QTc[\s:]*(\d+)', re.IGNORECASE),
+            'qt_uncorrected': re.compile(r'QT[\s:]*(\d+)', re.IGNORECASE),
+            'heart_rate': re.compile(r'heart rate[\s:]*(\d+)', re.IGNORECASE),
+            'blood_pressure': re.compile(r'blood pressure[\s:]*([\d/]+)', re.IGNORECASE),
+            'had_tdp': re.compile(r'\b(torsade[s]* de pointes|TdP|torsades)\b', re.IGNORECASE)
+        }
+        
+    def extract_value(self, text: str, pattern: re.Pattern) -> Optional[str]:
+        """Extract a value from text using a compiled regex pattern."""
+        if not text:
+            return None
+            
+        match = pattern.search(text)
+        if match:
+            return match.group(1)
+        return None
+        
+    def analyze_paper(self, paper: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Analyze a single paper for case report information."""
+        try:
+            # Combine title and abstract for analysis
+            text = f"{paper.get('title', '')} {paper.get('abstract', '')}"
+            
+            # Skip if no meaningful text to analyze
+            if not text.strip():
+                return None
+            
+            # Extract basic information
+            age = self.extract_value(text, self.patterns['age'])
+            sex = self.extract_value(text, self.patterns['sex'])
+            qtc = self.extract_value(text, self.patterns['qtc'])
+            qt = self.extract_value(text, self.patterns['qt_uncorrected'])
+            hr = self.extract_value(text, self.patterns['heart_rate'])
+            bp = self.extract_value(text, self.patterns['blood_pressure'])
+            
+            # Check for TdP
+            had_tdp = bool(self.patterns['had_tdp'].search(text))
+            
+            # Only return if we found some relevant information
+            if any([age, sex, qtc, qt, hr, bp, had_tdp]):
+                return {
+                    'title': paper.get('title', ''),
+                    'authors': paper.get('authors', ''),
+                    'year': paper.get('year'),
+                    'journal': paper.get('journal', ''),
+                    'doi': paper.get('doi', ''),
+                    'pmid': paper.get('pmid', ''),
+                    'age': float(age) if age else None,
+                    'sex': sex.title() if sex else None,
+                    'qtc': float(qtc) if qtc else None,
+                    'qt_uncorrected': float(qt) if qt else None,
+                    'heart_rate': float(hr) if hr else None,
+                    'blood_pressure': bp,
+                    'had_tdp': 'Yes' if had_tdp else 'No'
+                }
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error analyzing paper: {str(e)}")
+            return None
+            
+    def analyze_papers(self, papers: List[Dict[str, Any]], drug_name: str) -> pd.DataFrame:
+        """Analyze a list of papers and return results as a DataFrame."""
+        try:
+            results = []
+            for paper in papers:
+                result = self.analyze_paper(paper)
+                if result:
+                    results.append(result)
+                    
+            # Convert to DataFrame
+            df = pd.DataFrame(results) if results else pd.DataFrame()
+            
+            # Add drug name
+            if not df.empty:
+                df['drug'] = drug_name
+            
+            return df
+            
+        except Exception as e:
+            logger.error(f"Error analyzing papers: {str(e)}")
+            return pd.DataFrame()  # Return empty DataFrame on error

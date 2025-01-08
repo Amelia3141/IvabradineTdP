@@ -84,7 +84,7 @@ def health():
             "timestamp": time.time()
         }), 500
 
-def safe_pubmed_search(query, max_results=10):
+def safe_pubmed_search(query, max_results=5):
     """Safely search PubMed and handle errors"""
     try:
         # First try searching
