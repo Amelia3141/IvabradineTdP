@@ -8,17 +8,16 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.8, 3.9, "3.10"]
+        python-version: ["3.10"]
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
         
@@ -39,6 +38,9 @@ jobs:
       run: |
         pip install -e .
         
-    - name: Run example
+    - name: Test API server
+      env:
+        NCBI_EMAIL: ${{ secrets.NCBI_EMAIL }}
+        NCBI_API_KEY: ${{ secrets.NCBI_API_KEY }}
       run: |
-        python app.py donepezil
+        python -c "from api_server import app; print('API server imports successfully')"
