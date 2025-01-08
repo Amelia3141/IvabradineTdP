@@ -3,7 +3,7 @@ from flask_cors import CORS
 import os
 from dotenv import load_dotenv
 import logging
-from Bio import Entrez
+from Bio import Entrez, Medline
 import time
 
 # Set up logging
@@ -71,6 +71,32 @@ def health():
             "error": str(e)
         }), 500
 
+def safe_pubmed_search(query, max_results=10):
+    """Safely search PubMed and handle errors"""
+    try:
+        # First try searching
+        logger.info(f"Searching PubMed for: {query}")
+        handle = Entrez.esearch(db="pubmed", term=query, retmax=max_results, retmode="xml")
+        results = Entrez.read(handle)
+        handle.close()
+        
+        if not results.get('IdList'):
+            logger.warning("No results found")
+            return []
+            
+        # Then fetch the papers
+        logger.info(f"Found {len(results['IdList'])} papers, fetching details")
+        handle = Entrez.efetch(db="pubmed", id=results['IdList'], rettype="medline", retmode="text")
+        records = Medline.parse(handle)
+        papers = list(records)
+        handle.close()
+        
+        return papers
+        
+    except Exception as e:
+        logger.error(f"Error in PubMed search: {str(e)}")
+        raise
+
 @app.route('/analyze/<drug_name>', methods=['GET'])
 def analyze(drug_name):
     try:
@@ -91,19 +117,11 @@ def analyze(drug_name):
         query = f"{drug_name} AND (torsades de pointes OR QT prolongation OR arrhythmia)"
         
         # Search PubMed
-        logger.info(f"Executing PubMed search with query: {query}")
-        handle = Entrez.esearch(db="pubmed", term=query, retmax=10)
-        record = Entrez.read(handle)
-        handle.close()
+        papers = safe_pubmed_search(query)
         
-        if not record['IdList']:
+        if not papers:
             logger.warning(f"No papers found for {drug_name}")
             return jsonify({'message': f"No papers found for {drug_name}"})
-            
-        # Fetch paper details
-        handle = Entrez.efetch(db="pubmed", id=record['IdList'], rettype="medline", retmode="text")
-        papers = list(Entrez.parse(handle))
-        handle.close()
         
         # Process papers
         results = []
@@ -111,11 +129,11 @@ def analyze(drug_name):
             try:
                 paper_info = {
                     'title': paper.get('TI', ''),
-                    'authors': '; '.join(paper.get('AU', [])),
+                    'authors': '; '.join(paper.get('AU', [])) if paper.get('AU') else '',
                     'year': paper.get('DP', '').split()[0] if paper.get('DP') else None,
                     'journal': paper.get('JT', ''),
                     'abstract': paper.get('AB', ''),
-                    'doi': next((id for id in paper.get('AID', []) if id.endswith('[doi]')), '').rstrip('[doi]'),
+                    'doi': next((id for id in paper.get('AID', []) if '[doi]' in id), '').replace('[doi]', '') if paper.get('AID') else '',
                     'pmid': paper.get('PMID', '')
                 }
                 results.append(paper_info)
