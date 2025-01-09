@@ -2,7 +2,6 @@
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
 .Python
 build/
 develop-eggs/
@@ -19,6 +18,16 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+
+# R
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*.Rproj
+.Rapp.history
+.RDataTmp
+.Rprofile
 
 # Environment variables
 .env
