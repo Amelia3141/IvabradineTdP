@@ -323,9 +323,15 @@ def analyze_herg_activity(drug_name: str, doses: List[float]) -> Dict[str, Any]:
     """Analyze hERG channel activity for drug."""
     try:
         # Initialize analyzer with NCBI credentials
+        if not st.secrets.get("NCBI_EMAIL") or not st.secrets.get("NCBI_API_KEY"):
+            return {
+                "error": "NCBI credentials not found. Please configure NCBI_EMAIL and NCBI_API_KEY in secrets.toml",
+                "concentrations": []
+            }
+            
         analyzer = DrugAnalyzer(
-            email=Entrez.email,
-            api_key=Entrez.api_key
+            email=st.secrets["NCBI_EMAIL"],
+            api_key=st.secrets["NCBI_API_KEY"]
         )
         
         # Analyze drug

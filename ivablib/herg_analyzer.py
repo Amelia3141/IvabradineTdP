@@ -47,6 +47,11 @@ class DrugAnalyzer:
             'User-Agent': 'DrugAnalyzer/1.0',
             'Accept': 'application/json'
         }
+        logger.info(f"Initializing DrugAnalyzer with email: {email}")
+        if not email or not api_key:
+            logger.error("Missing NCBI credentials")
+            raise ValueError("NCBI email and API key are required")
+            
         Entrez.email = email
         Entrez.api_key = api_key
 
@@ -120,8 +125,10 @@ class DrugAnalyzer:
         """Search for hERG IC50 data in literature."""
         try:
             # Search PubMed for articles about the drug and hERG
-            query = f"{drug_name} AND (hERG OR KCNH2 OR Kv11.1) AND (IC50 OR IC_50 OR inhibition)"
-            handle = Entrez.esearch(db="pubmed", term=query, retmax=10)
+            query = f"{drug_name} AND (hERG OR KCNH2 OR Kv11.1 OR potassium channel) AND (IC50 OR IC_50 OR IC 50 OR inhibition OR block OR current)"
+            logger.info(f"Searching PubMed with query: {query}")
+            
+            handle = Entrez.esearch(db="pubmed", term=query, retmax=20)
             record = Entrez.read(handle)
             handle.close()
             
@@ -129,6 +136,8 @@ class DrugAnalyzer:
                 logger.info(f"No articles found for {drug_name}")
                 return None, None
                 
+            logger.info(f"Found {len(record['IdList'])} articles")
+            
             # Get details for each article
             handle = Entrez.efetch(db="pubmed", id=record['IdList'], rettype="medline", retmode="text")
             records = Medline.parse(handle)
@@ -136,35 +145,43 @@ class DrugAnalyzer:
             handle.close()
             
             # Look for IC50 values in abstracts
-            for article in records:
+            for i, article in enumerate(records):
                 try:
                     abstract = article.get('AB', '')  # AB is the Medline field for abstract
                     if not abstract:
                         continue
                         
+                    logger.info(f"Checking article {i+1}/{len(records)}: {article.get('TI', 'No title')}")
+                    logger.info(f"Abstract: {abstract[:200]}...")  # Log first 200 chars
+                    
                     # Look for IC50 values with different unit formats
                     ic50_patterns = [
-                        r'IC50\s*(?:=|:|\s+of\s+)?\s*(\d+(?:\.\d+)?)\s*(?:±\s*\d+(?:\.\d+)?)?\s*(?:n|μ|micro)?M',
-                        r'IC50\s+value\s*(?:of|was|is)?\s*(\d+(?:\.\d+)?)\s*(?:±\s*\d+(?:\.\d+)?)?\s*(?:n|μ|micro)?M',
-                        r'hERG.*?(\d+(?:\.\d+)?)\s*(?:±\s*\d+(?:\.\d+)?)?\s*(?:n|μ|micro)?M.*?IC50',
-                        r'IC50.*?(\d+(?:\.\d+)?)\s*(?:±\s*\d+(?:\.\d+)?)?\s*(?:n|μ|micro)?M.*?hERG'
+                        r'IC50\s*(?:=|:|\s+of\s+|value[s]?\s+(?:is|was|were|of))?\s*(\d+(?:\.\d+)?)\s*(?:±|\+/-|±|\+/-)?\s*\d*(?:\.\d+)?\s*(?:n|µ|u|micro|m|nano|μ)?M'
                     ]
                     
                     for pattern in ic50_patterns:
-                        match = re.search(pattern, abstract, re.IGNORECASE)
+                        match = re.search(pattern, abstract, re.IGNORECASE | re.MULTILINE)
                         if match:
-                            ic50_value = float(match.group(1))
-                            
-                            # Get citation
-                            authors = article.get('AU', [])
-                            first_author = authors[0] if authors else "Unknown"
-                            year = article.get('DP', '').split()[0] if article.get('DP') else ''
-                            title = article.get('TI', 'Unknown Title')
-                            journal = article.get('JT', 'Unknown Journal')
-                            
-                            citation = f"{first_author} et al. ({year}). {title}. {journal}"
-                            logger.info(f"Found hERG IC50 value: {ic50_value} μM")
-                            return ic50_value, citation
+                            try:
+                                ic50_value = float(match.group(1))
+                                if ic50_value <= 0:
+                                    logger.warning(f"Invalid IC50 value found: {ic50_value}")
+                                    continue
+                                    
+                                # Get citation
+                                authors = article.get('AU', [])
+                                first_author = authors[0] if authors else "Unknown"
+                                year = article.get('DP', '').split()[0] if article.get('DP') else ''
+                                title = article.get('TI', 'Unknown Title')
+                                journal = article.get('JT', 'Unknown Journal')
+                                pmid = article.get('PMID', '')
+                                
+                                citation = f"{first_author} et al. ({year}). {title}. {journal}. PMID: {pmid}"
+                                logger.info(f"Found hERG IC50 value: {ic50_value} μM")
+                                return ic50_value, citation
+                            except (ValueError, TypeError) as e:
+                                logger.warning(f"Error converting IC50 value: {str(e)}")
+                                continue
                             
                 except Exception as e:
                     logger.error(f"Error processing article: {str(e)}")
@@ -332,7 +349,7 @@ class DrugAnalyzer:
                 citations.append(
                     "National Center for Biotechnology Information (2024). PubChem Compound Summary for CID {}, {}. "
                     "Retrieved January 10, 2024, from https://pubchem.ncbi.nlm.nih.gov/compound/{}".format(
-                        response['cid'], drug_name, drug_name
+                        response['cid'], drug_name, response['cid']
                     )
                 )
             if response['herg_source']:
