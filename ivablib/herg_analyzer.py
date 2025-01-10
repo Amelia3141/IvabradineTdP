@@ -5,6 +5,8 @@ from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from datetime import datetime
 import logging
+from Bio import Entrez, Medline
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +39,8 @@ class DrugAnalyzer:
             'User-Agent': 'DrugAnalyzer/1.0',
             'Accept': 'application/json'
         }
+        Entrez.email = email
+        Entrez.api_key = api_key
 
     def _make_request(self, url: str, params: Dict = None) -> Optional[requests.Response]:
         """Make API request with rate limiting and error handling"""
@@ -83,57 +87,53 @@ class DrugAnalyzer:
             return None
 
     def search_herg_data(self, drug_name: str) -> Tuple[Optional[float], Optional[str]]:
-        """Search PubMed for hERG IC50 data"""
+        """Search for hERG IC50 data in literature."""
         try:
-            # Search PubMed for relevant articles
-            search_url = f"{self.base_url_pubmed}/esearch.fcgi"
-            search_params = {
-                'db': 'pubmed',
-                'term': f"{drug_name} hERG IC50",
-                'retmode': 'json',
-                'retmax': '5'
-            }
+            # Search PubMed for articles about the drug and hERG
+            query = f"{drug_name} AND (hERG OR KCNH2 OR Kv11.1) AND (IC50 OR IC_50 OR inhibition)"
+            handle = Entrez.esearch(db="pubmed", term=query, retmax=10)
+            record = Entrez.read(handle)
+            handle.close()
             
-            response = self._make_request(search_url, search_params)
-            if response is None:
+            if not record['IdList']:
                 return None, None
                 
-            data = response.json()
+            # Get details for each article
+            handle = Entrez.efetch(db="pubmed", id=record['IdList'], rettype="medline", retmode="xml")
+            records = Entrez.read(handle)
+            handle.close()
             
-            if not data['esearchresult']['idlist']:
-                return None, None
-
-            # Get abstracts and look for IC50 values
-            for pmid in data['esearchresult']['idlist']:
-                fetch_url = f"{self.base_url_pubmed}/efetch.fcgi"
-                fetch_params = {
-                    'db': 'pubmed',
-                    'id': pmid,
-                    'retmode': 'xml'
-                }
-                
-                response = self._make_request(fetch_url, fetch_params)
-                if response is None:
+            # Look for IC50 values in abstracts
+            for article in records['PubmedArticle']:
+                try:
+                    abstract = article['MedlineCitation']['Article'].get('Abstract', {}).get('AbstractText', [''])[0]
+                    if not abstract:
+                        continue
+                        
+                    # Look for IC50 values
+                    ic50_pattern = r'IC50\s*(?:=|:|\s+of\s+)?\s*(\d+(?:\.\d+)?)\s*(?:±\s*\d+(?:\.\d+)?)?\s*(?:n|μ|micro)?M'
+                    match = re.search(ic50_pattern, abstract, re.IGNORECASE)
+                    
+                    if match:
+                        ic50_value = float(match.group(1))
+                        # Get citation
+                        authors = article['MedlineCitation']['Article']['AuthorList']
+                        first_author = f"{authors[0].get('LastName', '')} {authors[0].get('ForeName', '')}"
+                        year = article['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate'].get('Year', '')
+                        title = article['MedlineCitation']['Article']['ArticleTitle']
+                        journal = article['MedlineCitation']['Article']['Journal']['Title']
+                        
+                        citation = f"{first_author} et al. ({year}). {title}. {journal}"
+                        return ic50_value, citation
+                        
+                except Exception as e:
+                    logger.error(f"Error processing article: {str(e)}")
                     continue
                     
-                abstract_text = response.text.lower()
-                
-                # Look for IC50 values in different formats
-                import re
-                patterns = [
-                    r'herg.*?ic50.*?(\d+\.?\d*).*?[μµ]m',
-                    r'ic50.*?(\d+\.?\d*).*?[μµ]m.*?herg',
-                    r'ic50\s*[=:]\s*(\d+\.?\d*)\s*[μµ]m'
-                ]
-                
-                for pattern in patterns:
-                    match = re.search(pattern, abstract_text)
-                    if match:
-                        return float(match.group(1)), f"PMID: {pmid}"
-            
             return None, None
             
-        except Exception:
+        except Exception as e:
+            logger.error(f"Error searching hERG data: {str(e)}")
             return None, None
 
     def calculate_concentrations(self, molecular_weight: float, doses: List[float]) -> List[DrugConcentration]:

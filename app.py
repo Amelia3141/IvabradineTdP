@@ -380,14 +380,14 @@ if "hERG Channel Activity" in analysis_sections:
         doses = [5.0, 7.5]  # Standard doses
         analysis = analyze_herg_activity(drug_name, doses)
         
-        if analysis.get("error"):
-            st.error(analysis["error"])
+        if "error" in analysis:
+            st.warning(analysis["error"])
         else:
             # Display hERG data
             st.markdown("<div class='herg-data'>", unsafe_allow_html=True)
             
             if analysis["herg_ic50"] != "N/A":
-                st.markdown(f"**hERG IC50:** {analysis['herg_ic50']}")
+                st.markdown(f"**hERG IC50:** {analysis['herg_ic50']} μM")
                 if analysis["herg_source"] != "N/A":
                     st.markdown(f"**Source:** {analysis['herg_source']}")
             else:
@@ -398,26 +398,29 @@ if "hERG Channel Activity" in analysis_sections:
             # Display concentration analysis
             st.subheader("hERG Binding Analysis")
             st.markdown("<div class='concentration-data'>", unsafe_allow_html=True)
-            st.markdown("The concentration analysis shows:")
             
-            for conc in analysis["concentrations"]:
-                st.markdown(f"""
-                * **Dose:** {conc['dose']} mg
-                * **Theoretical Max:** {conc['theoretical_max']} μM (Maximum theoretical concentration based on dose and distribution volume)
-                * **Plasma Concentration:** {conc['plasma_concentration']} μM (Estimated plasma concentration with 40% bioavailability)
-                * **IC50/Theoretical Ratio:** {conc['ratio_theoretical']} (Ratio between hERG IC50 and theoretical concentration - values < 1 indicate potential risk)
-                * **IC50/Plasma Ratio:** {conc['ratio_plasma']} (Ratio between hERG IC50 and plasma concentration - values < 1 indicate potential risk)
-                """)
+            if analysis["concentrations"]:
+                for conc in analysis["concentrations"]:
+                    st.markdown(f"""
+                    **For {conc['dose']} mg dose:**
+                    - Theoretical Maximum Concentration: {conc['theoretical_max']} μM
+                    - Estimated Plasma Concentration: {conc['plasma_concentration']} μM
+                    - Theoretical Safety Ratio: {conc['ratio_theoretical']}
+                    - Plasma Safety Ratio: {conc['ratio_plasma']}
+                    """)
+                
+                if analysis["theoretical_binding"]:
+                    st.warning("⚠️ Potential hERG channel binding detected at therapeutic concentrations")
+                else:
+                    st.success("✅ No significant hERG channel binding predicted at therapeutic concentrations")
+            
+            # Display citations
+            if analysis.get("citations"):
+                st.markdown("### References")
+                for citation in analysis["citations"]:
+                    st.markdown(f"- {citation}")
             
             st.markdown("</div>", unsafe_allow_html=True)
-            
-            # Citations
-            if analysis["citations"]:
-                st.markdown("<div class='citations'>", unsafe_allow_html=True)
-                st.markdown("**References:**")
-                for citation in analysis["citations"]:
-                    st.markdown(f"* {citation}")
-                st.markdown("</div>", unsafe_allow_html=True)
             
     except Exception as e:
         st.error(f"Error analyzing hERG activity: {str(e)}")
