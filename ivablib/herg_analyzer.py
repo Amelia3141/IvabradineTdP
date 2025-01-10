@@ -5,7 +5,6 @@ import re
 import logging
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
-from Bio import Entrez, Medline
 from datetime import datetime
 
 # Configure logging
@@ -25,24 +24,118 @@ class DrugConcentration:
     ratio_theoretical: Optional[float] = None
     ratio_plasma: Optional[float] = None
 
-@dataclass
-class DrugAnalysis:
-    name: str
-    cid: Optional[int]
-    molecular_weight: Optional[float]
-    herg_ic50: Optional[float]
-    herg_source: Optional[str]
-    concentrations: List[DrugConcentration]
-    theoretical_binding: bool
-    citations: List[str]
+class PubChemSearcher:
+    def __init__(self):
+        self.base_url = "https://pubchem.ncbi.nlm.nih.gov/rest/pug"
+        
+    def search_bioassays(self, cid: int) -> List[Dict]:
+        """Search PubChem BioAssay database for ion channel data"""
+        try:
+            # First get list of all bioassays for this compound
+            url = f"{self.base_url}/compound/cid/{cid}/aids/JSON"
+            response = requests.get(url)
+            response.raise_for_status()
+            aids = response.json().get('InformationList', {}).get('Information', [{}])[0].get('AID', [])
+            
+            results = []
+            for aid in aids:
+                try:
+                    # Get assay details
+                    url = f"{self.base_url}/assay/aid/{aid}/JSON"
+                    response = requests.get(url)
+                    response.raise_for_status()
+                    assay_data = response.json()
+                    
+                    # Check if assay is related to ion channels
+                    description = str(assay_data).lower()
+                    if any(term in description for term in [
+                        'herg', 'kcnh2', 'ion channel', 'iks', 'kcnq1', 
+                        'calcium channel', 'sodium channel', 'patch clamp'
+                    ]):
+                        # Get specific results for this compound
+                        url = f"{self.base_url}/assay/aid/{aid}/cid/{cid}/JSON"
+                        response = requests.get(url)
+                        response.raise_for_status()
+                        result_data = response.json()
+                        
+                        # Extract IC50 or other relevant data
+                        if 'Table' in result_data:
+                            for row in result_data['Table'].get('Row', []):
+                                if any(term in str(row).lower() for term in ['ic50', 'inhibition']):
+                                    results.append({
+                                        'assay_id': aid,
+                                        'data': row,
+                                        'description': assay_data.get('description', '')
+                                    })
+                    
+                    time.sleep(0.3)  # Rate limiting
+                except Exception as e:
+                    logger.warning(f"Error processing assay {aid}: {str(e)}")
+                    continue
+                    
+            return results
+        except Exception as e:
+            logger.error(f"Error searching bioassays: {str(e)}")
+            return []
+
+    def search_bioactivity(self, cid: int) -> List[Dict]:
+        """Search PubChem's bioactivity data"""
+        try:
+            url = f"{self.base_url}/compound/cid/{cid}/assaysummary/JSON"
+            response = requests.get(url)
+            response.raise_for_status()
+            data = response.json()
+            
+            results = []
+            if 'AssaySummaries' in data:
+                for assay in data['AssaySummaries']:
+                    if any(term in str(assay).lower() for term in [
+                        'herg', 'ion channel', 'cardiotoxicity', 'cardiac', 
+                        'action potential', 'qt', 'arrhythmia'
+                    ]):
+                        results.append({
+                            'activity_id': assay.get('SID'),
+                            'data': assay
+                        })
+            
+            return results
+        except Exception as e:
+            logger.error(f"Error searching bioactivity: {str(e)}")
+            return []
+
+    def get_compound_data(self, cid: int) -> Dict:
+        """Get comprehensive compound data from PubChem"""
+        try:
+            endpoints = [
+                ('property', 'MolecularWeight,XLogP,Charge,ComplexityScore,HBondDonorCount,HBondAcceptorCount'),
+                ('record', 'synonyms'),
+                ('classification', '')
+            ]
+            
+            results = {}
+            for endpoint, params in endpoints:
+                url = f"{self.base_url}/compound/cid/{cid}/{endpoint}"
+                if params:
+                    url += f"/{params}"
+                url += "/JSON"
+                
+                response = requests.get(url)
+                response.raise_for_status()
+                results[endpoint] = response.json()
+                time.sleep(0.3)
+            
+            return results
+        except Exception as e:
+            logger.error(f"Error getting compound data: {str(e)}")
+            return {}
 
 class DrugAnalyzer:
     def __init__(self, email: str, api_key: str):
         """Initialize with PubMed/NCBI credentials"""
         self.email = email
         self.api_key = api_key
+        self.pubchem = PubChemSearcher()
         self.base_url_pubchem = "https://pubchem.ncbi.nlm.nih.gov/rest/pug"
-        self.base_url_pubmed = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
         self.headers = {
             'User-Agent': 'DrugAnalyzer/1.0',
             'Accept': 'application/json'
@@ -51,40 +144,17 @@ class DrugAnalyzer:
         if not email or not api_key:
             logger.error("Missing NCBI credentials")
             raise ValueError("NCBI email and API key are required")
-            
-        Entrez.email = email
-        Entrez.api_key = api_key
-
-    def _make_request(self, url: str, params: Dict = None) -> Optional[requests.Response]:
-        """Make API request with rate limiting and error handling"""
-        try:
-            if params is None:
-                params = {}
-            
-            # Only add API key for PubMed requests
-            if 'eutils.ncbi.nlm.nih.gov' in url:
-                params['api_key'] = self.api_key
-                params['email'] = self.email
-            
-            response = requests.get(url, headers=self.headers, params=params)
-            response.raise_for_status()
-            time.sleep(0.34)  # Rate limiting for NCBI APIs
-            return response
-        except requests.exceptions.RequestException as e:
-            if hasattr(e.response, 'status_code') and e.response.status_code == 404:
-                return None
-            raise Exception(f"API request failed: {str(e)}")
 
     def get_drug_cid(self, drug_name: str) -> Optional[int]:
         """Get PubChem CID for drug"""
         try:
             url = f"{self.base_url_pubchem}/compound/name/{drug_name}/cids/JSON"
-            response = self._make_request(url)
-            if response is None:
-                return None
+            response = requests.get(url)
+            response.raise_for_status()
             data = response.json()
             return data['IdentifierList']['CID'][0]
-        except Exception:
+        except Exception as e:
+            logger.error(f"Error getting drug CID: {str(e)}")
             return None
 
     def get_molecular_weight(self, cid: str) -> Optional[float]:
@@ -94,8 +164,9 @@ class DrugAnalyzer:
                 logger.warning("No CID provided for molecular weight lookup")
                 return None
                 
-            url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/property/MolecularWeight/JSON"
+            url = f"{self.base_url_pubchem}/compound/cid/{cid}/property/MolecularWeight/JSON"
             response = requests.get(url)
+            response.raise_for_status()
             
             if response.status_code == 200:
                 data = response.json()
@@ -111,83 +182,65 @@ class DrugAnalyzer:
                                 logger.warning("Invalid molecular weight: must be positive")
                                 return None
                         except (ValueError, TypeError) as e:
-                            logger.warning("Could not convert molecular weight to float: {}".format(str(e)))
+                            logger.warning(f"Could not convert molecular weight to float: {str(e)}")
                             return None
             
             logger.warning("Could not retrieve molecular weight from PubChem")
             return None
             
         except Exception as e:
-            logger.error("Error getting molecular weight: {}".format(str(e)))
+            logger.error(f"Error getting molecular weight: {str(e)}")
             return None
 
     def search_herg_data(self, drug_name: str) -> Tuple[Optional[float], Optional[str]]:
-        """Search for hERG IC50 data in literature."""
+        """Search for hERG IC50 data in PubChem."""
         try:
-            # Search PubMed for articles about the drug and hERG
-            query = f"{drug_name} AND (hERG OR KCNH2 OR Kv11.1 OR potassium channel) AND (IC50 OR IC_50 OR IC 50 OR inhibition OR block OR current)"
-            logger.info(f"Searching PubMed with query: {query}")
-            
-            handle = Entrez.esearch(db="pubmed", term=query, retmax=20)
-            record = Entrez.read(handle)
-            handle.close()
-            
-            if not record['IdList']:
-                logger.info(f"No articles found for {drug_name}")
+            # Get CID first
+            cid = self.get_drug_cid(drug_name)
+            if not cid:
+                logger.info(f"No CID found for {drug_name}")
                 return None, None
                 
-            logger.info(f"Found {len(record['IdList'])} articles")
+            # Search bioassays
+            bioassays = self.pubchem.search_bioassays(cid)
             
-            # Get details for each article
-            handle = Entrez.efetch(db="pubmed", id=record['IdList'], rettype="medline", retmode="text")
-            records = Medline.parse(handle)
-            records = list(records)  # Convert iterator to list
-            handle.close()
-            
-            # Look for IC50 values in abstracts
-            for i, article in enumerate(records):
-                try:
-                    abstract = article.get('AB', '')  # AB is the Medline field for abstract
-                    if not abstract:
-                        continue
-                        
-                    logger.info(f"Checking article {i+1}/{len(records)}: {article.get('TI', 'No title')}")
-                    logger.info(f"Abstract: {abstract[:200]}...")  # Log first 200 chars
-                    
-                    # Look for IC50 values with different unit formats
-                    ic50_patterns = [
-                        r'IC50\s*(?:=|:|\s+of\s+|value[s]?\s+(?:is|was|were|of))?\s*(\d+(?:\.\d+)?)\s*(?:±|\+/-|±|\+/-)?\s*\d*(?:\.\d+)?\s*(?:n|µ|u|micro|m|nano|μ)?M'
-                    ]
-                    
-                    for pattern in ic50_patterns:
-                        match = re.search(pattern, abstract, re.IGNORECASE | re.MULTILINE)
-                        if match:
-                            try:
-                                ic50_value = float(match.group(1))
-                                if ic50_value <= 0:
-                                    logger.warning(f"Invalid IC50 value found: {ic50_value}")
-                                    continue
-                                    
-                                # Get citation
-                                authors = article.get('AU', [])
-                                first_author = authors[0] if authors else "Unknown"
-                                year = article.get('DP', '').split()[0] if article.get('DP') else ''
-                                title = article.get('TI', 'Unknown Title')
-                                journal = article.get('JT', 'Unknown Journal')
-                                pmid = article.get('PMID', '')
-                                
-                                citation = f"{first_author} et al. ({year}). {title}. {journal}. PMID: {pmid}"
+            # Look for hERG IC50 values in bioassays
+            for assay in bioassays:
+                data_str = str(assay['data']).lower()
+                if 'herg' in data_str or 'kcnh2' in data_str:
+                    # Look for IC50 values
+                    ic50_pattern = r'ic50\s*[=:]\s*(\d+(?:\.\d+)?)\s*(?:n|µ|u|micro|m|nano|μ)?m'
+                    match = re.search(ic50_pattern, data_str)
+                    if match:
+                        try:
+                            ic50_value = float(match.group(1))
+                            if ic50_value > 0:
+                                citation = f"PubChem BioAssay AID: {assay['assay_id']}"
                                 logger.info(f"Found hERG IC50 value: {ic50_value} μM")
                                 return ic50_value, citation
-                            except (ValueError, TypeError) as e:
-                                logger.warning(f"Error converting IC50 value: {str(e)}")
-                                continue
-                            
-                except Exception as e:
-                    logger.error(f"Error processing article: {str(e)}")
-                    continue
+                        except (ValueError, TypeError) as e:
+                            logger.warning(f"Error converting IC50 value: {str(e)}")
+                            continue
             
-            logger.info(f"No hERG IC50 values found in literature for {drug_name}")
+            # If no IC50 found in bioassays, check bioactivity data
+            bioactivities = self.pubchem.search_bioactivity(cid)
+            for activity in bioactivities:
+                data_str = str(activity['data']).lower()
+                if 'herg' in data_str or 'kcnh2' in data_str:
+                    ic50_pattern = r'ic50\s*[=:]\s*(\d+(?:\.\d+)?)\s*(?:n|µ|u|micro|m|nano|μ)?m'
+                    match = re.search(ic50_pattern, data_str)
+                    if match:
+                        try:
+                            ic50_value = float(match.group(1))
+                            if ic50_value > 0:
+                                citation = f"PubChem BioActivity SID: {activity['activity_id']}"
+                                logger.info(f"Found hERG IC50 value: {ic50_value} μM")
+                                return ic50_value, citation
+                        except (ValueError, TypeError) as e:
+                            logger.warning(f"Error converting IC50 value: {str(e)}")
+                            continue
+            
+            logger.info(f"No hERG IC50 values found in PubChem for {drug_name}")
             return None, None
             
         except Exception as e:
@@ -221,26 +274,32 @@ class DrugAnalyzer:
                         ratio_theoretical=None,
                         ratio_plasma=None
                     ) for dose in doses]
-                    
+                
                 # Calculate concentrations for each dose
                 for dose in doses:
                     try:
                         # Convert dose from mg to μmol
-                        dose_in_mol = float(str(dose).strip()) / mol_weight * 1000.0
+                        dose_umol = (dose * 1000) / mol_weight
                         
-                        # Calculate concentrations
-                        theoretical_max = round(dose_in_mol / 5.0, 3)  # Assuming 5L distribution volume
-                        plasma_conc = round(theoretical_max * 0.4, 3)  # 40% bioavailability
+                        # Estimate volume of distribution (L)
+                        volume = 70  # Average adult body weight in kg
+                        
+                        # Calculate theoretical maximum concentration (μM)
+                        theoretical_max = dose_umol / volume
+                        
+                        # Calculate plasma concentration with 40% bioavailability
+                        plasma_concentration = theoretical_max * 0.4
                         
                         concentrations.append(DrugConcentration(
                             dose=dose,
                             theoretical_max=theoretical_max,
-                            plasma_concentration=plasma_conc,
+                            plasma_concentration=plasma_concentration,
                             ratio_theoretical=None,
                             ratio_plasma=None
                         ))
-                    except (ValueError, TypeError, ZeroDivisionError) as e:
-                        logger.error("Error calculating concentration for dose {}: {}".format(dose, str(e)))
+                        
+                    except Exception as e:
+                        logger.error(f"Error calculating concentration for dose {dose}: {str(e)}")
                         concentrations.append(DrugConcentration(
                             dose=dose,
                             theoretical_max=None,
@@ -250,7 +309,7 @@ class DrugAnalyzer:
                         ))
                         
             except (ValueError, TypeError) as e:
-                logger.warning("Invalid molecular weight {}: {}".format(molecular_weight, str(e)))
+                logger.error(f"Error converting molecular weight: {str(e)}")
                 return [DrugConcentration(
                     dose=dose,
                     theoretical_max=None,
@@ -259,17 +318,17 @@ class DrugAnalyzer:
                     ratio_plasma=None
                 ) for dose in doses]
                 
+            return concentrations
+            
         except Exception as e:
-            logger.error("Error calculating concentrations: {}".format(str(e)))
-            concentrations = [DrugConcentration(
+            logger.error(f"Error calculating concentrations: {str(e)}")
+            return [DrugConcentration(
                 dose=dose,
                 theoretical_max=None,
                 plasma_concentration=None,
                 ratio_theoretical=None,
                 ratio_plasma=None
             ) for dose in doses]
-            
-        return concentrations
 
     def analyze_drug(self, drug_name: str, doses: List[float]) -> Dict:
         """Complete drug analysis"""
@@ -294,7 +353,7 @@ class DrugAnalyzer:
                 if molecular_weight:
                     response['molecular_weight'] = molecular_weight
             
-            # Get hERG data
+            # Get hERG data from PubChem
             herg_ic50, herg_source = self.search_herg_data(drug_name)
             if herg_ic50 is not None:
                 response['herg_ic50'] = herg_ic50
@@ -330,7 +389,7 @@ class DrugAnalyzer:
                                         herg_ic50_float / conc.plasma_concentration, 3
                                     )
                         except (ValueError, TypeError, ZeroDivisionError) as e:
-                            logger.warning("Error calculating ratios: {}".format(str(e)))
+                            logger.warning(f"Error calculating ratios: {str(e)}")
                     
                     formatted_concentrations.append(conc_data)
                 
@@ -353,14 +412,14 @@ class DrugAnalyzer:
                     )
                 )
             if response['herg_source']:
-                citations.append("hERG IC50 data source: {}".format(response['herg_source']))
+                citations.append(f"hERG IC50 data source: {response['herg_source']}")
             response['citations'] = citations
             
             return response
             
         except Exception as e:
-            logger.error("Error analyzing drug: {}".format(str(e)))
+            logger.error(f"Error analyzing drug: {str(e)}")
             return {
-                'error': "Error analyzing hERG activity: {}".format(str(e)),
+                'error': f"Error analyzing hERG activity: {str(e)}",
                 'concentrations': []  # Ensure this is always present
             }
