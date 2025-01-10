@@ -4,6 +4,9 @@ import time
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class DrugConcentration:
@@ -136,21 +139,26 @@ class DrugAnalyzer:
     def calculate_concentrations(self, molecular_weight: float, doses: List[float]) -> List[DrugConcentration]:
         """Calculate drug concentrations for given doses"""
         concentrations = []
-        for dose in doses:
-            # Convert dose from mg to μmol
-            dose_in_mol = float(dose) / float(molecular_weight) * 1000.0 if molecular_weight else 0.0
-            
-            # Calculate concentrations
-            theoretical_max = dose_in_mol / 5.0  # Assuming 5L distribution volume
-            plasma_conc = theoretical_max * 0.4  # 40% bioavailability
-            
-            concentrations.append(DrugConcentration(
-                theoretical_max=theoretical_max,
-                plasma_concentration=plasma_conc
-            ))
+        try:
+            for dose in doses:
+                # Convert dose from mg to μmol
+                dose_in_mol = float(dose) / float(molecular_weight) * 1000.0 if molecular_weight else 0.0
+                
+                # Calculate concentrations
+                theoretical_max = dose_in_mol / 5.0  # Assuming 5L distribution volume
+                plasma_conc = theoretical_max * 0.4  # 40% bioavailability
+                
+                concentrations.append(DrugConcentration(
+                    theoretical_max=theoretical_max,
+                    plasma_concentration=plasma_conc
+                ))
+        except (ValueError, TypeError) as e:
+            logger.error(f"Error calculating concentrations: {str(e)}")
+            # Return default concentrations if calculation fails
+            concentrations = [DrugConcentration(theoretical_max=0.0, plasma_concentration=0.0) for _ in doses]
         return concentrations
 
-    def analyze_drug(self, drug_name: str, doses: List[float]) -> DrugAnalysis:
+    def analyze_drug(self, drug_name: str, doses: List[float]) -> Optional[DrugAnalysis]:
         """Complete drug analysis"""
         try:
             # Get basic drug data
@@ -161,14 +169,16 @@ class DrugAnalyzer:
             herg_ic50, herg_source = self.search_herg_data(drug_name)
             
             # Calculate concentrations
-            concentrations = self.calculate_concentrations(molecular_weight or 0, doses)
+            concentrations = self.calculate_concentrations(molecular_weight or 0.0, doses)
             
             # Calculate ratios if hERG IC50 is available
             if herg_ic50:
                 for conc in concentrations:
                     try:
-                        conc.ratio_theoretical = float(herg_ic50) / float(conc.theoretical_max) if conc.theoretical_max else None
-                        conc.ratio_plasma = float(herg_ic50) / float(conc.plasma_concentration) if conc.plasma_concentration else None
+                        if conc.theoretical_max > 0:
+                            conc.ratio_theoretical = float(herg_ic50) / float(conc.theoretical_max)
+                        if conc.plasma_concentration > 0:
+                            conc.ratio_plasma = float(herg_ic50) / float(conc.plasma_concentration)
                     except (ValueError, TypeError):
                         conc.ratio_theoretical = None
                         conc.ratio_plasma = None
@@ -202,4 +212,5 @@ class DrugAnalyzer:
             )
             
         except Exception as e:
-            raise Exception(f"Error analyzing drug {drug_name}: {str(e)}")
+            logger.error(f"Error analyzing drug: {str(e)}")
+            return None

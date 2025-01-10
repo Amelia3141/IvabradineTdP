@@ -3,3 +3,5 @@ plotly==5.18.0
 pandas==1.5.3
 requests==2.31.0
 biopython==1.81
+PyPDF2==3.0.1
+beautifulsoup4==4.12.2

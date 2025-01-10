@@ -112,7 +112,7 @@ class CaseReportAnalyzer:
                     results.append(result)
                     
             # Convert to DataFrame
-            df = pd.DataFrame(results) if results else pd.DataFrame()
+            df = pd.DataFrame(results) if results else pd.DataFrame(columns=['title', 'authors', 'year', 'journal', 'doi', 'pmid', 'age', 'sex', 'qtc', 'qt_uncorrected', 'heart_rate', 'blood_pressure', 'had_tdp', 'patient_type', 'treatment_successful', 'treatment_duration', 'drug_combinations', 'drug'])
             
             # Add drug name
             if not df.empty:
@@ -122,7 +122,7 @@ class CaseReportAnalyzer:
             
         except Exception as e:
             logger.error(f"Error analyzing papers: {str(e)}")
-            return pd.DataFrame()  # Return empty DataFrame on error
+            return pd.DataFrame(columns=['title', 'authors', 'year', 'journal', 'doi', 'pmid', 'age', 'sex', 'qtc', 'qt_uncorrected', 'heart_rate', 'blood_pressure', 'had_tdp', 'patient_type', 'treatment_successful', 'treatment_duration', 'drug_combinations', 'drug'])
 
 def analyze_papers(papers: List[Dict[str, Any]], drug_name: str) -> pd.DataFrame:
     """Analyze a list of papers and create a case report table."""

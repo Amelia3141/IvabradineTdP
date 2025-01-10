@@ -67,21 +67,22 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("TdP Risk Assessment Tool")
+# Initialize analyzers
+drug_analyzer = DrugAnalyzer(NCBI_EMAIL, NCBI_API_KEY)
 
-# Initialize analyzer
-analyzer = DrugAnalyzer(NCBI_EMAIL, NCBI_API_KEY)
+# Main content
+st.title("TdP Risk Assessment")
+st.markdown("Analyze the risk of Torsades de Pointes (TdP) for a given drug.")
 
-# Sidebar
-st.sidebar.title("Analysis Sections")
-analysis_sections = st.sidebar.multiselect(
-    "Select sections to display:",
+# Drug input
+drug_name = st.text_input("Enter drug name:", "Ivabradine").strip().lower()
+
+# Analysis sections selection
+analysis_sections = st.multiselect(
+    "Select analysis sections:",
     ["Risk Category", "hERG Channel Activity", "Literature Analysis"],
     default=["Risk Category", "hERG Channel Activity", "Literature Analysis"]
 )
-
-# Drug input
-drug_name = st.text_input("Enter drug name:", "ivabradine").strip().lower()
 
 def check_drug_risk(drug_name):
     """Check drug risk category in CredibleMeds database."""
@@ -146,7 +147,7 @@ def search_pubmed_literature(drug_name: str) -> pd.DataFrame:
     
     try:
         # Search PubMed
-        handle = Entrez.esearch(db="pubmed", term=query, retmax=10)
+        handle = Entrez.esearch(db="pubmed", term=query, retmax=50)  
         record = Entrez.read(handle)
         handle.close()
         
@@ -161,31 +162,58 @@ def search_pubmed_literature(drug_name: str) -> pd.DataFrame:
         # Extract relevant information
         papers = []
         for article in records['PubmedArticle']:
-            medline = article['MedlineCitation']
-            article_data = medline['Article']
-            
-            # Extract authors
-            authors = article_data.get('AuthorList', [])
-            author_names = []
-            for author in authors:
-                if isinstance(author, dict):
-                    last_name = author.get('LastName', '')
-                    fore_name = author.get('ForeName', '')
-                    author_names.append(f"{last_name} {fore_name}")
-            
-            # Get publication date
-            pub_date = article_data['Journal']['JournalIssue']['PubDate']
-            year = pub_date.get('Year', 'N/A')
-            
-            papers.append({
-                'title': article_data['ArticleTitle'],
-                'authors': ', '.join(author_names) if author_names else 'No authors listed',
-                'year': year,
-                'journal': article_data['Journal'].get('Title', 'Journal not specified'),
-                'pmid': medline['PMID'],
-                'abstract': article_data.get('Abstract', {}).get('AbstractText', [''])[0]
-            })
+            try:
+                medline = article['MedlineCitation']
+                article_data = medline['Article']
+                
+                # Extract authors
+                authors = article_data.get('AuthorList', [])
+                author_names = []
+                for author in authors:
+                    if isinstance(author, dict):
+                        last_name = author.get('LastName', '')
+                        fore_name = author.get('ForeName', '')
+                        author_names.append(f"{last_name} {fore_name}")
+                
+                # Get publication date
+                pub_date = article_data['Journal']['JournalIssue']['PubDate']
+                year = pub_date.get('Year', 'N/A')
+                
+                # Extract abstract text safely
+                abstract = ''
+                abstract_data = article_data.get('Abstract', {})
+                if abstract_data:
+                    abstract_text = abstract_data.get('AbstractText', [])
+                    if abstract_text:
+                        if isinstance(abstract_text, list):
+                            # Handle labeled sections
+                            sections = []
+                            for section in abstract_text:
+                                if isinstance(section, str):
+                                    sections.append(section)
+                                elif hasattr(section, 'attributes') and hasattr(section, 'string'):
+                                    label = section.attributes.get('Label', '')
+                                    text = str(section)
+                                    sections.append(f"{label}: {text}" if label else text)
+                            abstract = ' '.join(sections)
+                        else:
+                            abstract = str(abstract_text)
+                
+                papers.append({
+                    'title': article_data['ArticleTitle'],
+                    'authors': ', '.join(author_names) if author_names else 'No authors listed',
+                    'year': year,
+                    'journal': article_data['Journal'].get('Title', 'Journal not specified'),
+                    'pmid': medline['PMID'],
+                    'abstract': abstract
+                })
+            except Exception as e:
+                st.warning(f"Error processing article: {str(e)}")
+                continue
         
+        if not papers:
+            return pd.DataFrame()
+            
         # Initialize case report analyzer
         analyzer = CaseReportAnalyzer()
         
@@ -303,53 +331,48 @@ if "hERG Channel Activity" in analysis_sections:
     try:
         # Standard doses for ivabradine (mg)
         doses = [5.0, 7.5]  # Standard doses
-        analysis = analyzer.analyze_drug(drug_name, doses)
+        analysis = drug_analyzer.analyze_drug(drug_name, doses)
         
-        # Display hERG data
-        st.markdown(f"""
-        <div class='herg-data'>
-        <p><b>Molecular Weight:</b> {f"{analysis.molecular_weight:.2f}" if analysis.molecular_weight else 'Not found'} g/mol</p>
-        <p><b>hERG IC50:</b> {f"{analysis.herg_ic50:.2f}" if analysis.herg_ic50 else 'Not found'} μM</p>
-        <p><b>Source:</b> {analysis.herg_source if analysis.herg_source else 'Not available'}</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Display concentration data
-        if any(analysis.concentrations) and analysis.molecular_weight:
-            st.markdown("<div style='color: white;'><h3>Concentration Analysis</h3></div>", unsafe_allow_html=True)
-            for i, conc in enumerate(analysis.concentrations):
+        if analysis:
+            # Display hERG data
+            st.markdown("<div class='herg-data'>", unsafe_allow_html=True)
+            
+            if analysis.herg_ic50:
+                st.markdown(f"**hERG IC50:** {analysis.herg_ic50:.2f} μM")
+                if analysis.herg_source:
+                    st.markdown(f"**Source:** {analysis.herg_source}")
+            else:
+                st.warning("No hERG IC50 data found in literature.")
+            
+            st.markdown("</div>", unsafe_allow_html=True)
+            
+            # Display concentration analysis
+            st.subheader("hERG Binding Analysis")
+            st.markdown("<div class='concentration-data'>", unsafe_allow_html=True)
+            st.markdown("The concentration analysis shows:")
+            
+            for conc in analysis.concentrations:
                 st.markdown(f"""
-                <div class='concentration-data'>
-                <p><b>Dose {doses[i]} mg:</b></p>
-                <ul>
-                    <li>Theoretical Max: {f"{conc.theoretical_max:.2f}"} μM</li>
-                    <li>Plasma Concentration: {f"{conc.plasma_concentration:.2f}"} μM</li>
-                    {f'<li>IC50/Plasma Ratio: {conc.ratio_plasma:.2f}</li>' if conc.ratio_plasma else ''}
-                </ul>
-                </div>
-                """, unsafe_allow_html=True)
-        
-        # Display citations
-        if analysis.citations:
-            st.markdown("<div style='color: white;'><h3>References</h3></div>", unsafe_allow_html=True)
-            for citation in analysis.citations:
-                st.markdown(f"<div style='color: white;'>{citation}</div>", unsafe_allow_html=True)
+                * **Theoretical Max:** {conc.theoretical_max:.2f} μM (Maximum theoretical concentration based on dose and distribution volume)
+                * **Plasma Concentration:** {conc.plasma_concentration:.2f} μM (Estimated plasma concentration with 40% bioavailability)
+                * **IC50/Plasma Ratio:** {conc.ratio_plasma:.2f} (Ratio between hERG IC50 and plasma concentration - values < 1 indicate potential risk)
+                """)
+            
+            st.markdown("</div>", unsafe_allow_html=True)
+            
+            # Citations
+            if analysis.citations:
+                st.markdown("<div class='citations'>", unsafe_allow_html=True)
+                st.markdown("**References:**")
+                for citation in analysis.citations:
+                    st.markdown(f"* {citation}")
+                st.markdown("</div>", unsafe_allow_html=True)
+        else:
+            st.error("Could not analyze hERG activity. Please check that the drug name is correct.")
             
     except Exception as e:
         st.error(f"Error analyzing hERG activity: {str(e)}")
         st.info("Please check that your NCBI credentials are properly configured.")
-    
-    st.markdown("### hERG Binding Analysis", unsafe_allow_html=True)
-    st.markdown("""
-    <div style='color: white;'>
-    <p>The concentration analysis shows:</p>
-    <ul>
-        <li><b>Theoretical Max:</b> Maximum theoretical concentration based on dose and distribution volume</li>
-        <li><b>Plasma Concentration:</b> Estimated plasma concentration with 40% bioavailability</li>
-        <li><b>IC50/Plasma Ratio:</b> Ratio between hERG IC50 and plasma concentration (values < 1 indicate potential risk)</li>
-    </ul>
-    </div>
-    """, unsafe_allow_html=True)
 
 if "Literature Analysis" in analysis_sections:
     st.header("Literature Analysis")
