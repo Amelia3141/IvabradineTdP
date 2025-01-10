@@ -330,11 +330,17 @@ def analyze_herg_activity(drug_name: str, doses: List[float]) -> Dict[str, Any]:
         
         # Analyze drug
         analysis = analyzer.analyze_drug(drug_name, doses)
-        if not analysis:
+        
+        # Handle case where analysis returns None or has error
+        if not analysis or "error" in analysis:
             return {
-                "error": "No hERG IC50 data found in literature.",
+                "error": analysis.get("error", "No hERG IC50 data found in literature."),
                 "concentrations": []
             }
+            
+        # Return analysis directly if it's already a dictionary
+        if isinstance(analysis, dict):
+            return analysis
             
         # Format concentrations for display
         concentrations = []
