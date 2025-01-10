@@ -327,17 +327,17 @@ def analyze_herg_activity(drug_name: str, doses: List[float]) -> Dict[str, Any]:
         for i, conc in enumerate(analysis.concentrations):
             conc_data = {
                 "dose": doses[i],
-                "theoretical_max": f"{conc.theoretical_max:.2f}",
-                "plasma_concentration": f"{conc.plasma_concentration:.2f}",
-                "ratio_theoretical": f"{conc.ratio_theoretical:.2f}" if conc.ratio_theoretical else "N/A",
-                "ratio_plasma": f"{conc.ratio_plasma:.2f}" if conc.ratio_plasma else "N/A"
+                "theoretical_max": f"{conc.theoretical_max:.2f}" if conc.theoretical_max is not None else "N/A",
+                "plasma_concentration": f"{conc.plasma_concentration:.2f}" if conc.plasma_concentration is not None else "N/A",
+                "ratio_theoretical": f"{conc.ratio_theoretical:.2f}" if conc.ratio_theoretical is not None else "N/A",
+                "ratio_plasma": f"{conc.ratio_plasma:.2f}" if conc.ratio_plasma is not None else "N/A"
             }
             concentrations.append(conc_data)
             
         return {
             "name": analysis.name,
-            "molecular_weight": f"{analysis.molecular_weight:.2f}" if analysis.molecular_weight else "N/A",
-            "herg_ic50": f"{analysis.herg_ic50:.2f}" if analysis.herg_ic50 else "N/A",
+            "molecular_weight": f"{analysis.molecular_weight:.2f}" if analysis.molecular_weight is not None else "N/A",
+            "herg_ic50": f"{analysis.herg_ic50:.2f}" if analysis.herg_ic50 is not None else "N/A",
             "herg_source": analysis.herg_source or "N/A",
             "theoretical_binding": analysis.theoretical_binding,
             "concentrations": concentrations,
@@ -405,8 +405,8 @@ if "hERG Channel Activity" in analysis_sections:
                     for conc in analysis["concentrations"]:
                         st.markdown(f"""
                         **For {conc['dose']} mg dose:**
-                        - Theoretical Maximum Concentration: {conc['theoretical_max']} μM
-                        - Estimated Plasma Concentration: {conc['plasma_concentration']} μM
+                        - Theoretical Maximum Concentration: {conc['theoretical_max']} {'μM' if conc['theoretical_max'] != 'N/A' else ''}
+                        - Estimated Plasma Concentration: {conc['plasma_concentration']} {'μM' if conc['plasma_concentration'] != 'N/A' else ''}
                         - Theoretical Safety Ratio: {conc['ratio_theoretical']}
                         - Plasma Safety Ratio: {conc['ratio_plasma']}
                         """)

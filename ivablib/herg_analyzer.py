@@ -151,26 +151,44 @@ class DrugAnalyzer:
         """Calculate drug concentrations for given doses"""
         concentrations = []
         try:
-            for dose in doses:
-                # Convert dose from mg to μmol
-                dose_in_mol = float(dose) / float(molecular_weight) * 1000.0 if molecular_weight else 0.0
-                
-                # Calculate concentrations
-                theoretical_max = dose_in_mol / 5.0  # Assuming 5L distribution volume
-                plasma_conc = theoretical_max * 0.4  # 40% bioavailability
-                
-                concentrations.append(DrugConcentration(
-                    theoretical_max=theoretical_max,
-                    plasma_concentration=plasma_conc,
+            if not molecular_weight or molecular_weight <= 0:
+                # Return default concentrations if molecular weight is invalid
+                return [DrugConcentration(
+                    theoretical_max=None,
+                    plasma_concentration=None,
                     ratio_theoretical=None,
                     ratio_plasma=None
-                ))
-        except (ValueError, TypeError) as e:
+                ) for _ in doses]
+                
+            for dose in doses:
+                try:
+                    # Convert dose from mg to μmol
+                    dose_in_mol = float(dose) / float(molecular_weight) * 1000.0
+                    
+                    # Calculate concentrations
+                    theoretical_max = dose_in_mol / 5.0  # Assuming 5L distribution volume
+                    plasma_conc = theoretical_max * 0.4  # 40% bioavailability
+                    
+                    concentrations.append(DrugConcentration(
+                        theoretical_max=theoretical_max,
+                        plasma_concentration=plasma_conc,
+                        ratio_theoretical=None,
+                        ratio_plasma=None
+                    ))
+                except (ValueError, TypeError, ZeroDivisionError) as e:
+                    logger.error(f"Error calculating concentration for dose {dose}: {str(e)}")
+                    concentrations.append(DrugConcentration(
+                        theoretical_max=None,
+                        plasma_concentration=None,
+                        ratio_theoretical=None,
+                        ratio_plasma=None
+                    ))
+        except Exception as e:
             logger.error(f"Error calculating concentrations: {str(e)}")
             # Return default concentrations if calculation fails
             concentrations = [DrugConcentration(
-                theoretical_max=0.0,
-                plasma_concentration=0.0,
+                theoretical_max=None,
+                plasma_concentration=None,
                 ratio_theoretical=None,
                 ratio_plasma=None
             ) for _ in doses]
