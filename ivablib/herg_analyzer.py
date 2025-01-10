@@ -34,7 +34,6 @@ class DrugAnalyzer:
         """Initialize with NCBI credentials"""
         self.email = email
         self.api_key = api_key
-        self.crediblemeds_file = os.path.join(os.path.dirname(__file__), '..', 'data', 'crediblemeds_data.txt')
     
     def _get_molecular_weight(self, cid: int) -> Optional[float]:
         """Get molecular weight from PubChem"""
@@ -89,16 +88,15 @@ class DrugAnalyzer:
             return None
 
     def _check_crediblemeds(self, drug_name: str) -> bool:
-        """Check if drug is in CredibleMeds TdP risk list"""
+        """Check if drug is in CredibleMeds list of known TdP risk drugs."""
         try:
-            with open(self.crediblemeds_file, 'r') as f:
-                for line in f:
-                    if line.startswith('#'):
-                        continue
-                    parts = line.strip().split('|')
-                    if len(parts) == 2 and parts[0].strip().lower() == drug_name.lower():
-                        return True
-            return False
+            data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
+            crediblemeds_file = os.path.join(data_dir, 'crediblemeds_data.txt')
+            
+            with open(crediblemeds_file, 'r') as f:
+                crediblemeds_drugs = [line.strip().lower() for line in f.readlines()]
+            
+            return drug_name.lower() in crediblemeds_drugs
         except Exception as e:
             logger.error(f"Error checking CredibleMeds: {str(e)}")
             return False

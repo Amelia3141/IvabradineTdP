@@ -1,0 +1,24 @@
+amiodarone
+chloroquine
+haloperidol
+methadone
+sotalol
+quinidine
+dofetilide
+ibutilide
+procainamide
+disopyramide
+droperidol
+erythromycin
+pentamidine
+thioridazine
+arsenic trioxide
+astemizole
+bepridil
+cisapride
+grepafloxacin
+levomethadyl
+mesoridazine
+probucol
+terfenadine
+pimozide
