@@ -81,7 +81,7 @@ def search_pubmed_literature(drug_name: str) -> pd.DataFrame:
             return pd.DataFrame()
             
         # Fetch details for each article
-        handle = Entrez.efetch(db="pubmed", id=record['IdList'], rettype="medline", retmode="text")
+        handle = Entrez.efetch(db="pubmed", id=record['IdList'], rettype="medline", retmode="xml")
         records = Entrez.read(handle)
         handle.close()
         
@@ -180,8 +180,8 @@ if "hERG Channel Activity" in analysis_sections:
         # Display hERG data
         st.markdown(f"""
         <div style='color: black;'>
-        <p><b>Molecular Weight:</b> {analysis.molecular_weight:.2f if analysis.molecular_weight else 'Not found'} g/mol</p>
-        <p><b>hERG IC50:</b> {analysis.herg_ic50 if analysis.herg_ic50 else 'Not found'} μM</p>
+        <p><b>Molecular Weight:</b> {f"{analysis.molecular_weight:.2f}" if analysis.molecular_weight else 'Not found'} g/mol</p>
+        <p><b>hERG IC50:</b> {f"{analysis.herg_ic50:.2f}" if analysis.herg_ic50 else 'Not found'} μM</p>
         <p><b>Source:</b> {analysis.herg_source if analysis.herg_source else 'Not available'}</p>
         </div>
         """, unsafe_allow_html=True)
@@ -194,8 +194,8 @@ if "hERG Channel Activity" in analysis_sections:
                 <div style='color: black;'>
                 <p><b>Dose {doses[i]} mg:</b></p>
                 <ul>
-                    <li>Theoretical Max: {conc.theoretical_max:.2f} μM</li>
-                    <li>Plasma Concentration: {conc.plasma_concentration:.2f} μM</li>
+                    <li>Theoretical Max: {f"{conc.theoretical_max:.2f}"} μM</li>
+                    <li>Plasma Concentration: {f"{conc.plasma_concentration:.2f}"} μM</li>
                     {f'<li>IC50/Plasma Ratio: {conc.ratio_plasma:.2f}</li>' if conc.ratio_plasma else ''}
                 </ul>
                 </div>
