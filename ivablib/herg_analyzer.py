@@ -1,14 +1,21 @@
 """hERG Channel Analysis Module"""
 import requests
 import time
+import re
+import logging
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
-from datetime import datetime
-import logging
 from Bio import Entrez, Medline
-import re
+from datetime import datetime
 
+# Configure logging
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter('%(levelname)s:%(name)s:%(message)s'))
+    logger.addHandler(handler)
 
 @dataclass
 class DrugConcentration:
@@ -151,8 +158,9 @@ class DrugAnalyzer:
         """Calculate drug concentrations for given doses"""
         concentrations = []
         try:
-            if not molecular_weight or molecular_weight <= 0:
-                # Return default concentrations if molecular weight is invalid
+            # Check if molecular weight is valid
+            if not molecular_weight or not isinstance(molecular_weight, (int, float)) or molecular_weight <= 0:
+                logger.warning(f"Invalid molecular weight: {molecular_weight}")
                 return [DrugConcentration(
                     theoretical_max=None,
                     plasma_concentration=None,
@@ -185,7 +193,6 @@ class DrugAnalyzer:
                     ))
         except Exception as e:
             logger.error(f"Error calculating concentrations: {str(e)}")
-            # Return default concentrations if calculation fails
             concentrations = [DrugConcentration(
                 theoretical_max=None,
                 plasma_concentration=None,
@@ -204,26 +211,36 @@ class DrugAnalyzer:
             # Get hERG data
             herg_ic50, herg_source = self.search_herg_data(drug_name)
             
-            # Calculate concentrations
-            concentrations = self.calculate_concentrations(molecular_weight or 0.0, doses)
+            # Calculate concentrations only if we have valid molecular weight
+            if molecular_weight and isinstance(molecular_weight, (int, float)) and molecular_weight > 0:
+                concentrations = self.calculate_concentrations(molecular_weight, doses)
+            else:
+                logger.warning(f"Cannot calculate concentrations: invalid molecular weight ({molecular_weight})")
+                concentrations = [DrugConcentration(
+                    theoretical_max=None,
+                    plasma_concentration=None,
+                    ratio_theoretical=None,
+                    ratio_plasma=None
+                ) for _ in doses]
             
             # Calculate ratios if hERG IC50 is available
-            if herg_ic50:
+            if herg_ic50 and isinstance(herg_ic50, (int, float)):
                 for conc in concentrations:
                     try:
-                        if conc.theoretical_max > 0:
+                        if conc.theoretical_max and conc.theoretical_max > 0:
                             conc.ratio_theoretical = float(herg_ic50) / float(conc.theoretical_max)
-                        if conc.plasma_concentration > 0:
+                        if conc.plasma_concentration and conc.plasma_concentration > 0:
                             conc.ratio_plasma = float(herg_ic50) / float(conc.plasma_concentration)
-                    except (ValueError, TypeError):
+                    except (ValueError, TypeError, ZeroDivisionError):
                         conc.ratio_theoretical = None
                         conc.ratio_plasma = None
             
             # Determine theoretical binding
             theoretical_binding = False
-            if herg_ic50:
+            if herg_ic50 and isinstance(herg_ic50, (int, float)):
                 theoretical_binding = any(
-                    c.ratio_plasma and c.ratio_plasma < 1 for c in concentrations
+                    c.ratio_plasma and isinstance(c.ratio_plasma, (int, float)) and c.ratio_plasma < 1 
+                    for c in concentrations
                 )
             
             # Generate citations
@@ -231,7 +248,7 @@ class DrugAnalyzer:
             if cid:
                 citations.append(
                     f"National Center for Biotechnology Information (2024). PubChem Compound Summary for CID {cid}, {drug_name}. "
-                    f"Retrieved {datetime.now().strftime('%B %d, %Y')}, from https://pubchem.ncbi.nlm.nih.gov/compound/{drug_name}"
+                    f"Retrieved January 10, 2024, from https://pubchem.ncbi.nlm.nih.gov/compound/{drug_name}"
                 )
             if herg_source:
                 citations.append(f"hERG IC50 data source: {herg_source}")
