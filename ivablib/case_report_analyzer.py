@@ -36,8 +36,11 @@ class CaseReportAnalyzer:
             
         match = pattern.search(text)
         if match:
-            # Return the first non-None group
-            return next((g for g in match.groups() if g is not None), None)
+            # Get all groups that matched
+            groups = [g for g in match.groups() if g is not None]
+            if groups:
+                # Return the first non-None group
+                return groups[0].strip()
         return None
         
     def extract_all_matches(self, text: str, pattern: re.Pattern) -> List[str]:
@@ -46,7 +49,12 @@ class CaseReportAnalyzer:
             return []
             
         matches = pattern.finditer(text)
-        return [next((g for g in m.groups() if g is not None), '') for m in matches]
+        results = []
+        for m in matches:
+            groups = [g for g in m.groups() if g is not None]
+            if groups:
+                results.append(groups[0].strip())
+        return results
         
     def analyze_paper(self, paper: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Analyze a single paper for case report information."""
@@ -75,6 +83,27 @@ class CaseReportAnalyzer:
             # Check for TdP
             had_tdp = bool(self.patterns['had_tdp'].search(text))
             
+            # Clean up numeric values
+            try:
+                age = float(age) if age and age.isdigit() else None
+            except (ValueError, TypeError):
+                age = None
+                
+            try:
+                qtc = float(qtc) if qtc and qtc.isdigit() else None
+            except (ValueError, TypeError):
+                qtc = None
+                
+            try:
+                qt = float(qt) if qt and qt.isdigit() else None
+            except (ValueError, TypeError):
+                qt = None
+                
+            try:
+                hr = float(hr) if hr and hr.isdigit() else None
+            except (ValueError, TypeError):
+                hr = None
+            
             # Only return if we found some relevant information
             if any([age, sex, qtc, qt, hr, bp, had_tdp, patient_type, outcome, treatment_duration, drug_combinations]):
                 return {
@@ -84,17 +113,17 @@ class CaseReportAnalyzer:
                     'journal': paper.get('journal', ''),
                     'doi': paper.get('doi', ''),
                     'pmid': paper.get('pmid', ''),
-                    'age': float(age) if age and age.isdigit() else None,
+                    'age': age,
                     'sex': sex.title() if sex else None,
-                    'qtc': float(qtc) if qtc and qtc.isdigit() else None,
-                    'qt_uncorrected': float(qt) if qt and qt.isdigit() else None,
-                    'heart_rate': float(hr) if hr and hr.isdigit() else None,
+                    'qtc': qtc,
+                    'qt_uncorrected': qt,
+                    'heart_rate': hr,
                     'blood_pressure': bp,
                     'had_tdp': 'Yes' if had_tdp else 'No',
                     'patient_type': patient_type.title() if patient_type else None,
                     'treatment_successful': 'Yes' if outcome else 'No',
                     'treatment_duration': treatment_duration,
-                    'drug_combinations': drug_combinations if drug_combinations else []
+                    'drug_combinations': ', '.join(drug_combinations) if drug_combinations else None
                 }
             return None
             

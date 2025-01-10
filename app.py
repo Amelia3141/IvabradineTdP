@@ -6,7 +6,7 @@ import os
 import requests
 from Bio import Entrez, Medline
 import re
-from typing import Dict
+from typing import Dict, List
 from ivablib.herg_analyzer import DrugAnalyzer
 from ivablib.case_report_analyzer import CaseReportAnalyzer
 
@@ -303,6 +303,51 @@ def create_risk_gauge(risk_category):
     )
     return fig
 
+def analyze_herg_activity(drug_name: str, doses: List[float]) -> Dict[str, Any]:
+    """Analyze hERG channel activity for drug."""
+    try:
+        # Initialize analyzer with NCBI credentials
+        analyzer = DrugAnalyzer(
+            email="amelia.glasauer@gmail.com",
+            api_key="8b23b0c60e6b8c8a40f2867c88a9d43c5f09"
+        )
+        
+        # Analyze drug
+        analysis = analyzer.analyze_drug(drug_name, doses)
+        if not analysis:
+            return {
+                "error": "No hERG IC50 data found in literature.",
+                "concentrations": []
+            }
+            
+        # Format concentrations for display
+        concentrations = []
+        for i, conc in enumerate(analysis.concentrations):
+            conc_data = {
+                "dose": doses[i],
+                "theoretical_max": f"{conc.theoretical_max:.2f}",
+                "plasma_concentration": f"{conc.plasma_concentration:.2f}",
+                "ratio_theoretical": f"{conc.ratio_theoretical:.2f}" if conc.ratio_theoretical else "N/A",
+                "ratio_plasma": f"{conc.ratio_plasma:.2f}" if conc.ratio_plasma else "N/A"
+            }
+            concentrations.append(conc_data)
+            
+        return {
+            "name": analysis.name,
+            "molecular_weight": f"{analysis.molecular_weight:.2f}" if analysis.molecular_weight else "N/A",
+            "herg_ic50": f"{analysis.herg_ic50:.2f}" if analysis.herg_ic50 else "N/A",
+            "herg_source": analysis.herg_source or "N/A",
+            "theoretical_binding": analysis.theoretical_binding,
+            "concentrations": concentrations,
+            "citations": analysis.citations
+        }
+        
+    except Exception as e:
+        return {
+            "error": str(e),
+            "concentrations": []
+        }
+
 # Main content
 if "Risk Category" in analysis_sections:
     st.header("Risk Category Analysis")
@@ -331,16 +376,18 @@ if "hERG Channel Activity" in analysis_sections:
     try:
         # Standard doses for ivabradine (mg)
         doses = [5.0, 7.5]  # Standard doses
-        analysis = drug_analyzer.analyze_drug(drug_name, doses)
+        analysis = analyze_herg_activity(drug_name, doses)
         
-        if analysis:
+        if analysis.get("error"):
+            st.error(analysis["error"])
+        else:
             # Display hERG data
             st.markdown("<div class='herg-data'>", unsafe_allow_html=True)
             
-            if analysis.herg_ic50:
-                st.markdown(f"**hERG IC50:** {analysis.herg_ic50:.2f} μM")
-                if analysis.herg_source:
-                    st.markdown(f"**Source:** {analysis.herg_source}")
+            if analysis["herg_ic50"] != "N/A":
+                st.markdown(f"**hERG IC50:** {analysis['herg_ic50']}")
+                if analysis["herg_source"] != "N/A":
+                    st.markdown(f"**Source:** {analysis['herg_source']}")
             else:
                 st.warning("No hERG IC50 data found in literature.")
             
@@ -351,24 +398,24 @@ if "hERG Channel Activity" in analysis_sections:
             st.markdown("<div class='concentration-data'>", unsafe_allow_html=True)
             st.markdown("The concentration analysis shows:")
             
-            for conc in analysis.concentrations:
+            for conc in analysis["concentrations"]:
                 st.markdown(f"""
-                * **Theoretical Max:** {conc.theoretical_max:.2f} μM (Maximum theoretical concentration based on dose and distribution volume)
-                * **Plasma Concentration:** {conc.plasma_concentration:.2f} μM (Estimated plasma concentration with 40% bioavailability)
-                * **IC50/Plasma Ratio:** {conc.ratio_plasma:.2f} (Ratio between hERG IC50 and plasma concentration - values < 1 indicate potential risk)
+                * **Dose:** {conc['dose']} mg
+                * **Theoretical Max:** {conc['theoretical_max']} μM (Maximum theoretical concentration based on dose and distribution volume)
+                * **Plasma Concentration:** {conc['plasma_concentration']} μM (Estimated plasma concentration with 40% bioavailability)
+                * **IC50/Theoretical Ratio:** {conc['ratio_theoretical']} (Ratio between hERG IC50 and theoretical concentration - values < 1 indicate potential risk)
+                * **IC50/Plasma Ratio:** {conc['ratio_plasma']} (Ratio between hERG IC50 and plasma concentration - values < 1 indicate potential risk)
                 """)
             
             st.markdown("</div>", unsafe_allow_html=True)
             
             # Citations
-            if analysis.citations:
+            if analysis["citations"]:
                 st.markdown("<div class='citations'>", unsafe_allow_html=True)
                 st.markdown("**References:**")
-                for citation in analysis.citations:
+                for citation in analysis["citations"]:
                     st.markdown(f"* {citation}")
                 st.markdown("</div>", unsafe_allow_html=True)
-        else:
-            st.error("Could not analyze hERG activity. Please check that the drug name is correct.")
             
     except Exception as e:
         st.error(f"Error analyzing hERG activity: {str(e)}")
