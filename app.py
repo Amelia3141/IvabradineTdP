@@ -126,7 +126,10 @@ if analyze_button:
                         st.subheader("Drug Information")
                         st.write(f"**PubChem CID:** {analysis.get('cid', 'Not found')}")
                         st.write(f"**Molecular Weight:** {analysis.get('molecular_weight', 'Not found')} g/mol")
-                        st.write(f"**hERG IC50:** {analysis.get('herg_ic50', 'None')} μM")
+                        if analysis.get('herg_ic50'):
+                            st.write(f"**hERG IC50:** {analysis['herg_ic50']:.2f} μM")
+                        else:
+                            st.write("**hERG IC50:** Not found")
                         st.write(f"**Source:** {analysis.get('source', 'Unknown')}")
                     
                     with col2:
@@ -135,7 +138,7 @@ if analyze_button:
                             risk_text = analysis.get('risk_category', 'Known Risk')
                             st.error(f"⚠️ {risk_text} (CredibleMeds)")
                             st.markdown("[View on CredibleMeds](https://crediblemeds.org)")
-                        elif analysis.get('theoretical_binding'):
+                        elif analysis.get('herg_ic50') and analysis['herg_ic50'] < 10:  # Less than 10 μM is concerning
                             st.warning("⚠️ Potential hERG binding detected")
                         else:
                             st.success("✅ No significant hERG binding predicted")
@@ -205,16 +208,11 @@ if analyze_button:
                 
                 with tab2:
                     st.subheader("Literature Review")
-                    literature = analysis.get('literature', [])
-                    if not literature:
+                    literature = analysis.get('literature', pd.DataFrame())
+                    if literature.empty:
                         st.info("No relevant literature found.")
                     else:
-                        for paper in literature:
-                            with st.expander(paper['title']):
-                                st.write(f"**Authors:** {', '.join(paper['authors'])}")
-                                st.write(f"**Journal:** {paper['journal']} ({paper['year']})")
-                                st.write(f"**Abstract:** {paper['abstract']}")
-                                st.write(f"[View on PubMed](https://pubmed.ncbi.nlm.nih.gov/{paper['pmid']}/)")
+                        st.dataframe(literature)
                     
     except Exception as e:
         st.error(f"Error analyzing drug: {str(e)}")

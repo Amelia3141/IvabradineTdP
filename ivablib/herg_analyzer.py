@@ -66,15 +66,20 @@ class DrugAnalyzer:
             for mol in results:
                 acts = activities.filter(
                     molecule_chembl_id=mol['molecule_chembl_id'],
-                    target_chembl_id='CHEMBL240'  # hERG
-                ).only(['standard_value', 'standard_units'])
+                    target_chembl_id='CHEMBL240',  # hERG
+                    standard_type__iexact='IC50'
+                ).only(['standard_value', 'standard_units', 'standard_type'])
                 
                 for act in acts:
                     if 'standard_value' in act and 'standard_units' in act:
-                        if act['standard_units'] == 'nM':
-                            herg_activities.append(float(act['standard_value']))
-                        elif act['standard_units'] == 'uM':
-                            herg_activities.append(float(act['standard_value']) * 1000)
+                        value = float(act['standard_value'])
+                        if act['standard_units'].lower() == 'nm':
+                            value = value / 1000  # Convert to μM
+                        elif act['standard_units'].lower() == 'um':
+                            value = value
+                        else:
+                            continue
+                        herg_activities.append(value)
             
             if not herg_activities:
                 logger.warning(f"No hERG activity data found for {compound_name}")
@@ -82,14 +87,14 @@ class DrugAnalyzer:
                 
             # Return median IC50
             median_ic50 = statistics.median(herg_activities)
-            logger.info(f"Found hERG IC50 for {compound_name}: {median_ic50} nM")
+            logger.info(f"Found hERG IC50 for {compound_name}: {median_ic50} μM")
             return median_ic50
             
         except Exception as e:
             logger.error(f"Error searching ChEMBL: {str(e)}")
             return None
 
-    def _check_crediblemeds(self, drug_name: str) -> Tuple[bool, str]:
+    def _check_crediblemeds(self, drug_name: str) -> tuple[bool, str]:
         """Check if drug is in CredibleMeds list of known TdP risk drugs.
         Returns (is_risk, risk_category)"""
         try:
@@ -103,10 +108,19 @@ class DrugAnalyzer:
                 for line in f:
                     if line.startswith('#') or '|' not in line:
                         continue
-                    drug, risk = [x.strip() for x in line.split('|')]
-                    drug_risks[drug.lower()] = risk
+                    drug, risk = [x.strip().lower() for x in line.split('|')]
+                    drug_risks[drug] = risk
             
+            # Try exact match first
             risk_category = drug_risks.get(drug_name.lower(), '')
+            
+            # If no exact match, try partial match
+            if not risk_category:
+                for drug in drug_risks:
+                    if drug in drug_name.lower() or drug_name.lower() in drug:
+                        risk_category = drug_risks[drug]
+                        break
+            
             logger.info(f"CredibleMeds result for {drug_name}: {risk_category}")
             return bool(risk_category), risk_category
             
@@ -189,68 +203,29 @@ class DrugAnalyzer:
             return pd.DataFrame()
 
     def analyze_drug(self, drug_name: str, doses: List[float]) -> Dict:
-        """Analyze a drug for hERG interactions"""
+        """Analyze a drug for TdP risk"""
         try:
             logger.info(f"Starting analysis for {drug_name}")
             
-            # Get drug info from PubChem
-            url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{drug_name}/cids/JSON"
-            response = requests.get(url)
-            response.raise_for_status()
-            data = response.json()
-            
-            if "IdentifierList" not in data:
-                return {"error": f"Drug {drug_name} not found in PubChem"}
-            
-            cid = data["IdentifierList"]["CID"][0]
-            logger.info(f"Found CID {cid} for {drug_name}")
-            molecular_weight = self._get_molecular_weight(cid)
-            
-            if not molecular_weight:
-                return {"error": "Could not retrieve molecular weight"}
-            
-            # Get hERG IC50 from ChEMBL
-            herg_ic50 = self._search_chembl_herg(drug_name)
-            logger.info(f"hERG IC50: {herg_ic50}")
-            
-            # Calculate concentrations
-            concentrations = self._calculate_concentrations(
-                doses=doses,
-                molecular_weight=molecular_weight,
-                herg_ic50=herg_ic50
-            )
+            # Get hERG data from ChEMBL
+            ic50 = self._search_chembl_herg(drug_name)
+            logger.info(f"hERG IC50: {ic50}")
             
             # Check CredibleMeds
             is_risk, risk_category = self._check_crediblemeds(drug_name)
             logger.info(f"CredibleMeds: {is_risk}, {risk_category}")
             
-            # Determine if theoretical binding is likely
-            theoretical_binding = (
-                any(c.ratio_theoretical and c.ratio_theoretical > 0.1 for c in concentrations) 
-                if herg_ic50 else None
-            ) or is_risk
-            
-            # Format concentrations for output
-            concentration_data = [
-                [c.dose, c.theoretical_max, c.plasma_concentration, c.ratio_theoretical, c.ratio_plasma]
-                for c in concentrations
-            ]
+            # Get literature
+            literature = self._search_literature(drug_name)
+            logger.info(f"Found {len(literature)} literature results")
             
             result = {
-                "name": drug_name,
-                "cid": cid,
-                "molecular_weight": molecular_weight,
-                "herg_ic50": herg_ic50,
-                "herg_source": "ChEMBL Database",
-                "concentrations": concentration_data,
-                "theoretical_binding": theoretical_binding,
-                "crediblemeds_risk": is_risk,
-                "risk_category": risk_category,
-                "citations": [
-                    "Mendez-Lucio O, et al. (2017). Computational Tools for HERG Channel Blockers Safety Assessment in Drug Discovery. Front Pharmacol.",
-                    "Gintant G, et al. (2016). Evolution of strategies to improve preclinical cardiac safety testing. Nat Rev Drug Discov.",
-                    "Woosley RL, et al. www.Crediblemeds.org, QTdrugs List, AZCERT, Inc. 1822 Innovation Park Dr., Oro Valley, AZ 85755"
-                ]
+                'drug_name': drug_name,
+                'herg_ic50': ic50,
+                'crediblemeds_risk': is_risk,
+                'risk_category': risk_category,
+                'literature': literature,
+                'source': 'ChEMBL Database' if ic50 is not None else 'Unknown'
             }
             
             logger.info(f"Analysis result: {result}")
@@ -258,4 +233,4 @@ class DrugAnalyzer:
             
         except Exception as e:
             logger.error(f"Error analyzing drug: {str(e)}")
-            return {"error": str(e)}
+            raise
