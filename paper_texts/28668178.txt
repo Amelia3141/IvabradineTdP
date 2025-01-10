@@ -1,8 +1,0 @@
-Title: Cholinergic symptoms and QTc prolongation following donepezil overdose.
-
-PMID: 28668178
-DOI: S0735-6757(17)30495-3 [pii] 10.1016/j.ajem.2017.06.044
-
-Full Text:
-Abstract:
-Donepezil is the most commonly prescribed acetylcholinesterase inhibitor for the treatment of Alzheimer's disease, an ailment that affects millions of older adult patients. By inhibiting the breakdown of acetylcholine in the central nervous system, donepezil has been shown to slow cognitive decline and improve patients' functional status. While donepezil is well-tolerated and generally considered safe at therapeutic doses, taking more than the prescribed dose could result in adverse cholinergic effects that range from mild gastrointestinal distress to serious cardiac dysrhythmias. We present a case of an 84-year-old man who developed gastrointestinal and cardiac disturbances after ingesting seven-times his daily dose of donepezil. As no specific antidote is available for donepezil overdose, this case highlights the importance of supportive care with particular attention to the management of cardiac dysrhythmias in patients displaying signs of toxicity.
