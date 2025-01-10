@@ -92,15 +92,24 @@ class DrugAnalyzer:
         try:
             data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
             crediblemeds_file = os.path.join(data_dir, 'crediblemeds_data.txt')
+            logger.info(f"Looking for CredibleMeds file at: {crediblemeds_file}")
+            logger.info(f"Checking drug: {drug_name}")
             
+            if not os.path.exists(crediblemeds_file):
+                logger.error(f"CredibleMeds file not found at: {crediblemeds_file}")
+                return False
+                
             with open(crediblemeds_file, 'r') as f:
                 for line in f:
                     if line.startswith('#'):
                         continue
                     if '|' in line:
                         drug, risk = [x.strip() for x in line.split('|')]
+                        logger.info(f"Comparing {drug.lower()} with {drug_name.lower()}")
                         if drug.lower() == drug_name.lower():
+                            logger.info(f"Found match! Risk: {risk}")
                             return True
+            logger.info("No match found in CredibleMeds data")
             return False
         except Exception as e:
             logger.error(f"Error checking CredibleMeds: {str(e)}")
