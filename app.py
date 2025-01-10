@@ -1,4 +1,12 @@
 import streamlit as st
+
+# Page config
+st.set_page_config(
+    page_title="TdP Risk Assessment",
+    page_icon="❤️",
+    layout="wide"
+)
+
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
@@ -34,13 +42,6 @@ st.title("TdP Risk Assessment Tool")
 
 # Initialize analyzer
 analyzer = DrugAnalyzer(NCBI_EMAIL, NCBI_API_KEY)
-
-# Page config
-st.set_page_config(
-    page_title="TdP Risk Assessment",
-    page_icon="❤️",
-    layout="wide"
-)
 
 # Sidebar
 st.sidebar.title("Analysis Sections")
