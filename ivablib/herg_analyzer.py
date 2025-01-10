@@ -9,6 +9,7 @@ from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from datetime import datetime
 from chembl_webresource_client.new_client import new_client
+import statistics
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -42,6 +43,7 @@ class DrugAnalyzer:
             response = requests.get(url)
             response.raise_for_status()
             data = response.json()
+            logger.info(f"Got molecular weight for CID {cid}: {data['PropertyTable']['Properties'][0]['MolecularWeight']}")
             return float(data["PropertyTable"]["Properties"][0]["MolecularWeight"])
         except Exception as e:
             logger.error(f"Error getting molecular weight: {str(e)}")
@@ -50,38 +52,38 @@ class DrugAnalyzer:
     def _search_chembl_herg(self, compound_name: str) -> Optional[float]:
         """Search ChEMBL for hERG IC50 values"""
         try:
-            target = new_client.target
-            activity = new_client.activity
+            molecule = new_client.molecule
+            activities = new_client.activity
             
-            # Find hERG target
-            herg_targets = target.filter(pref_name__icontains="HERG")
-            herg_target_ids = [t['target_chembl_id'] for t in herg_targets]
-            
-            # Find compound
-            molecules = new_client.molecule.filter(pref_name__iexact=compound_name)
-            if not molecules:
-                logger.warning(f"No molecules found for {compound_name}")
+            # Search for the molecule
+            results = molecule.filter(molecule_synonyms__molecule_synonym__icontains=compound_name).only(['molecule_chembl_id'])
+            if not results:
+                logger.warning(f"No ChEMBL results found for {compound_name}")
                 return None
                 
-            molecule = molecules[0]
+            # Get activities for hERG
+            herg_activities = []
+            for mol in results:
+                acts = activities.filter(
+                    molecule_chembl_id=mol['molecule_chembl_id'],
+                    target_chembl_id='CHEMBL240'  # hERG
+                ).only(['standard_value', 'standard_units'])
+                
+                for act in acts:
+                    if 'standard_value' in act and 'standard_units' in act:
+                        if act['standard_units'] == 'nM':
+                            herg_activities.append(float(act['standard_value']))
+                        elif act['standard_units'] == 'uM':
+                            herg_activities.append(float(act['standard_value']) * 1000)
             
-            # Get activities
-            activities = activity.filter(
-                target_chembl_id__in=herg_target_ids,
-                molecule_chembl_id=molecule['molecule_chembl_id']
-            )
-            
-            # Find IC50 values
-            ic50_values = []
-            for act in activities:
-                if act.get('standard_type') == 'IC50' and act.get('standard_value'):
-                    ic50_values.append(float(act['standard_value']))
-            
-            if ic50_values:
-                # Return median IC50 value
-                return sorted(ic50_values)[len(ic50_values)//2]
-            
-            return None
+            if not herg_activities:
+                logger.warning(f"No hERG activity data found for {compound_name}")
+                return None
+                
+            # Return median IC50
+            median_ic50 = statistics.median(herg_activities)
+            logger.info(f"Found hERG IC50 for {compound_name}: {median_ic50} nM")
+            return median_ic50
             
         except Exception as e:
             logger.error(f"Error searching ChEMBL: {str(e)}")
@@ -93,6 +95,7 @@ class DrugAnalyzer:
         try:
             data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
             crediblemeds_file = os.path.join(data_dir, 'crediblemeds_data.txt')
+            logger.info(f"Checking CredibleMeds file: {crediblemeds_file}")
             
             # Create a dictionary of drug names to risk categories for faster lookup
             drug_risks = {}
@@ -102,9 +105,11 @@ class DrugAnalyzer:
                         continue
                     drug, risk = [x.strip() for x in line.split('|')]
                     drug_risks[drug.lower()] = risk
-
+            
             risk_category = drug_risks.get(drug_name.lower(), '')
+            logger.info(f"CredibleMeds result for {drug_name}: {risk_category}")
             return bool(risk_category), risk_category
+            
         except Exception as e:
             logger.error(f"Error checking CredibleMeds: {str(e)}")
             return False, ''
@@ -139,6 +144,7 @@ class DrugAnalyzer:
                 ratio_plasma=ratio_plasma
             ))
         
+        logger.info(f"Calculated concentrations: {concentrations}")
         return concentrations
 
     def _search_literature(self, drug_name: str) -> pd.DataFrame:
@@ -176,6 +182,7 @@ class DrugAnalyzer:
                         logger.warning(f"Error fetching paper {pmid}: {str(e)}")
                         continue
             
+            logger.info(f"Found {len(papers)} literature results")
             return pd.DataFrame(papers)
         except Exception as e:
             logger.error(f"Error searching literature: {str(e)}")
@@ -184,6 +191,8 @@ class DrugAnalyzer:
     def analyze_drug(self, drug_name: str, doses: List[float]) -> Dict:
         """Analyze a drug for hERG interactions"""
         try:
+            logger.info(f"Starting analysis for {drug_name}")
+            
             # Get drug info from PubChem
             url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{drug_name}/cids/JSON"
             response = requests.get(url)
@@ -194,6 +203,7 @@ class DrugAnalyzer:
                 return {"error": f"Drug {drug_name} not found in PubChem"}
             
             cid = data["IdentifierList"]["CID"][0]
+            logger.info(f"Found CID {cid} for {drug_name}")
             molecular_weight = self._get_molecular_weight(cid)
             
             if not molecular_weight:
@@ -201,6 +211,7 @@ class DrugAnalyzer:
             
             # Get hERG IC50 from ChEMBL
             herg_ic50 = self._search_chembl_herg(drug_name)
+            logger.info(f"hERG IC50: {herg_ic50}")
             
             # Calculate concentrations
             concentrations = self._calculate_concentrations(
@@ -211,7 +222,8 @@ class DrugAnalyzer:
             
             # Check CredibleMeds
             is_risk, risk_category = self._check_crediblemeds(drug_name)
-
+            logger.info(f"CredibleMeds: {is_risk}, {risk_category}")
+            
             # Determine if theoretical binding is likely
             theoretical_binding = (
                 any(c.ratio_theoretical and c.ratio_theoretical > 0.1 for c in concentrations) 
@@ -224,7 +236,7 @@ class DrugAnalyzer:
                 for c in concentrations
             ]
             
-            return {
+            result = {
                 "name": drug_name,
                 "cid": cid,
                 "molecular_weight": molecular_weight,
@@ -240,6 +252,9 @@ class DrugAnalyzer:
                     "Woosley RL, et al. www.Crediblemeds.org, QTdrugs List, AZCERT, Inc. 1822 Innovation Park Dr., Oro Valley, AZ 85755"
                 ]
             }
+            
+            logger.info(f"Analysis result: {result}")
+            return result
             
         except Exception as e:
             logger.error(f"Error analyzing drug: {str(e)}")
