@@ -395,26 +395,24 @@ if "hERG Channel Activity" in analysis_sections:
         analysis = analyze_herg_activity(drug_name, doses)
         
         if "error" in analysis:
-            st.warning(analysis["error"])
+            st.error(analysis["error"])
+            st.info("Please check that your NCBI credentials are properly configured.")
         else:
-            # Display hERG data
-            st.markdown("<div class='herg-data'>", unsafe_allow_html=True)
-            
-            # Show hERG IC50 data if available
-            if analysis["herg_ic50"] != "N/A":
-                st.markdown(f"""
-                **hERG IC50:** {analysis['herg_ic50']} μM
-                **Source:** {analysis['herg_source']}
-                """)
+            # Display hERG data if available
+            if analysis["herg_ic50"] is not None:
+                st.markdown("""
+                **hERG IC50:** {0} μM
+                **Source:** {1}
+                """.format(
+                    analysis['herg_ic50'],
+                    analysis['herg_source'] if analysis['herg_source'] else "Not available"
+                ))
             else:
                 st.info("No hERG IC50 data found in literature. This does not necessarily indicate safety - please consult other sources.")
-            
-            st.markdown("</div>", unsafe_allow_html=True)
             
             # Display concentration analysis if we have molecular weight
             if analysis["molecular_weight"] is not None:
                 st.subheader("hERG Binding Analysis")
-                st.markdown("<div class='concentration-data'>", unsafe_allow_html=True)
                 
                 if analysis["concentrations"]:
                     for conc in analysis["concentrations"]:
@@ -456,13 +454,11 @@ if "hERG Channel Activity" in analysis_sections:
                     st.markdown("### References")
                     for citation in analysis["citations"]:
                         st.markdown("- {}".format(citation))
-                
-                st.markdown("</div>", unsafe_allow_html=True)
             else:
                 st.info("Could not calculate drug concentrations: molecular weight not available from PubChem.")
-            
+                
     except Exception as e:
-        st.error(f"Error analyzing hERG activity: {str(e)}")
+        st.error("Error analyzing hERG activity: {}".format(str(e)))
         st.info("Please check that your NCBI credentials are properly configured.")
 
 if "Literature Analysis" in analysis_sections:
