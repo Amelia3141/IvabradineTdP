@@ -166,8 +166,12 @@ class DrugAnalyzer:
             # Calculate ratios if hERG IC50 is available
             if herg_ic50:
                 for conc in concentrations:
-                    conc.ratio_theoretical = herg_ic50 / conc.theoretical_max if conc.theoretical_max else None
-                    conc.ratio_plasma = herg_ic50 / conc.plasma_concentration if conc.plasma_concentration else None
+                    try:
+                        conc.ratio_theoretical = float(herg_ic50) / float(conc.theoretical_max) if conc.theoretical_max else None
+                        conc.ratio_plasma = float(herg_ic50) / float(conc.plasma_concentration) if conc.plasma_concentration else None
+                    except (ValueError, TypeError):
+                        conc.ratio_theoretical = None
+                        conc.ratio_plasma = None
             
             # Determine theoretical binding
             theoretical_binding = False

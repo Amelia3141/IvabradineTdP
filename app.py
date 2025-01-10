@@ -1,12 +1,4 @@
 import streamlit as st
-
-# Page config
-st.set_page_config(
-    page_title="TdP Risk Assessment",
-    page_icon="❤️",
-    layout="wide"
-)
-
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
@@ -14,6 +6,14 @@ import os
 from ivablib.herg_analyzer import DrugAnalyzer
 import requests
 from Bio import Entrez, Medline
+import re
+
+# Page config
+st.set_page_config(
+    page_title="TdP Risk Assessment",
+    page_icon="❤️",
+    layout="wide"
+)
 
 # Set NCBI credentials
 NCBI_EMAIL = "ghhercock@gmail.com"
@@ -110,16 +110,43 @@ def search_pubmed_literature(drug_name: str) -> pd.DataFrame:
         records = Entrez.read(handle)
         handle.close()
         
-        # Extract relevant information
+        # Extract relevant information with the desired columns
         articles = []
         for article in records['PubmedArticle']:
             medline = article['MedlineCitation']
+            article_data = medline['Article']
+            
+            # Extract age and sex from abstract if available
+            abstract = article_data.get('Abstract', {}).get('AbstractText', [''])[0]
+            age_match = re.search(r'(\d+)[\s-]*(year|yr|y)[s\s-]*old', abstract.lower())
+            age = age_match.group(1) if age_match else None
+            
+            sex_match = re.search(r'\b(male|female)\b', abstract.lower())
+            sex = sex_match.group(1).capitalize() if sex_match else None
+            
+            # Extract other clinical information
+            dose_match = re.search(r'(\d+(?:\.\d+)?)\s*mg', abstract.lower())
+            oral_dose = dose_match.group(1) if dose_match else None
+            
             articles.append({
-                'Title': medline['Article']['ArticleTitle'],
-                'Journal': medline['Article']['Journal']['Title'],
-                'Year': medline['Article']['Journal']['JournalIssue']['PubDate'].get('Year', 'N/A'),
-                'PMID': medline['PMID'],
-                'Abstract': medline['Article'].get('Abstract', {}).get('AbstractText', [''])[0]
+                'Case Report Title': article_data['ArticleTitle'],
+                'Age': age,
+                'Sex': sex,
+                'Oral Dose (mg)': oral_dose,
+                'theoretical max concentration (μM)': None,  # To be calculated
+                '40% bioavailability': None,  # To be calculated
+                'Theoretical hERG IC50 / Concentration μM': None,  # To be calculated
+                '40% Plasma': None,  # To be calculated
+                'Uncorrected QT (ms)': None,  # Extract if available
+                'QTc': None,  # Extract if available
+                'QTB': None,  # Extract if available
+                'QTF': None,  # Extract if available
+                'Heart Rate (bpm)': None,  # Extract if available
+                'Torsades de Pointes?': 'Yes' if 'torsade' in abstract.lower() or 'tdp' in abstract.lower() else 'No',
+                'Blood Pressure (mmHg)': None,  # Extract if available
+                'Medical History': None,  # Extract if available
+                'Medication History': None,  # Extract if available
+                'Course of Treatment': None  # Extract if available
             })
         
         return pd.DataFrame(articles)
