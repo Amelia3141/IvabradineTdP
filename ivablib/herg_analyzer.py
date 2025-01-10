@@ -82,16 +82,38 @@ class DrugAnalyzer:
         except Exception:
             return None
 
-    def get_molecular_weight(self, cid: int) -> Optional[float]:
-        """Get molecular weight for compound"""
+    def get_molecular_weight(self, cid: str) -> Optional[float]:
+        """Get molecular weight from PubChem"""
         try:
-            url = f"{self.base_url_pubchem}/compound/cid/{cid}/property/MolecularWeight/JSON"
-            response = self._make_request(url)
-            if response is None:
+            if not cid:
+                logger.warning("No CID provided for molecular weight lookup")
                 return None
-            data = response.json()
-            return data['PropertyTable']['Properties'][0]['MolecularWeight']
-        except Exception:
+                
+            url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/property/MolecularWeight/JSON"
+            response = requests.get(url)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if 'PropertyTable' in data and 'Properties' in data['PropertyTable']:
+                    properties = data['PropertyTable']['Properties']
+                    if properties and 'MolecularWeight' in properties[0]:
+                        mol_weight = properties[0]['MolecularWeight']
+                        try:
+                            mol_weight = float(str(mol_weight).strip())
+                            if mol_weight > 0:
+                                return mol_weight
+                            else:
+                                logger.warning("Invalid molecular weight: must be positive")
+                                return None
+                        except (ValueError, TypeError) as e:
+                            logger.warning("Could not convert molecular weight to float: {}".format(str(e)))
+                            return None
+            
+            logger.warning("Could not retrieve molecular weight from PubChem")
+            return None
+            
+        except Exception as e:
+            logger.error("Error getting molecular weight: {}".format(str(e)))
             return None
 
     def search_herg_data(self, drug_name: str) -> Tuple[Optional[float], Optional[str]]:
@@ -155,7 +177,7 @@ class DrugAnalyzer:
             logger.error(f"Error searching hERG data: {str(e)}")
             return None, None
 
-    def calculate_concentrations(self, molecular_weight: float, doses: List[float]) -> List[DrugConcentration]:
+    def calculate_concentrations(self, molecular_weight: Optional[float], doses: List[float]) -> List[DrugConcentration]:
         """Calculate drug concentrations for given doses"""
         concentrations = []
         try:
@@ -169,12 +191,47 @@ class DrugAnalyzer:
                     ratio_theoretical=None,
                     ratio_plasma=None
                 ) for dose in doses]
-                
+            
             # Convert molecular weight to float and validate
             try:
-                molecular_weight = float(str(molecular_weight).strip())
-                if molecular_weight <= 0:
-                    raise ValueError("Molecular weight must be positive")
+                mol_weight = float(str(molecular_weight).strip())
+                if mol_weight <= 0:
+                    logger.warning("Invalid molecular weight: must be positive")
+                    return [DrugConcentration(
+                        dose=dose,
+                        theoretical_max=None,
+                        plasma_concentration=None,
+                        ratio_theoretical=None,
+                        ratio_plasma=None
+                    ) for dose in doses]
+                    
+                # Calculate concentrations for each dose
+                for dose in doses:
+                    try:
+                        # Convert dose from mg to μmol
+                        dose_in_mol = float(str(dose).strip()) / mol_weight * 1000.0
+                        
+                        # Calculate concentrations
+                        theoretical_max = round(dose_in_mol / 5.0, 3)  # Assuming 5L distribution volume
+                        plasma_conc = round(theoretical_max * 0.4, 3)  # 40% bioavailability
+                        
+                        concentrations.append(DrugConcentration(
+                            dose=dose,
+                            theoretical_max=theoretical_max,
+                            plasma_concentration=plasma_conc,
+                            ratio_theoretical=None,
+                            ratio_plasma=None
+                        ))
+                    except (ValueError, TypeError, ZeroDivisionError) as e:
+                        logger.error("Error calculating concentration for dose {}: {}".format(dose, str(e)))
+                        concentrations.append(DrugConcentration(
+                            dose=dose,
+                            theoretical_max=None,
+                            plasma_concentration=None,
+                            ratio_theoretical=None,
+                            ratio_plasma=None
+                        ))
+                        
             except (ValueError, TypeError) as e:
                 logger.warning("Invalid molecular weight {}: {}".format(molecular_weight, str(e)))
                 return [DrugConcentration(
@@ -185,31 +242,6 @@ class DrugAnalyzer:
                     ratio_plasma=None
                 ) for dose in doses]
                 
-            for dose in doses:
-                try:
-                    # Convert dose from mg to μmol
-                    dose_in_mol = float(str(dose).strip()) / molecular_weight * 1000.0
-                    
-                    # Calculate concentrations
-                    theoretical_max = round(dose_in_mol / 5.0, 3)  # Assuming 5L distribution volume
-                    plasma_conc = round(theoretical_max * 0.4, 3)  # 40% bioavailability
-                    
-                    concentrations.append(DrugConcentration(
-                        dose=dose,
-                        theoretical_max=theoretical_max,
-                        plasma_concentration=plasma_conc,
-                        ratio_theoretical=None,
-                        ratio_plasma=None
-                    ))
-                except (ValueError, TypeError, ZeroDivisionError) as e:
-                    logger.error("Error calculating concentration for dose {}: {}".format(dose, str(e)))
-                    concentrations.append(DrugConcentration(
-                        dose=dose,
-                        theoretical_max=None,
-                        plasma_concentration=None,
-                        ratio_theoretical=None,
-                        ratio_plasma=None
-                    ))
         except Exception as e:
             logger.error("Error calculating concentrations: {}".format(str(e)))
             concentrations = [DrugConcentration(
@@ -219,6 +251,7 @@ class DrugAnalyzer:
                 ratio_theoretical=None,
                 ratio_plasma=None
             ) for dose in doses]
+            
         return concentrations
 
     def analyze_drug(self, drug_name: str, doses: List[float]) -> Optional[DrugAnalysis]:
