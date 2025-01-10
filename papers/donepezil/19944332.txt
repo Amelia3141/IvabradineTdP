@@ -1,0 +1,112 @@
+[Page 1]
+Journal of Cardiology (2009) 54, 507—511
+CASE REPORT
+T orsades de Pointes with QT prolongation related
+to donepezil use
+T omofumi Takaya (MD, PhD)a,∗, Masashi Okamoto (MD)a,
+Keiko Yodoi (MD)a, Katsuya Hata (MD, PhD)a, Yoichi Kijima (MD)a,
+Hideto Nakajima (MD)a, Yuji Nishikawa (MD)a, T omoyuki Kita (MD)a,
+Mitsuaki Ito (MD)a, T oshihiko Seo (MD)a,
+Seinosuke Kawashima (MD, PhD)b
+aDepartment of Cardiovascular Medicine, Saiseikai Nakatsu Hospital, 2-10-39,
+Shibata, Kita-ku, Osaka, 530-0012, Japan
+bDepartment of General Medicine, Saiseikai Nakatsu Hospital, Osaka, Japan
+Received 24 January 2009 ; received in revised form 14 March 2009; accepted 24 March 2009
+Available online 7 May 2009
+KEYWORDS
+Donepezil;
+T orsades de Pointes;QT prolongationAbstract An 83-year-old female, who had a history of anterior myocardial infarc-
+tion, was treated for Alzheimer’s disease with donepezil. She suffered from repeateddiarrhea and vomiting, and experienced syncope. She was admitted to our hos-pital and was diagnosed with acute colitis and syncope. On admission, her heartrate was 54 beats/min with regular rhythm. Laboratory data showed a low plasmapotassium level. Electrocardiogram (ECG) showed poor R progression, ST elevation,negative T in precordial leads, and marked QT prolongation. T ransthoracic echocar-diogram showed the enlargement of the left atrium and aneurysmal area at theapex. T orsades de Pointes (TdP) with syncope and convulsion were conﬁrmed onECG monitoring twice after admission. We treated her with potassium chloride andstarted magnesium sulfate and lidocaine, and then added isoprenaline injection.After these treatments, her heart rate increased and we did not detect TdP again.With the aging population in Japan, prescriptions for donepezil are increasing. Wehave to be vigilant for syncope in patients taking donepezil, which is possibly relatedto QT prolongation and TdP .© 2009 Japanese College of Cardiology . Published by Elsevier Ireland Ltd. All rightsreserved.
+∗Corresponding author . Present address: Department of Cardiology , Himeji Cardiovascular Center , 520, Saisho-ko, Himeji,
+670-0981, Hyogo, Japan. T el.: +81 79 293 3131; fax: +81 79 295 8199.
+E-mail address: toto54@hotmail.com (T . T akaya).
+0914-5087/$ — see front matter © 2009 Japanese College of Cardiology . Published by Elsevier Ireland Ltd. All rights reserved.
+doi: 10.1016/j.jjcc.2009.03.011
+
+[Page 2]
+508 T . T akaya et al.
+1. Introduction
+Donepezil is a cholinesterase inhibitor prescribed
+for patients with Alzheimer’s disease. With theaging society in Japan, the prescriptions fordonepezil are increasing. In addition, at present,there are no alternative oral drugs to delay theprogression of Alzheimer’s disease in Japan. Weexperienced a case of T orsades de Pointes (TdP)with QT prolongation in a patient suffering fromAlzheimer’s disease and taking donepezil.
+2. Case report
+An 83-year-old female was treated for Alzheimer’sdisease with donepezil (Aricept
+®, Eisai Co. Ltd.,
+Japan) 5 mg/day for at least 2 years by her homephysician. She also had hypertension, which hadbeen treated with bisoprolol 5 mg/day , diabetesmellitus, paroxysmal atrial ﬁbrillation, and a his-tory of anterior myocardial infarction (10 yearspreviously). She suffered from repeated diarrheaand vomiting from the morning, turned pale, andﬁnally developed syncope. Then she was broughtto our hospital by an ambulance in the evening,admitted, and was diagnosed with acute colitis andsyncope. She had no previous history of syncope. Onadmission, she was slightly obese (the height was146 cm and the weight 56 kg). Her heart rate was
+54 beats/min, regular rhythm, and blood pressurewas 148/63 mmHg. The oxygen saturation was 96%in room air . She had no cardiac murmur , rales, or legedema. Her bowel sound was sthenic, and there wasfrequent and much watery stool after admission.
+Laboratory data showed high white blood cell
+count (11,900/ /H9262L), a low plasma potassium level
+(3.3 mEq/L), and a high plasma brain natri-uretic peptide level (318.7 pg/ml). Renal andliver dysfunction was not conﬁrmed (aspartateaminotransferase 16 IU/L, alanine aminotrans-ferase 7 IU/L, blood urea nitrogen 17.9 mg/dL,creatinine 0.8 mg/dL). Electrocardiogram (ECG)demonstrated poor R progression, ST elevation inV1—3 leads, negative T in V2—5 leads, and QT c(corrected QT interval) prolongation (645 msec)(Figure 1 A). Chest X-ray disclosed an enlarged car-
+diac silhouette (cardiothoracic ratio: 60%), but nolung congestion. T ransthoracic echocardiography(TTE) revealed aneurysmal area at the apex. Thediameter of the end-diastolic left ventricle was42 mm, that of the end-systole 27 mm, and the ejec-tion fraction of the left ventricle was 56%. The sizeof the left atrium reached 47 mm and signiﬁcantvalvular failure was not detected.
+Ventricular premature contraction (VPC) was
+frequently recorded on continuous ECG monitor-ing just after admission. We discontinued all oraldrugs and corrected hypovolemia and the abnor-
+Figure 1 Changes in electrocardiogram (precordial leads). The apparent QT prolongation was detected on admission.
+(A) Admission, (B) next day and (C) the 14th day .
+
+[Page 3]
+T orsades de Pointes with QT prolongation 509
+Figure 2 Clinical course of the case.
+mal balance of electrolytes by intravenous injection
+with a potassium supplement ( Figure 2 ). Prompt
+correction of plasma potassium level was, how-ever , very difﬁcult because of the frequent waterystool. Five hours later , we detected T orsades dePointes for 35 s on ECG monitoring ( Figure 3 A), and
+started intravenous injection of magnesium sulfateand lidocaine ( Figure 2 ). After an additional 5 h,
+at midnight, we detected TdP again with transientconvulsion and syncope ( Figure 3 B), and discussed
+the use of a temporary external pacemaker . She,however , could not keep complete rest at that time,and we selected, therefore, the use of isoprenalineinjection ( Figure 2 ). After this administration, her
+Figure 3 Continuous ECG monitoring detected T orsades de Pointes (TdP) twice. (A) 1st event (TdP sustained for 35 s)
+and (B) 2nd event (TdP sustained for 15 s).
+
+[Page 4]
+510 T . T akaya et al.
+mean heart rate increased to 80—90 beats/min, and
+the frequency of VPC decreased. We did not detectTdP again thereafter .
+On the second day , her rhythm turned to atrial
+ﬁbrillation and this arrhythmia terminated with along pause (8.0 s) next day . We gradually decreasedisoprenaline and changed to oral preparations ofcilostazol and orciprenaline ( Figure 2 ). We per-
+formed catheter examination on the 13th day .Coronary angiography revealed triple vessel dis-ease. The left circumﬂex artery was occluded atthe proximal portion and was ﬁlled with good col-lateral ﬂow from the right coronary artery . Theleft anterior descending artery had diffuse calciﬁedstenotic lesions from the mid to distal portion andthe right coronary artery also had a mild stenoticlesion in the proximal portion. During the elec-trophysiological study , her rhythm turned to atrialﬁbrillation again by electric stimulation, and wecould not evaluate the extent of conduction dis-order completely . The corrected sinus recoveringtime was 340 msec and the HV interval was 39 msec.Three hours later , when the atrial ﬁbrillation spon-taneously terminated, we only detected a shortpause on continuous ECG monitoring (2.1 s).
+Discussing with the patient and her family , we
+selected medical follow-up considering her age,activities of daily living (ADL), and background.After washout of donepezil, we did not ﬁnd wors-ening of dementia during admission. QT c intervalin ECG gradually decreased ( Figure 1 C) and was
+485 msec (QT c) on the fourteenth day . We adjustedher oral preparations and she was discharged in astable condition.
+3. Discussion
+Donepezil is a central non-competitive reversiblecholinesterase inhibitor and has been reportedto be effective for all stages of Alzheimer’s dis-ease [1]. Donepezil can suppress the progression
+of dementia and maintain the ability of per-ception, cognition, global functioning, behavioralsymptoms, and ADL [2]. Because of the increasing
+aging population, the prescriptions for donepezilare increasing. In addition, at present, there is noalternative oral preparation in Japan to delay theprogression of Alzheimer’s disease, which is knownfor its high mortality rate [3].
+The frequent side effects of donepezil are
+appetite loss, nausea, and vomiting. In addition,donepezil is also known to cause bradycardia,sick sinus syndrome, or another arrhythmia by itscholinergic effect relating to vagal tone stimula-tion [4]. In some cases, discontinuation of donepezilis necessary . But, Bordier et al. [5] previously
+recommended the implantation of a permanentpacemaker for patients with bradycardia ratherthan discontinuation of donepezil, because thisapproach enables us to increase the dosage ofdonepezil. Almost all patients taking donepezil areaged people, in whom heart rate decreases withaging and the ability of handling the drug is oftendisturbed, and therefore often those side effectshave been reported. Regarding the side effects ofdonepezil on cardiac rhythm, to our knowledge,there is only one report that showed a reductionof heart rate and the prolongation of PR interval,but these changes were not necessarily associatedwith bradycardia-induced syncope [6]. In our case,
+we conﬁrmed a long pause just after the withdrawalof donepezil, which indicated that she might havepotential sick sinus syndrome. This event, however ,occurred during the washout period of donepezil,and we thought this bradycardia might also berelated to donepezil. The half-life of donepezil inblood ranges from 70 to 100 h and we did not detecteither bradycardia or TdP after the washout of thedrug in this case.
+It has been reported that about 3% of oral
+preparations are capable of prolonging QT interval[7]. TdP due to acquired QT prolongation syn-
+drome is related to multiple factors, such as aging,female, taking beta-blocker , hypo-potassium, andbaseline cardiac abnormalities such as ischemicheart disease [8]. In this case, coronary angiogra-
+phy revealed triple vessel disease and we thoughtthat ischemia was likely involved in this arrhyth-mic event. Her plasma donepezil level on admissionwas 21.3 ng/ml, a slightly high level, but thislevel did not necessarily mean overdose (the aver-age blood concentrations of healthy volunteerswho take donepezil for 14 days: 15—20 ng/ml).Drug-induced QT prolongation syndrome did notnecessarily depend on the plasma drug concentra-tions [8], and the mechanism was reported mainly
+as the blocking of potassium Ikr current, alteredtrafﬁcking of proteins that form the channel, ordelay of repolarization and prolongation of the con-sistent potential time of cardiac muscle. She mighthave abnormal sensitivity to donepezil or potentialQT prolongation syndrome. Though Kato et al. [9]
+reported that donepezil did not induce QT prolon-gation in young volunteers, they did not evaluatethe side effects associated with long-time use orthose in aged patients.
+Donepezil is prone to be prescribed to patients
+with only aging or to cases suspected of transientintensive care unit syndrome. In our case, donepezilhad been prescribed since the previous admissionto another hospital, and we could not fully eval-
+
+[Page 5]
+T orsades de Pointes with QT prolongation 511
+uate the precise judgment on the indication of
+donepezil. After the withdrawal of donepezil, hermental state was almost stable and we could handleher dementia without donepezil. Since donepezilmight cause fatal side effects, more careful atten-tion should be paid for the induction of this drug.Although QT prolongation associated with the useof galantamine, another cholinesterase inhibitorused for Alzheimer’s disease, has been shown [4],
+no detailed accounts on the association of TdPwith the use of cholinesterase inhibitors have beenreported. Our report may serve to give a warningagainst the easy use of a cholinesterase inhibitorfor aged patients with Alzheimer’s disease.
+We experienced a case of TdP with QT prolonga-
+tion in a patient suffering from Alzheimer’s diseaseand taking donepezil. If patients taking donepezilexperience syncope complicated with bradycardia,hypo-potassium, or ischemic heart disease, we haveto pay much care to the intermittent ECG and QT cinterval. That event might be due to QT prolonga-tion and TdP .
+References
+[1] Winblad B, Kilander L, Eriksson S, Minthon L, Båtsman S, Wet-
+terholm AL, Jansson-Blixt C, Haglund A, Severe Alzheimer’sDisease Study Group. Donepezil in patients with severe
+Alzheimer’s disease: double-blind, parallel-group, placebo-controlled study . Lancet 2006;367:1057—65.
+[2] Winblad B, Engedal K, Soininen H, Verhey F , Waldemar
+G, Wimo A, Wetterholm AL, Zhang R, Haglund A, SubbiahP , Donepezil Nordic Study Group. A 1-year , randomized,placebo-controlled study of donepezil in patients with mildto moderate AD. Neurology 2001;57:489—95.
+[3] Wolfson C, Wolfson DB, Asgharian M, M’Lan CE, Ostbye T ,
+Rockwood K, Hogan DB, Clinical Progression of DementiaStudy Group. A reevaluation of the duration of survival afterthe onset of dementia. N Engl J Med 2001;344:1111—6.
+[4] Fisher AA, Davis MW. Prolonged QT interval, syncope,
+and delirium with galantamine. Ann Pharmacother2008;42:278—83.
+[5] Bordier P , Garrigue S, Barold SS, Bressolles N, Lanusse S, Clé-
+menty J. Signiﬁcance of syncope in patients with Alzheimer’sdisease treated with cholinesterase inhibitors. Europace2003;5:429—31.
+[6] Bordier P , Garrigue S, Lanusse S, Margaine J, Robert F , Gen-
+cel L, Laﬁtte A. Cardiovascular effects and risk of syncoperelated to donepezil in patients with Alzheimer’s disease.CNS Drugs 2006;20:411—7.
+[7] De ponti F , Poluzzi E, Montanano N. QT -interval prolonga-
+tion by non-cardiac drugs: lessons to be learned from recentexperience. Eur J Clin Pharmacol 2000;56:1—18.
+[8] Roden DM. Drug-induced prolongation of the QT interval. N
+Engl J Med 2004;350:1013—22.
+[9] Kato T , Ueno A, Murata H. The effect of donepezil hydrochlo-
+ride on QT interval evaluated by objective measurements ofelectrocardiogram. Jpn J Electrocardiol 2007;27:588—95 [inJapanese].
+Available online at www.sciencedirect.com
+

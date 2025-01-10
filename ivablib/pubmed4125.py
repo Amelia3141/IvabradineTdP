@@ -408,6 +408,100 @@ def search_papers(drug_name: str, output_dir: Optional[str] = None) -> List[Dict
     logger.info(f"Found {len(results)} papers with PDFs")
     return results
 
+def format_pubmed_results(records):
+    """Format PubMed results into a DataFrame."""
+    results = []
+    for article in records:
+        try:
+            medline = article["MedlineCitation"]
+            article_data = medline["Article"]
+            
+            # Extract authors safely
+            authors = article_data.get("AuthorList", [])
+            author_names = []
+            for author in authors:
+                if isinstance(author, dict):
+                    last_name = author.get("LastName", "")
+                    fore_name = author.get("ForeName", "")
+                    author_names.append(f"{last_name} {fore_name}")
+            
+            # Get publication date
+            pub_date = article_data["Journal"]["JournalIssue"]["PubDate"]
+            year = pub_date.get("Year", "N/A")
+            
+            results.append({
+                "Title": article_data.get("ArticleTitle", "No title available"),
+                "Authors": ", ".join(author_names) if author_names else "No authors listed",
+                "Journal": article_data["Journal"].get("Title", "Journal not specified"),
+                "Year": year,
+                "PMID": medline.get("PMID", "No PMID")
+            })
+        except Exception as e:
+            print(f"Error processing article: {e}")
+            continue
+            
+    return pd.DataFrame(results)
+
+def search_pubmed_case_reports(drug_name):
+    """Search PubMed for case reports about the drug."""
+    try:
+        query = f'"{drug_name}"[Title/Abstract] AND "case reports"[Publication Type] AND ("torsade de pointes" OR "qt prolongation")'
+        handle = Entrez.esearch(db="pubmed", term=query, retmax=100)
+        record = Entrez.read(handle)
+        handle.close()
+
+        if not record["IdList"]:
+            return pd.DataFrame(columns=["Title", "Authors", "Journal", "Year", "PMID"])
+
+        handle = Entrez.efetch(db="pubmed", id=record["IdList"], rettype="medline", retmode="text")
+        records = Entrez.read(handle)["PubmedArticle"]
+        handle.close()
+
+        return format_pubmed_results(records)
+    except Exception as e:
+        print(f"Error in case reports search: {e}")
+        return pd.DataFrame(columns=["Title", "Authors", "Journal", "Year", "PMID"])
+
+def search_pubmed_cohort_studies(drug_name):
+    """Search PubMed for cohort studies about the drug."""
+    try:
+        query = f'"{drug_name}"[Title/Abstract] AND ("cohort studies"[MeSH Terms] OR "cohort"[Title/Abstract]) AND ("torsade de pointes" OR "qt prolongation")'
+        handle = Entrez.esearch(db="pubmed", term=query, retmax=100)
+        record = Entrez.read(handle)
+        handle.close()
+
+        if not record["IdList"]:
+            return pd.DataFrame(columns=["Title", "Authors", "Journal", "Year", "PMID"])
+
+        handle = Entrez.efetch(db="pubmed", id=record["IdList"], rettype="medline", retmode="text")
+        records = Entrez.read(handle)["PubmedArticle"]
+        handle.close()
+
+        return format_pubmed_results(records)
+    except Exception as e:
+        print(f"Error in cohort studies search: {e}")
+        return pd.DataFrame(columns=["Title", "Authors", "Journal", "Year", "PMID"])
+
+def search_pubmed_clinical_trials(drug_name):
+    """Search PubMed for clinical trials about the drug."""
+    try:
+        query = f'"{drug_name}"[Title/Abstract] AND "clinical trial"[Publication Type] AND ("torsade de pointes" OR "qt prolongation")'
+        handle = Entrez.esearch(db="pubmed", term=query, retmax=100)
+        record = Entrez.read(handle)
+        handle.close()
+
+        if not record["IdList"]:
+            return pd.DataFrame(columns=["Title", "Authors", "Journal", "Year", "PMID"])
+
+        handle = Entrez.efetch(db="pubmed", id=record["IdList"], rettype="medline", retmode="text")
+        records = Entrez.read(handle)["PubmedArticle"]
+        handle.close()
+
+        return format_pubmed_results(records)
+    except Exception as e:
+        print(f"Error in clinical trials search: {e}")
+        return pd.DataFrame(columns=["Title", "Authors", "Journal", "Year", "PMID"])
+
 def main():
     if len(sys.argv) != 2:
         print("Usage: python pubmed4125.py <drug_name>")

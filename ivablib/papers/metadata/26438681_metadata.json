@@ -1,0 +1,35 @@
+{
+  "pmid": "26438681",
+  "title": "A case of donepezil-related torsades de pointes.",
+  "abstract": "An 80-year-old woman with Alzheimer's dementia presented with diarrhoea, vomiting and worsening confusion following an increase in donepezil dose from 5 to 10 mg. The ECG revealed prolongation of QTc interval. Soon after admission, she became unresponsive with polymorphic ventricular tachycardia (VT). Cardiopulmonary resuscitation with a 200 J shock was successful in establishing cardiac output. Following the discontinuation of donepezil, the QTc interval normalised and no further arrhythmias were recorded. Treatment with anticholinesterase inhibitors may result in life-threatening VT. Vigilance is required for the identification of this condition in patients presenting with presyncope, syncope or seizures.",
+  "journal": "BMJ case reports",
+  "pub_date": "2015 Oct 5",
+  "authors": [
+    "Kitt J",
+    "Irons R",
+    "Al-Obaidi M",
+    "Missouris C"
+  ],
+  "chemicals": [],
+  "mesh_terms": [
+    "Aged, 80 and over",
+    "Alzheimer Disease/*drug therapy",
+    "Cardiopulmonary Resuscitation",
+    "Donepezil",
+    "Electrocardiography",
+    "Female",
+    "Humans",
+    "Indans/administration & dosage/*adverse effects",
+    "Long QT Syndrome/*chemically induced",
+    "Nootropic Agents/administration & dosage/*adverse effects",
+    "Piperidines/administration & dosage/*adverse effects",
+    "Seizures/chemically induced",
+    "Syncope/chemically induced/therapy",
+    "Torsades de Pointes/*chemically induced"
+  ],
+  "publication_types": [
+    "Case Reports",
+    "Journal Article"
+  ],
+  "doi": "10.1136/bcr-2015-211900"
+}

@@ -1,0 +1,14 @@
+Title: Arrhythmic effects of ivabradine in patients with coronary artery disease.
+Source: pubmed
+PMID: 19796572
+DOI: 10.25011/cim.v32i5.6919 [doi]
+Year: 2009
+Full text available: False
+Full text source: None
+
+FULL TEXT:
+--------------------------------------------------------------------------------
+Abstract:
+OBJECTIVES: Ivabradine is the first specific heart rate-lowering agent that has completed clinical development for stable angina pectoris. The aim of the present study was to investigate the effects of ivabradine therapy on P-wave duration, dispersion and QT duration, dispersion in coronary artery disease patients. METHODS AND RESULTS: The study population consisted of 21 patients with CAD who have confirmed by coronary angiography previously. Written informed consent was obtained in all patients. Twelve-lead electrocardiogram was recorded for each subject at a rate of 50mm/s on admission and repeated after 1 month ivabradine therapy. QT duration, QT dispertion, maximum and minimum QT duration calculated. Maximum and minimum P wave and P wave dispersion has been calculated. Heart rate was decreased after ivabradine therapy. (75+/-15 and 63+/-10, P=0.02).There was no difference between Pmax, Pmin and Pdis values before and after treatment. QTmax value was prolonged after treatment. (410+/-43 and 431+/-14, P=0,005) but there was no difference between cQTmax value.(455+/-38 and 439+/-21) There was no difference between QTdis and cQTdis values before and after treatment. (44+/-18 & 49+/-14; and 49+/-22 & 48+/-15). QTmax was prolonged after ivabradine therapy but cQTmax, Pdis, QTdis and cQTdis were not prolonged. CONCLUSION: There is no relationship between ivabradine therapy and increased risk of ventricular and atrial arrhythmia in coronary artery disease patient.
+--------------------------------------------------------------------------------
+

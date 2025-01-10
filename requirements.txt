@@ -1,12 +1,11 @@
+streamlit==1.29.0
+plotly==5.18.0
+pandas==1.5.3
+biopython==1.81
+requests==2.28.2
 flask==2.3.3
 flask-cors==4.0.0
 gunicorn==21.2.0
 python-dotenv==1.0.0
-biopython==1.81
-pandas==2.0.3
 numpy==1.24.3
-requests==2.31.0
---extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.0.1+cpu
-transformers==4.31.0
 sentence-transformers==2.2.2

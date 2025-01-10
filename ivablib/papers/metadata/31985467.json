@@ -1,0 +1,117 @@
+{
+  "PMID": "31985467",
+  "OWN": "NLM",
+  "STAT": "MEDLINE",
+  "DCOM": "20210513",
+  "LR": "20221207",
+  "IS": "1875-8908 (Electronic) 1387-2877 (Linking)",
+  "VI": "74",
+  "IP": "1",
+  "DP": "2020",
+  "TI": "Safety and Efficacy of Donepezil 10 mg/day in Patients with Mild to Moderate Alzheimer's Disease.",
+  "PG": "199-211",
+  "LID": "10.3233/JAD-190940 [doi]",
+  "AB": "BACKGROUND: Efficacy and dose-effect relationship of donepezil for treating patients with Alzheimer's disease (AD) have been proven. However, few studies focused on the safety of donepezil, particularly in Chinese patients. OBJECTIVE: To assess the safety of donepezil 10 mg/day in Chinese patients with mild-to-moderate AD. METHODS: In this single-arm, prospective, multicenter trial, 241 patients with mild to moderate AD who had been treated with donepezil 5 mg/day for at least 4 weeks were enrolled. All patients received donepezil 10 mg/day for 20 weeks. Primary outcome was the incidence of adverse events (AEs). Safety profile was evaluated by physical examinations including vital signs and weight, clinical laboratory tests and electrocardiograms, and also correlation analysis between AEs and APOE genotypes. RESULTS: 241 patients were enrolled. Of which, 38.59% patients experienced at least one AE and 17.43% discontinued due to AEs. Most AEs were mild to moderate, with diarrhea, vomiting, and nausea the most frequently reported. Risk of AEs was significantly increased by concomitant use of drugs for cardiovascular and cerebrovascular diseases. Mean changes in heart rate and corrected QT relative to baseline were -1.08+/-6.02 beat/min (p = 0.009) and -3.91+/-18.68 ms (p = 0.0062) at week 4 and -1.48 beat/min+/-7.18 (p = 0.0028) and -0.66 ms+/-19.66 (p = 0.6561) at week 20, respectively. There were no significant changes in other vital sign parameters. Patients' MMSE scores improved significantly after treatment (p = 0.0038), especially for non-APOEvarepsilon4 allele carriers and patients </=75 years. CONCLUSION: Donepezil 10 mg/day can be tolerated and is effective in Chinese patients with mild-to-moderate AD.",
+  "FAU": [
+    "Jia, Jianping",
+    "Wei, Cuibai",
+    "Chen, Wei",
+    "Jia, Longfei",
+    "Zhou, Aihong",
+    "Wang, Fen",
+    "Tang, Yi",
+    "Xu, Luoyi"
+  ],
+  "AU": [
+    "Jia J",
+    "Wei C",
+    "Chen W",
+    "Jia L",
+    "Zhou A",
+    "Wang F",
+    "Tang Y",
+    "Xu L"
+  ],
+  "AD": [
+    "Department of Neurology, Xuan Wu Hospital of Capital Medical University, Beijing, China.",
+    "Department of Neurology, Xuan Wu Hospital of Capital Medical University, Beijing, China.",
+    "Department of Psychiatry, Sir Run Run Shaw Hospital, Zhejiang University School of Medicine, Hangzhou, Zhejiang Province, China.",
+    "Department of Neurology, Xuan Wu Hospital of Capital Medical University, Beijing, China.",
+    "Department of Neurology, Xuan Wu Hospital of Capital Medical University, Beijing, China.",
+    "Department of Neurology, Xuan Wu Hospital of Capital Medical University, Beijing, China.",
+    "Department of Neurology, Xuan Wu Hospital of Capital Medical University, Beijing, China.",
+    "Department of Psychiatry, Sir Run Run Shaw Hospital, Zhejiang University School of Medicine, Hangzhou, Zhejiang Province, China."
+  ],
+  "LA": [
+    "eng"
+  ],
+  "SI": [
+    "ClinicalTrials.gov/NCT02787746"
+  ],
+  "PT": [
+    "Clinical Trial",
+    "Journal Article",
+    "Multicenter Study",
+    "Research Support, Non-U.S. Gov't"
+  ],
+  "PL": "United States",
+  "TA": "J Alzheimers Dis",
+  "JT": "Journal of Alzheimer's disease : JAD",
+  "JID": "9814863",
+  "RN": [
+    "0 (Apolipoprotein E4)",
+    "0 (Apolipoproteins E)",
+    "0 (Cholinesterase Inhibitors)",
+    "0 (Nootropic Agents)",
+    "8SSC91326P (Donepezil)"
+  ],
+  "SB": "IM",
+  "MH": [
+    "Aged",
+    "Aged, 80 and over",
+    "Alzheimer Disease/*drug therapy",
+    "Apolipoprotein E4/genetics",
+    "Apolipoproteins E/genetics",
+    "Asian People",
+    "Cholinesterase Inhibitors/*adverse effects/*therapeutic use",
+    "Donepezil/*adverse effects/*therapeutic use",
+    "Dose-Response Relationship, Drug",
+    "Drug Interactions",
+    "Electrocardiography/drug effects",
+    "Female",
+    "Genotype",
+    "Humans",
+    "Male",
+    "Mental Status and Dementia Tests",
+    "Middle Aged",
+    "Nootropic Agents/*adverse effects/*therapeutic use",
+    "Prospective Studies",
+    "Treatment Outcome"
+  ],
+  "OTO": [
+    "NOTNLM"
+  ],
+  "OT": [
+    "Alzheimer's disease",
+    "Chinese",
+    "clinical trial",
+    "donepezil",
+    "safety"
+  ],
+  "EDAT": "2020/01/28 06:00",
+  "MHDA": "2021/05/14 06:00",
+  "CRDT": [
+    "2020/01/28 06:00"
+  ],
+  "PHST": [
+    "2020/01/28 06:00 [pubmed]",
+    "2021/05/14 06:00 [medline]",
+    "2020/01/28 06:00 [entrez]"
+  ],
+  "AID": [
+    "JAD190940 [pii]",
+    "10.3233/JAD-190940 [doi]"
+  ],
+  "PST": "ppublish",
+  "SO": "J Alzheimers Dis. 2020;74(1):199-211. doi: 10.3233/JAD-190940."
+}

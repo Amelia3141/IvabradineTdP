@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
 .Python
 build/
 develop-eggs/
@@ -19,20 +20,6 @@ wheels/
 .installed.cfg
 *.egg
 
-# R
-.Rproj.user
-.Rhistory
-.RData
-.Ruserdata
-*.Rproj
-.Rapp.history
-.RDataTmp
-.Rprofile
-
-# Environment variables
-.env
-.env.local
-
 # Virtual Environment
 venv/
 ENV/
@@ -44,15 +31,12 @@ env/
 *.swp
 *.swo
 
-# Project specific
-papers/
-paper_texts/
-saved_papers/
-output/
-*.pdf
-*.xlsx
-unpaywall_cache
+# Streamlit
+.streamlit/secrets.toml
 
 # OS
 .DS_Store
 Thumbs.db
+
+# Logs
+*.log

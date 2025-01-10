@@ -1,0 +1,15 @@
+Query: ivabradine
+Date: 2025-01-05T12:42:06.500325
+Number of papers: 4
+Papers with full text: 4
+
+Full text sources:
+- abstract: 2
+- pmc: 1
+- doi: 1
+
+Saved files:
+- 32921663_101536_ihj20-073.txt
+- 27659287.txt
+- 25438492.txt
+- 25158669_101007_s12012-014-9274-y.txt

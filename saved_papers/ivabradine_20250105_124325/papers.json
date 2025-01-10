@@ -1,0 +1,46 @@
+[
+  {
+    "title": "Ivabradine-Induced Torsade de Pointes in Patients with Heart Failure Reduced Ejection Fraction.",
+    "source": "pubmed",
+    "pmid": "32921663",
+    "doi": "10.1536/ihj.20-073 [doi]",
+    "year": "2020",
+    "abstract": "Ivabradine is a selective inhibitor of the sinoatrial node \"funny\" current, prolonging the slow diastolic depolarization. As it has the ability to block the heart rate selectively, it is more effective at a faster heart rate. It is recommended for the treatment of heart failure reduced ejection fraction in the presence of beta-blocker therapy for the further reduction of the heart rate. However, previous reports have shown the association of Torsade de pointes (TdP) with concurrent use of ivabradine and drugs resulting in QT prolongation or blockage of the metabolic breakdown of ivabradine. In this article, we report two cases of patients with heart failure reduced ejection fraction who developed TdP after ivabradine use. Our report highlights the need to exercise caution with the administration of ivabradine in the presence of a reduced repolarization reserve, such as QT prolongation or metabolic insufficiency.",
+    "full_text_available": false,
+    "full_text_source": null,
+    "full_text": null
+  },
+  {
+    "title": "Emerging role of ivabradine for rate control in atrial fibrillation.",
+    "source": "pubmed",
+    "pmid": "27659287",
+    "doi": "1753944716669658 [pii]",
+    "year": "2016",
+    "abstract": "Control of ventricular rate is recommended for patients with paroxysmal, persistent, or permanent atrial fibrillation (AF). Existing rate-control options, including beta-blockers, nondihydropyridine calcium channel blockers, and digoxin, are limited by adverse hemodynamic effects and their ability to attain target heart rate (HR). Ivabradine, a novel HR-controlling agent, decreases HR through deceleration of conduction through I(f) ('funny') channels, and is approved for HR reduction in heart failure patients with ejection fraction less than 35% and elevated HR, despite optimal pharmacological treatment. Because I(f) channels were thought to be expressed solely in sinoatrial (SA) nodal tissue, ivabradine was not investigated in heart failure patients with concomitant AF. Subsequent identification of hyperpolarization-activated cyclic nucleotide-gated cation channel 4 (HCN4), the primary gene responsible for I(f) current expression throughout the myocardium, stimulated interest in the potential role of ivabradine for ventricular rate control in AF. Preclinical studies of ivabradine in animal models with induced AF demonstrated a reduction in HR, with no significant worsening of QT interval or mean arterial pressure. Preliminary human data suggest that ivabradine provides HR reduction without associated hemodynamic complications in patients with AF. Questions remain regarding efficacy, safety, optimal dosing, and length of therapy in these patients. Prospective, randomized studies are needed to determine if ivabradine has a role as a rate-control treatment in patients with AF.",
+    "full_text_available": true,
+    "full_text_source": "pmc",
+    "full_text": "Title: Emerging role of ivabradine for rate control in atrial fibrillation\n\nAbstract:\nControl of ventricular rate is recommended for patients with paroxysmal, persistent, or permanent atrial fibrillation (AF). Existing rate-control options, including beta-blockers, nondihydropyridine calcium channel blockers, and digoxin, are limited by adverse hemodynamic effects and their ability to attain target heart rate (HR). Ivabradine, a novel HR-controlling agent, decreases HR through deceleration of conduction through If (‘funny’) channels, and is approved for HR reduction in heart failure patients with ejection fraction less than 35% and elevated HR, despite optimal pharmacological treatment. Because If channels were thought to be expressed solely in sinoatrial (SA) nodal tissue, ivabradine was not investigated in heart failure patients with concomitant AF. Subsequent identification of hyperpolarization-activated cyclic nucleotide-gated cation channel 4 (HCN4), the primary gene responsible for If current expression throughout the myocardium, stimulated interest in the potential role of ivabradine for ventricular rate control in AF. Preclinical studies of ivabradine in animal models with induced AF demonstrated a reduction in HR, with no significant worsening of QT interval or mean arterial pressure. Preliminary human data suggest that ivabradine provides HR reduction without associated hemodynamic complications in patients with AF. Questions remain regarding efficacy, safety, optimal dosing, and length of therapy in these patients. Prospective, randomized studies are needed to determine if ivabradine has a role as a rate-control treatment in patients with AF.\n\nBody:\n"
+  },
+  {
+    "title": "Slow junctional rhythm, QTc prolongation and transient torsades de-pointes following combined use of Ivabradine, Diltiazem and Ranolazine.",
+    "source": "pubmed",
+    "pmid": "25438492",
+    "doi": "",
+    "year": "2014",
+    "abstract": "A case of unstable angina developed slow junctional rhythm with QTc prolongation and transient Torsades de pointes following simultaneous use of Ivabradine, Diltiazem and Ranolazine. Effect of Diltiazem on hepatic isoenzyme CYP 3A could be responsible. Such a combination should be avoided.",
+    "full_text_available": false,
+    "full_text_source": null,
+    "full_text": null
+  },
+  {
+    "title": "Torsades de pointes induced by the concomitant use of ivabradine and azithromycin: an unexpected dangerous interaction.",
+    "source": "pubmed",
+    "pmid": "25158669",
+    "doi": "10.1007/s12012-014-9274-y [doi]",
+    "year": "2015",
+    "abstract": "A 68-year-old man had a cardiac syncope. He was known to have a long QT-interval and was treated with ivabradine for paroxysmal sinusal tachycardia. In the last 5 days, azithromycin had been prescribed for sinusitis. An electrocardiogram showed torsades de pointes (TdP). Azithromycin is known to prolong the QT-interval. Ivabradine does not affect the QT-interval but has a conditional risk of TdP when taken with other drugs that block its metabolic breakdown. This case presents the specific problem of a patient with long QT who received two medications, which may interact and prolong the QT.",
+    "full_text_available": false,
+    "full_text_source": null,
+    "full_text": null
+  }
+]

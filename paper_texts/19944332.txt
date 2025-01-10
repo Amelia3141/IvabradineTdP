@@ -1,0 +1,8 @@
+Title: Torsades de Pointes with QT prolongation related to donepezil use.
+
+PMID: 19944332
+DOI: 10.1016/j.jjcc.2009.03.011
+
+Full Text:
+Abstract:
+An 83-year-old female, who had a history of anterior myocardial infarction, was treated for Alzheimer's disease with donepezil. She suffered from repeated diarrhea and vomiting, and experienced syncope. She was admitted to our hospital and was diagnosed with acute colitis and syncope. On admission, her heart rate was 54 beats/min with regular rhythm. Laboratory data showed a low plasma potassium level. Electrocardiogram (ECG) showed poor R progression, ST elevation, negative T in precordial leads, and marked QT prolongation. Transthoracic echocardiogram showed the enlargement of the left atrium and aneurysmal area at the apex. Torsades de Pointes (TdP) with syncope and convulsion were confirmed on ECG monitoring twice after admission. We treated her with potassium chloride and started magnesium sulfate and lidocaine, and then added isoprenaline injection. After these treatments, her heart rate increased and we did not detect TdP again. With the aging population in Japan, prescriptions for donepezil are increasing. We have to be vigilant for syncope in patients taking donepezil, which is possibly related to QT prolongation and TdP.

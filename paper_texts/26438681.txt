@@ -1,0 +1,12 @@
+Title: A case of donepezil-related torsades de pointes.
+
+PMID: 26438681
+DOI: 10.1136/bcr-2015-211900 [doi] bcr2015211900
+
+Full Text:
+Title: A case of donepezil-related torsades de pointes
+
+Abstract:
+An 80-year-old woman with Alzheimer's dementia presented with diarrhoea, vomiting and worsening confusion following an increase in donepezil dose from 5 to 10 mg. The ECG revealed prolongation of QTc interval. Soon after admission, she became unresponsive with polymorphic ventricular tachycardia (VT). Cardiopulmonary resuscitation with a 200 J shock was successful in establishing cardiac output. Following the discontinuation of donepezil, the QTc interval normalised and no further arrhythmias were recorded. Treatment with anticholinesterase inhibitors may result in life-threatening VT. Vigilance is required for the identification of this condition in patients presenting with presyncope, syncope or seizures.
+
+Body:

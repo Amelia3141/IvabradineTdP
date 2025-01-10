@@ -1,0 +1,82 @@
+80 © Royal College of Physicians 2019. All rights reserved.ORIGINAL RESEARCH Clinical Medicine 2017 Vol 17, No 6: 80–8LESSON OF THE MONTH Clinical Medicine 2019 Vol 19, No 1: 80–1
+ Authors:     A core medical trainee, Chesterﬁeld Royal Hospital NHS 
+Foundation Trust, Chesterﬁeld, UK  ;    B consultant geriatrician, 
+Airedale General Hospital, Keighley, UK                 L e s s o n  o f  t h e  m o n t h  1 :  Prolonged QT syndrome due to 
+donepezil: a reversible cause of falls?   
+ Authors:       E m i l y  G      J a c k s o n     A        a n d     S a r a h      S t o w e     B   
+                     Prolonged QT syndrome precipitates cardiac arrhythmias such 
+as torsades de pointes (TdP) resulting in cardiogenic syncope or sudden death. We report a case of prolonged QT syndrome caused by donepezil which resulted in a fall and hip fracture. In this case female sex, advanced age and diuretic use may have increased the risk of recurrent syncope and potential underlying TdP. Cessation of donepezil resulted in normalisa-tion of the QT interval. This case highlights a lesser known side effect of this dementia drug. It also reminds us of the importance of taking a thorough drug history while consider-ing potential drug toxicity/interactions as part of the compre-hensive geriatric assessment.   
+ K E Y W O R D S   :    Donepezil  ,   falls  ,   QT interval  ,   torsades de pointes  , 
+  syncope      
+  Case presentation 
+ An 83 year old Caucasian female presented to the emergency 
+department with hip pain after an unwitnessed syncopal episode. She denied any prodromal symptoms and there was no post-ictal phase, tongue biting or incontinence. A fractured neck of the femur was diagnosed and she was transferred to the orthopaedic trauma ward. Her past medical history included early Alzheimer’s dementia, hypertension and recurrent falls (although she had not previously sought medical attention for this problem). Her admission medications were bendroﬂumethiazide 2.5 mg, simvastatin 20 mg and donepezil 10 mg. She lived alone and was independent with activities of daily living (ADLs). 
+ On admission the patient’s electrocardiogram (ECG) 
+demonstrated normal sinus rhythm with a prolonged corrected QT interval (QTc) of 638 ms (the upper limit of normal for females is 460 ms).  
+1   Blood tests, including electrolytes, were all within normal 
+limits and there was no postural blood pressure deﬁcit. The patient was reviewed by the orthogeriatrics team for falls and bone health assessment, and medical optimisation prior to surgery. Given her history of syncope without prodromal symptoms, we suspected that this patient had fallen as a result of cardiogenic syncope ABSTRACTrelating to prolonged QT syndrome. Donepezil was withdrawn as the potentially causative medication. The 12 lead ECG was repeated at days 2 and 10, and the QTc had returned to normal (436 ms) by day 10. Subsequent echocardiogram and 24 h ECG were normal. Following surgical intervention for the fracture, and input from the multi-disciplinary team, the patient was transferred to a community rehabilitation facility.  
+  D i s c u s s i o n  
+ The QT interval is the measurement between the start of the QRS complex and the end of the T wave, and it represents the duration of ventricular repolarisation.  
+1   There are multiple factors 
+that affect the duration of the QT interval including sex, heart rate and underlying heart rhythm. In clinical practice it is most relevant to correct QT for heart rate; Bazett’s formula (QTc = QT/ √RR) is 
+most widely used. Drug interactions can lead to a cumulative effect on QT interval although this has an unpredictable effect in causing TdP and is affected by many risk factors.  
+2   In this case the 
+only causative medication was donepezil, although female sex, advanced age and use of diuretics were risk factors for TdP with prolonged QT. 
+ Donepezil is a reversible inhibitor of acetylcholinesterase for 
+use in mild to moderate dementia in Alzheimer’s disease. It has multiple known cardiac side-effects including dizziness, syncope, bradycardia, atrioventricular block, and sinoatrial block.  
+3   In recent 
+years, cases of donepezil-induced QT prolongation and TdP have been reported but this is not widely known and it is not a listed side effect in the British National Formulary.  
+3–7   The list of drugs 
+known to cause prolonged QT syndrome is long and frequently growing. The website CredibleMeds.org, published in conjunction with the US Food and Drug Administration, is a regularly updated list of drugs with a risk of QT interval prolongation and cardiac arrhythmias. Indeed, donepezil is listed as a ‘known risk of TdP’ on this resource.  
+8   
+ People living with dementia have an increased risk of falls. 
+This is related to multiple factors including impaired gait, balance and orthostatic hypotension coupled with changes in cognition, attention and behaviour.  
+7   Furthermore people living 
+with dementia are more likely to suffer the serious consequences of falls and less likely to recover from their injuries.  
+9   A recent 
+Cochrane review of the use of donepezil in Alzheimer’s disease has found only modest beneﬁt in terms of cognition and ability to perform ADLs with no improvement in quality of life. Concern was also raised about the rate of adverse effects with donepezil 
+CMJv19n1-EmilyJackson.indd   80CMJv19n1-EmilyJackson.indd   80 1/3/19   11:07 AM1/3/19   11:07 AM
+
+© Royal College of Physicians 2019. All rights reserved.  81Lesson of the month
+which increased with higher doses.  10   With this in mind, clinicians 
+should consider the cardiac side effects and measure a baseline 
+QT interval prior to commencing therapy. 
+  K e y  p o i n t s   
+   > Donepezil causes QT prolongation but this is not widely known.  
+  > Growing evidence is emerging of the signiﬁ  cant potential harms r
+elated to donepezil with only modest beneﬁ  t.  
+  > Clinicians should start this drug with caution after careful co
+nsideration of the cardiac side effects and risk of falls.  
+  > Prior to starting donepezil, a 12 lead ECG should be performed to d
+ocument baseline heart rhythm and QTc and risk factors for 
+TdP should be considered.  
+  > Patients should be informed of the potential for cardiac a
+rrhythmias and falls when starting donepezil. ■      
+  C o n s e n t  
+ Consent was obtained to publish the clinical details in this article.     
+ References 
+  1        Rautaharju   PM   ,    Surawicz   B   ,    Gettes   LS   .  AHA/ACCF/HRS recom-
+mendations for the standardisation and interpretation of the 
+ electrocardiogram. Part IV: the ST segment, T and U Waves, and QT interval .  J Am Coll Cardiol   2009 ; 53 : 982 – 91 .    2        Nachimuthu   S   ,    Assar   MD   ,    Schussler   JM   .  Drug-induced QT interval 
+prolongation: mechanisms and clinical management .  Ther Adv 
+Drug Saf   2012 ; 3 : 241 – 53 .  
+  3       Joint Formulary Committee  .  British National Formulary .  London : 
+ BMJ Group and Pharmaceutical Press ,  2018 .  
+  4        Kitt   J   ,    Irons   R   ,    Al-Obaidi   M   ,    Missouris   C   .  A case of donepezil-related 
+torsades de pointes .  BMJ Case Rep   2015 ; 2015:bcr2015211900.   
+  5        Gurbuz   AS   ,    Ozturk   S   ,    Acar   E     et al   .  Acquired long QT syndrome and 
+torsades de pointes related to donepezil use in a patient with Alzheimer disease .  Egypt Heart J   2016 ; 68 : 197 – 9 .  
+  6        T ayaka   T   ,    Okamoto   M   ,    Yodoi   K     et al   .  Torsades de pointes with 
+QT prolongation related to donepezil use .  J Cardiol   2009 ; 54 : 507 – 11 .  
+  7        Kim   DH   ,    Brown   RT   ,    Ding   EL   ,    Kiel   DP   ,    Berry   SD   .  Dementia  medications 
+and risk of falls, syncope, and related adverse events meta-analysis of randomized controlled trials .  J Am Geriatr Soc   2011 ; 59 : 1019 – 31 .  
+  8      QTdrugs List ,  2018  .    https://crediblemeds.org/new-drug-list/  
+[Accessed 30 August 2018] .  
+  9        Allan   LM   ,    Ballard   CG   ,    Rowan   EN   ,    Kenny   RA   .  Incidence and 
+ prediction of falls in dementia: a prospective study in older people .  PLoS ONE   2009 ; 4 : e5521 .  
+  10        Birks   JS   ,    Harvey   RJ   .  Donepezil for dementia due to Alzheimer’s 
+ disease .  Cochrane Database Syst Rev   2018 ; 6 : CD001190 .    
+Address for correspondence: Dr Emily Georgina Jackson, 
+Chesterﬁeld Royal Hospital NHS Foundation Trust, Cardiology, Chesterﬁeld Road, Calow, Chesterﬁeld, S44 5BL, UK. Email:  emilygjackson@doctors.org.uk 
+CMJv19n1-EmilyJackson.indd   81CMJv19n1-EmilyJackson.indd   81 1/3/19   11:07 AM1/3/19   11:07 AM
+

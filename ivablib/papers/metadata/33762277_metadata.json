@@ -1,0 +1,35 @@
+{
+  "pmid": "33762277",
+  "title": "Torsades de pointes in SARS-CoV-2 (COVID-19) pneumonia: medicine reconciliation and careful monitoring of QTc interval may help prevent cardiac complications.",
+  "abstract": "Hydroxychloroquine has been widely prescribed to treat patients with COVID-19 pneumonia. A 73-year-0ld woman with COVID-19 pneumonia was treated with dexamethasone and hydroxychloroquine. Her home medications, citalopram and donepezil, were continued. The ECG prior to starting hydroxychloroquine showed normal sinus rhythm with prolonged corrected QT (QTc) of 497 ms, due to citalopram and donepezil therapy. Repeat ECG on days 3 and 4 of hydroxychloroquine therapy showed significantly prolonged QTc of 557 ms and 538 ms, respectively, despite normal serum electrolytes. All QT-prolonging medications including hydroxychloroquine were discontinued on day 4; however, she suffered a transient torsades de pointes lasting for about 15 s, which resolved before any intervention. QTc improved to 477 ms, after discontinuation of QT-prolonging medications. The patient had QTc prolongation and torsades de pointes due to therapy with multiple QT-prolonging medications. Medicine reconciliation and careful monitoring of QTc may help prevent cardiac complications in patients with COVID-19 treated with hydroxychloroquine.",
+  "journal": "BMJ case reports",
+  "pub_date": "2021 Mar 24",
+  "authors": [
+    "Aslam W",
+    "Lamb CR",
+    "Ali N"
+  ],
+  "chemicals": [],
+  "mesh_terms": [
+    "Aged",
+    "Anti-Infective Agents/adverse effects/therapeutic use",
+    "Citalopram/adverse effects/therapeutic use",
+    "Dexamethasone/*adverse effects/therapeutic use",
+    "Donepezil/adverse effects/therapeutic use",
+    "Drug Therapy, Combination",
+    "Electrocardiography/methods",
+    "Female",
+    "Heart Diseases/chemically induced/prevention & control",
+    "Humans",
+    "Hydroxychloroquine/*adverse effects/therapeutic use",
+    "Long QT Syndrome/chemically induced",
+    "SARS-CoV-2",
+    "Torsades de Pointes/*chemically induced",
+    "*COVID-19 Drug Treatment"
+  ],
+  "publication_types": [
+    "Case Reports",
+    "Journal Article"
+  ],
+  "doi": "10.1136/bcr-2020-239963"
+}

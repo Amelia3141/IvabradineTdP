@@ -1,0 +1,14 @@
+Title: Torsades de pointes induced by the concomitant use of ivabradine and azithromycin: an unexpected dangerous interaction.
+Source: pubmed
+PMID: 25158669
+DOI: 10.1007/s12012-014-9274-y [doi]
+Year: 2015
+Full text available: False
+Full text source: None
+
+FULL TEXT:
+--------------------------------------------------------------------------------
+Abstract:
+A 68-year-old man had a cardiac syncope. He was known to have a long QT-interval and was treated with ivabradine for paroxysmal sinusal tachycardia. In the last 5 days, azithromycin had been prescribed for sinusitis. An electrocardiogram showed torsades de pointes (TdP). Azithromycin is known to prolong the QT-interval. Ivabradine does not affect the QT-interval but has a conditional risk of TdP when taken with other drugs that block its metabolic breakdown. This case presents the specific problem of a patient with long QT who received two medications, which may interact and prolong the QT.
+--------------------------------------------------------------------------------
+

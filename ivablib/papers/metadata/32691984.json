@@ -1,0 +1,105 @@
+{
+  "PMID": "32691984",
+  "OWN": "NLM",
+  "STAT": "MEDLINE",
+  "DCOM": "20210603",
+  "LR": "20231103",
+  "IS": "2052-1707 (Electronic) 2052-1707 (Linking)",
+  "VI": "8",
+  "IP": "4",
+  "DP": "2020 Aug",
+  "TI": "Comparative risk of cardiac arrhythmias associated with acetylcholinesterase inhibitors used in treatment of dementias - A narrative review.",
+  "PG": "e00622",
+  "LID": "10.1002/prp2.622 [doi] e00622",
+  "AB": "Donepezil, galantamine, and rivastigmine are the three acetylcholinesterase inhibitors (AChEIs), out of a total of only four medications prescribed in the treatment of Alzheimer's Disease (AD) and related dementias. These medications are known to be associated with bradycardia given their mechanism of action of increasing acetylcholine (ACh). However, in March 2015, donepezil was added to the CredibleMeds \"known-risk\" category, a list where medications have a documented risk for acquired long-QT syndrome (ALQTS) and torsades de pointes (TdP) - a malignant ventricular arrhythmia that is a different adverse event than bradycardia (and is not necessarily associated with ACh action). The purpose of this article is to review the three AChEIs, especially with regards to mechanistic differences that may explain why only donepezil poses this risk; several pharmacological mechanisms may explain why. However, from an empirical point-of-view, aside from some case-reports, only a limited number of studies have generated relevant information regarding AChEIs' and electrocardiogram findings; none have specifically compared donepezil against galantamine or rivastigmine for malignant arrhythmias such as TdP. Currently, the choice of one of the three AChEIs for treatment of AD symptoms is primarily dependent upon clinician and patient preference. However, clinicians should be aware of the potential increased risk associated with donepezil. There is a need to examine the comparative risk of malignant arrhythmias among AChEIs users in real-world practice; this may have important implications with regards to changes in AChEI prescribing patterns.",
+  "CI": [
+    "(c) 2020 The Authors. Pharmacology Research & Perspectives published by John Wiley",
+    "& Sons Ltd, British Pharmacological Society and American Society for Pharmacology",
+    "and Experimental Therapeutics."
+  ],
+  "FAU": [
+    "Huang, Yichang",
+    "Alsabbagh, Mhd Wasem"
+  ],
+  "AU": [
+    "Huang Y",
+    "Alsabbagh MW"
+  ],
+  "AUID": [
+    "ORCID: 0000-0003-2224-6282",
+    "ORCID: 0000-0002-2426-9528"
+  ],
+  "AD": [
+    "School of Pharmacy, Faculty of Science, University of Waterloo, Kitchener, Canada.",
+    "School of Pharmacy, Faculty of Science, University of Waterloo, Kitchener, Canada."
+  ],
+  "LA": [
+    "eng"
+  ],
+  "PT": [
+    "Comparative Study",
+    "Journal Article",
+    "Review"
+  ],
+  "PL": "United States",
+  "TA": "Pharmacol Res Perspect",
+  "JT": "Pharmacology research & perspectives",
+  "JID": "101626369",
+  "RN": [
+    "0 (Cholinesterase Inhibitors)",
+    "0D3Q044KCA (Galantamine)",
+    "8SSC91326P (Donepezil)",
+    "PKI06M3IW0 (Rivastigmine)"
+  ],
+  "SB": "IM",
+  "MH": [
+    "Alzheimer Disease/drug therapy",
+    "Animals",
+    "Arrhythmias, Cardiac/*chemically induced/physiopathology",
+    "Cholinesterase Inhibitors/administration & dosage/*adverse effects",
+    "Dementia/drug therapy",
+    "Donepezil/administration & dosage/adverse effects",
+    "Galantamine/administration & dosage/adverse effects",
+    "Humans",
+    "Rivastigmine/administration & dosage/adverse effects"
+  ],
+  "PMC": "PMC7372915",
+  "OTO": [
+    "NOTNLM"
+  ],
+  "OT": [
+    "Acetylcholinesterase inhibitor",
+    "Alzheimer's Disease",
+    "adverse drug event",
+    "cardiac arrhythmia",
+    "pharmacoepidemiology"
+  ],
+  "COIS": [
+    "The authors have no conflicts of interest to declare. Yichang Huang is a Master",
+    "of Science Candidate working under Mhd. WasemAlsabbagh. He is receiving funding",
+    "from Mhd. Wasem Alsabbagh and the University of Waterloo."
+  ],
+  "EDAT": "2020/07/22 06:00",
+  "MHDA": "2021/06/04 06:00",
+  "PMCR": [
+    "2020/07/21"
+  ],
+  "CRDT": [
+    "2020/07/22 06:00"
+  ],
+  "PHST": [
+    "2020/04/15 00:00 [received]",
+    "2020/06/08 00:00 [revised]",
+    "2020/06/09 00:00 [accepted]",
+    "2020/07/22 06:00 [entrez]",
+    "2020/07/22 06:00 [pubmed]",
+    "2021/06/04 06:00 [medline]",
+    "2020/07/21 00:00 [pmc-release]"
+  ],
+  "AID": [
+    "PRP2622 [pii]",
+    "10.1002/prp2.622 [doi]"
+  ],
+  "PST": "ppublish",
+  "SO": "Pharmacol Res Perspect. 2020 Aug;8(4):e00622. doi: 10.1002/prp2.622."
+}

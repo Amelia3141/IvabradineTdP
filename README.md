@@ -1,78 +1,45 @@
-# TdP Risk Predictor
+# Ivabradine TdP Risk Assessment Dashboard
 
-A tool for analyzing drug-induced Torsades de Pointes (TdP) risk by extracting and analyzing case reports from medical literature.
+A Streamlit-based dashboard for analyzing Torsades de Pointes (TdP) risk associated with Ivabradine and other drugs.
 
 ## Features
 
-- Automated PubMed search for drug case reports
-- PDF download and text extraction
-- Analysis of key clinical parameters:
-  - Patient age and sex
-  - Drug dosage
-  - Heart rate
-  - Blood pressure
-  - QTc measurements
-- Excel report generation with findings
+- Risk category analysis using CredibleMeds data
+- Literature review from PubMed (case reports, cohort studies, clinical trials)
+- hERG channel activity analysis
+- Interactive visualizations
 
 ## Installation
 
-1. Clone the repository:
-```bash
-git clone https://github.com/Amelia3141/TdPRiskPredictor.git
-cd TdPRiskPredictor
-```
-
-2. Create a virtual environment (recommended):
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-3. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-## Usage
+## Running Locally
 
-Run the analyzer with a drug name:
 ```bash
-python app.py donepezil
+streamlit run app.py
 ```
 
-The tool will:
-1. Search PubMed for case reports
-2. Download and analyze the papers
-3. Extract key clinical information
-4. Generate an Excel report with the findings
+## Deployment
 
-## Project Structure
+This app is deployed on Streamlit Cloud. Visit [https://ivabradine-tdp.streamlit.app](https://ivabradine-tdp.streamlit.app) to use the live version.
 
-```
-TdPRiskPredictor/
-├── app.py              # Main entry point
-├── requirements.txt    # Python dependencies
-├── data/
-│   └── drugnames.csv  # Drug name mappings
-└── ivablib/           # Core library
-    ├── __init__.py
-    ├── case_report_analyzer.py  # Text analysis
-    └── pubmed4125.py           # PubMed interface
-```
+### Deploy Your Own Instance
 
-## Dependencies
+1. Fork this repository
+2. Go to [Streamlit Cloud](https://streamlit.io/cloud)
+3. Click "New app"
+4. Select your forked repository
+5. Select `app.py` as the main file
+6. Click "Deploy"
 
-- pandas
-- numpy
-- requests
-- beautifulsoup4
-- PyPDF2
-- biopython
+## Data Sources
 
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
+- CredibleMeds database for TdP risk categorization
+- PubMed for literature analysis
+- PubChem for hERG activity data
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+MIT License

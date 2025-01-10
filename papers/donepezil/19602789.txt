@@ -1,0 +1,144 @@
+[Page 1]
+1219
+˘CASE REPORT ˘
+Donepezil-Induced Adverse Side Effects of Cardiac Rhythm:
+2 Cases Report of Atrioventricular Block
+and Torsade de Pointes
+Atsushi Tanaka, Shoichi Koga and Yoshihiro Hiramatsu
+Abstract
+Acetylcholinesterase inhibitors (AChIs) are widely used in the treatment of mild-to-moderate Alzheimer’s
+disease (AD), but their cholinergic effects could generate adverse side effects in the cardiovascular system.This report presents the cases of 2 patients who experienced adverse side effects of cardiac rhythm with QTprolongation caused by Donepezil. Both of them improve d to the original rhythm and shortened QT intervals
+after the discontinuation of Donepezil.
+The present cases suggest that the cholinergic effects of Donepezil could induce adverse side effects on
+cardiac rhythm and careful consideration is needed for the patients treated by Donepezil.
+Key words: acetylcholinesterase inhibitors (AChIs), Donep ezil, QT prolongation, atrioventricular block, tor-
+sade de pointes
+(Inter Med 48: 1219-1223, 2009)
+(DOI: 10.2169/internalmedicine.48.2181)
+Introduction
+Acetylcholinesterase inhibitors (AChIs) are widely used in
+the treatment of mild-to-moderate Alzheimer’s disease (AD)(1, 2). AChIs are well tolerated and the side effects are basi-cally cholinergic dependent (3, 4). The cholinergic adverseeffects, include gastrointestinal symptoms (i.e., nausea, vom-iting, diarrhea and anorexia) predominate. The patients re-ceiving AChIs rarely develop serious disorders of the cardio-vascular system such as syncope, bradycardia, atrioventricu-lar block and QT prolongation (3). However, non-cardiacdrugs can affect the cardiovascular system. QT prolongationmay possibly lead to life-threatening ventricular arrhythmias(i.e: torsade de pointes, ventricular fibrillation). This reportpresents 2 cases in which patients experienced transient car-diac rhythm disorders, associated with Donepezil. The disor-ders disappeared after discontinuing Donepezil.Case Report
+Case 1
+A 90-year-old man presented with accidental bradycardia.
+The patient had no history of the cardiovascular disease andsyncope. The patient had been treated with Donepezil forAlzheimer’s disease (AD) for many years. The daily dose ofthe drug was 5 mg, but it had been increased to 10 mg 3days earlier because of his deteriorating mental state.
+The patient was alert and asy mptomatic, but not coopera-
+tive. His body temperature was 36.0 ˆ; blood pressure was
+158/49 mmHg; and heart rate was 36 beats/minute. Thephysical and neurological findings, chest x-ray, and labora-tory screening test were unremarkable. A transthoracic echo-cardiography revealed normal left ventricular wall motionand ejection fraction. ECG demonstrated an advancedatrioventricular block (2:1 block) and a complete right bun-dle branch block with negative T-waves in leads I, II,
+aVL
+and V2-6. Marked QT prolongation (QT 0.514 sec) was alsoobserved (Fig. 1).
+Department of Cardiology, Koga Hospital 21, Kurume
+Received for publication February 18, 2009; Accepted for publication April 6, 2009
+Correspondence to Dr. Atsushi Tanaka, mikechann@gmail.com
+
+[Page 2]
+Inter Med 48: 1219-1223, 2009 DOI: 10.2169 /internalmedicine.48.2181
+1220Figure 1.  ECG showed 2:1 atrioventricular block and negative T-waves in leads I, II, aVL and 
+V2-6 with QT prolongation (QT 0.514 sec).
+Figure 2.  ECG showed sinus rhythm, but a 1st degree atrioventricular block (PQ 0.220 sec) and 
+the negative T-waves in the same leads and QT prolongation (QT 0.536 sec; QTc 0.538) persisted 
+(A). On the 5th day the negative T-waves disappeared and the QT interval decreased to QT 0.450 
+sec; QTc 0.456 (B).
+We considered that the latest increase of Donepezil may
+have contributed to the atrioventricular block, and continu-ing the drug could worsen the arrhythmia. Therefore the
+daily Donepezil was discontinued and Orciprenaline at adosage of 30 mg/daily, which has a βstimulating effect, was
+instead administered.
+The following day, ECG showed sinus rhythm, but the 1st
+degree atrioventricular block (PQ 0.220 sec) and QT prolon-gation (QT 0.536 sec; QTc 0.538) remained. Orciprenalinewas continued. The ECG on the 5th day showed that the QTinterval was shortened to QT 0.450 sec and QTc 0.456(Fig. 2). As a result, Orciprenaline was stopped, and he re-mained asymptomatic and no significant arrhythmia oc-curred thereafter for 2 months.Case 2
+An 87-year-old woman, with a long-term history of hy-
+pertension, chronic atrial fibrillation and AD, was diagnosedto have bradycardia (heart rate 40 beats/minute) at anotherclinic. The ECG showed atrial fibrillation and negative T-waves in leads V1-2 and biphasic T-waves in leads V3-6with QT prolongation (QT 0.570 sec; QTc 0.461). Becauseshe experienced neither syncope nor heart failure, she wasadministered 100 mg/daily of Cilostazole in addition to herdaily drugs (Amlodipine 5 mg, Spironolactone 25 mg, War-farin 1 mg and Donepezil 5 mg). After a month, she wasadmitted to the department of orthopedics because of a tho-racic vertebral fracture caused by sudden fall due to tran-
+
+[Page 3]
+Inter Med 48: 1219-1223, 2009 DOI: 10.2169 /internalmedicine.48.2181
+1221Figure 3.  ECG showed atrial fibrillation and negative T-waves in leads V1-2 and biphasic T-
+waves in leads V3-6 with a longer QT prolongation (QT 0.720 sec; QTc 0.594) on admission.
+Figure 4.  ECG monitor recording showing Torsade de Pointes followed by R on T (A). Leading 
+to ventricular fibrillation (B). This arrhythmia was observed for about 3 minutes and thereafter re
+covered without medication.
+sient syncope.
+On admission she had become alert and complained of
+back pain. Her body temperature was 36.4 ˆ; blood pressure
+was 115/63 mmHg; and heart rate was 40 beats/minute. Thephysical and neurological findings, radiologic examinations,including a computed tomography of the brain, and labora-tory screening test were unremarkable. A transthoracic echo-cardiography revealed normal left ventricular wall motionand ejection fraction. ECG demonstrated atrial fibrillationand the T-wave morphology in the aforementioned leadswith QT prolongation (QT 0.720 sec; QTc 0.594; Fig. 3).
+Ten hours after hospitalization, she suddenly complained
+of vomiting and nausea. Thirty minutes before that event,the continuous ECG monitoring had revealed torsade depointes followed by R on T and leading to ventricular fibril-lation (Fig. 4). This arrhythmia was sustained for about 3
+minutes and recovered to the original rhythm without medi-cation. She was therefore assumed to have fallen because ofAdams-Stokes syndrome due to torsade de pointes. Or-ciprenaline 30 mg/daily was administered in order to preventthe progression of the bradycardia. Furthermore, Donepezilwas discontinued on the 5th day. Her heart rate slightly in-creased to 55 beats/minute, and no adverse ventricular ar-rhythmia was seen. ECG on the 18th day showed disappear-ance of the negative part of the T-waves in leads V3-6 andsignificantly shortened QT intervals (QT 0.490 sec; QTc0.446; Fig. 5). She was discharged on the 37th day, underthe administration of Orciprenaline 30 mg/daily and herusual medications, without the a dministration of Donepezil.
+
+[Page 4]
+Inter Med 48: 1219-1223, 2009 DOI: 10.2169 /internalmedicine.48.2181
+1222Figure 5.  ECG on the 18th day showed disappearance of negative part of the T-waves in leads 
+V3-6 and shortened QT intervals (QT 0.490 sec; QTc 446).
+Discussion
+The disorders of recognition in Alzheimer’s disease (AD)
+are caused by a decreased function of the central cholinergicnervous system (5). Donepezil is a drug which has inhibi-tory effects on acetylcholinesterase which can improve cog-nitive function in AD and it is widely used in the treatmentof mild-to-moderate AD (1, 2). Donepezil mainly works atthe level of the central nervous system, and causes few pe-ripheral side effects (6, 7). Although its cholinergically-dependent gastrointestinal effects are well recognized, Done-pezil requires careful administration for patients with sinusnode dysfunction or conduction disturbance because of itscholinergic effects. Morganroth et al reported that about30% and 10% of the patients treated with AChIs in Al-zheimer’s disease had cardiovascular disorders and heartrate/rhythm disorders, respectively (8). However, drug-induced bradycardia has rarely been reported and essentiallyoccurs only when the drug is administered in excessivedoses. Therefore, the direct relationship between the routineuse of AChIs and bradyarrhythmia remains controversial andlife-threatening ventricular arrhythmia had also rarely beenreported (6, 9).
+Both bradycardia and QT prolongation were observed in
+the current cases (case 1: HR36 beats/minute and QT0.514sec, case 2: HR40 beats/minute and QT0.536 sec; QTc0.538). Donepezil had not been used at either in excessivedoses or in combination with other drugs that might effectof QT prolongation. Fortunately, the symptoms improved af-ter discontinuation of Donepezil. Some reports have shownthat the serum potassium level is important to QT prolonga-tion (10, 11). However, the serum potassium concentrationof both patients was 4.4 mEq/L. In both cases it was unclearwhether or not they had conduction disturbances of the heartbefore Donepezil medication, because we did not have anypast ECG taken during without Donepezil medication.
+Therefore, we concluded that the observed changes had beeninduced by Donepezil. But there was possibility that Done-pezil worsened their potential conduction disturbances of theheart, because they were extremely old aged. Bordier et alexamined patients with AD who were being treated withDonepezil and experienced syncope, and found a completeatrioventricular block in two cases (12). On the other hand,Fisher et al demonstrated a case with QT prolongation andrecurrent syncope after restarting Galantamine (AChIs) (13).A c c o r d i n gt oa na n a l y s i sb yt h eA u s t r a l i a nA d v e r s eD r u gReaction Advisory Committee (ADRAC), no cases of tor-sade de pointes associated with AChIs were reported, andthe rate of reported adverse effects of Donepezil is 2 timeslower than the rates for other A ChIs (i.e., Galantamine and
+Rivastigmine) (13). These side effects may occur more fre-quently than in previous reports, because the patients withAD are often unable to describe symptoms and they couldbe asymptomatic cases such as those seen in the current re-port.
+The QT interval is often prolonged by class Ia anti-
+arrhythmic drugs. These drugs inhibit the function of therapidly activating delayed rectifier potassium current (Ikr),coded by the HERG (human ether-a-go-go related gene),which is most frequently affected by drugs inducing QTprolongation (14-17). These QT prolongations are thought tobe a marker of the fatal ventricular arrhythmia (i.e., torsadede pointes, ventricular fibrillation) as in the present lattercase (18-20). QT intervals on the surface ECG show the re-polarization in the M cell zone with the longest action po-tential duration in the myocardium. Some possible factorsinducing specific gene mutations and selective action poten-tial prolongation in this zone may lead to a proarrhythmicstate precipitating the onset of QT prolongation and torsadede pointes (21, 22). This indicates that there are individualspecificities and differences in the sensitivity to the drug,
+
+[Page 5]
+Inter Med 48: 1219-1223, 2009 DOI: 10.2169 /internalmedicine.48.2181
+1223and gene abnormalities are assumed behind these differences
+(23, 24). Therefore, the drug effects blocking Ikr could ac-celerate such subclinical genetic features of the ion channelsand thereby lead to the development of QT prolongation.
+In conclusion, Donepezil has been widely used in the
+treatment of AD and it is well tolerated. However, the po-tential adverse and life-threatening cardiac effects of Done-
+pezil should be carefully followed by ECG, because they arecaused by various factors such as diverse underlying drugs,organic heart disease, meta bolic abnormalities and genetic
+features.
+References
+1.Fragtiglioni L, Launer LJ, Andersen K, et al. Incidence of demen-
+tia and major subtypes in Europe: a collaborative study ofpopulation-based cohorts. Neurologic Diseases in Elderly ResearchGroup. Neurology 54: S10-S15, 2000.
+2.Farlow MR, Cummings JL. Effective pharmacologic management
+of Alzheimer’s disease. Am J Med 120: 388-397, 2007.
+3.Rowland JP, Rigby J, Harper AC, Rowland R. Cardiovascular
+monitoring with acetylcholinesterase inhibitors: a clinical protocol.
+Adv Psych Treat 13: 178-184, 2007.
+4.Loy C, Schneider L. Galantamine for Alzheimer’s disease and
+mild cognitive impairment. Cochrane Datebase Syst Rev CD001747, 2006.
+5.Coyle JT, Price DL, Delong MR. Alzheimer’s disease; A disorders
+of cortical cholinergic innervation. Science 219: 1184-1190, 1983.
+6.Calvo-Romero JM, Raomos-Sadlado JL. Symptomatic sinus
+bradycardia associated with donepezil. Rev Neurol 28: 1070-1072,
+1999.
+7.Cummings JL. Cholinesterase inhibitors: a new class of psy-
+chotropic compounds. Am J Psychiatry 157: 4-15, 2000.
+8.Morganroth J, Graham S, Hartman R, Anand R. Electrocar-
+diographic effects of rivastigmine. J Clin Pharmacol 42: 558-568,
+2002.
+9.Shepherd G, Klein-Schwartz W, Edwards R. Donepezil overdose:
+a tenfold dosing error. Ann Pharmacother 33: 812-815, 1999.
+10.Keren A, Tzivoni D, Gavish D, et al. Etiology, warning signs and
+therapy of torsade de pointes. A study of 10 patients. Circulation64: 1167-1174, 1981.
+11.Yap YG, Camm AJ. Drug induced QT prolongation and torsades
+de pointes. Heart 89: 1363-1372, 2003.
+12.Bordier P, Lanusse S, Garrigue S, et al. Causes of syncope in pa-
+tients with Alzheimer’s disease treated with donepezil. Drugs Ag-ing22: 687-694, 2005.
+13.Fisher AA, Davis MW. Prolonged QT interval, syncope, and delir-ium with galantamine. Ann Pharmacother 42: 278-283, 2008.
+14.Zareba W. Drug induced QT prolongation. Cardiol J 14: 523-533,
+2007.
+15.Keating MT, Sanguinetti MC. Molecular and cellular mechanisms
+of cardiac arrhythmias. Cell 104: 569-580, 2001.
+16.Sanguinetti MC, Jiang C, Curran ME, Keating MT. A mechanistic
+link between an inherited and an acquired cardiac arrhythmia:HERG encodes the IKr potassium channel. Cell 81: 229-307,
+1995.
+17.De Bruin ML, Pettersson M, Meyboom RH, et al. Anti-HERG ac-
+tivity and risk of drug-induced arrhythmias and sudden death. EurHeart J 26: 590-597, 2005.
+18.Malik M, Camm AJ. Evaluation of drug-induced QT interval pro-
+longation: implications for drug a pproval and labelling. Drug Saf
+24: 323-351, 2001.
+19.Gladman G, Davis AM, Fogelman R, et al. Torsade de pointes,
+acquired complete heart block and inappropriately long QT inchildhood. Can J Cardiol 12: 683-685, 1996.
+20.Kurita T, Ohe T, Marui N, et al. Bradycardia-induced abnormal
+QT prolongation on patients with complete atrioventricular block
+with torsade de pointes. Am J Cardiol 69: 528-633, 1992.
+21.Antzelevitch C. Role of transmural dispersion of repolarization in
+the genesis of drug-induced torsades de pointes. Heart Rhythm 2:
+S9-S15, 2005.
+22.Antzelevitch C, Shimizu W. Cellular mechanisms underlying the
+long QT syndrome. Curr Opin Cardiol 17: 43-51, 2002.
+23.Yang P, Kanki H, Drolet B, et al. Allelic variants in long-QT dis-
+ease genes in patients with drug-associated torsade de pointes.Circulaton 105: 1943-1948, 2002.
+24.Makita N, Horie M, Nakamura T, et al. Drug-induced long-QT
+syndrome associated with a subclinical SCN5A mutation. Circula-tion106: 1269-1274, 2002.
+⡥2009 The Japanese Society of Internal Medicine
+http://www.naika.or.jp/imindex.html
+

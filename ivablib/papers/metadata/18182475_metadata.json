@@ -1,0 +1,26 @@
+{
+  "pmid": "18182475",
+  "title": "Prolonged QT interval, syncope, and delirium with galantamine.",
+  "abstract": "OBJECTIVE: To describe a case of QT interval prolongation, syncope, and delirium associated with galantamine use and to analyze similar cases related to acetylcholinesterase inhibitors (AChIs) reported to the Australian Adverse Drug Reaction Advisory Committee (ADRAC). CASE SUMMARY: An 85-year-old man with dementia was treated with prolonged release galantamine 8 mg daily for 1.5 years. Three months prior to the current admission, he had a syncopal episode with low blood pressure and bradycardia. Two months later, galantamine was withdrawn, but within 2 weeks, the man developed marked cognitive, behavioral, and functional deterioration and galantamine was restarted. Three weeks later, he developed syncope, delirium, hypotension, and prolonged QT interval with serious cardiac arrhythmias, in addition to vomiting and diarrhea. A complete blood cell count and biochemistry panel performed on admission were normal. No infection was detected. Galantamine and irbesartan were ceased. The delirium fully resolved in 6 days, and the QT interval shortened from 503 to 443 msec (corrected by Bazett's formula) 4 days after discontinuation of galantamine and remained normal. DISCUSSION: In the ADRAC reports, galantamine was associated with 18 cases of delirium/confusion, 8 of syncope, 13 of bradycardia, 6 of other arrhythmias or conduction abnormalities, and 6 of hypotension. Donepezil was associated with 56, 15, 26, 15, and 5, and rivastigmine with 21, 8, 6, 2, and 2, respectively, of these reactions. Five fatal outcomes were reported in association with galantamine, 11 with donepezil, and 3 with rivastigmine, including 3, 6, and 0 sudden deaths, respectively. This case, along with previously published reports and cases identified from the ADRAC database, illustrates that AChIs may lead to delirium, syncope, hypotension, and life-threatening arrhythmias. The Naranjo probability scale indicated that galantamine was the probable cause of QT interval prolongation, syncope, and delirium in this patient. CONCLUSIONS: Administration of galantamine and other AChIs requires vigilance and assessment of risk factors that may precipitate QT interval prolongation, syncope, and delirium.",
+  "journal": "The Annals of pharmacotherapy",
+  "pub_date": "2008 Feb",
+  "authors": [
+    "Fisher AA",
+    "Davis MW"
+  ],
+  "chemicals": [],
+  "mesh_terms": [
+    "Aged, 80 and over",
+    "Delirium/*chemically induced/diagnosis",
+    "Galantamine/*adverse effects",
+    "Humans",
+    "Long QT Syndrome/*chemically induced/diagnosis",
+    "Male",
+    "Syncope/*chemically induced/diagnosis"
+  ],
+  "publication_types": [
+    "Case Reports",
+    "Journal Article"
+  ],
+  "doi": "10.1345/aph.1K514"
+}

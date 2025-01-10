@@ -1,0 +1,156 @@
+# CredibleMeds Drug Categories
+# Format: Drug Name | Risk Category
+
+# Known Risk of TdP
+Aclarubicin | Known Risk of TdP
+Amiodarone | Known Risk of TdP
+Anagrelide | Known Risk of TdP
+Arsenic trioxide | Known Risk of TdP
+Astemizole | Known Risk of TdP
+Azithromycin | Known Risk of TdP
+Chloroquine | Known Risk of TdP
+Chlorpromazine | Known Risk of TdP
+Cilostazol | Known Risk of TdP
+Ciprofloxacin | Known Risk of TdP
+Cisapride | Known Risk of TdP
+Citalopram | Known Risk of TdP
+Clarithromycin | Known Risk of TdP
+Cocaine | Known Risk of TdP
+Disopyramide | Known Risk of TdP
+Dofetilide | Known Risk of TdP
+Domperidone | Known Risk of TdP
+Dronedarone | Known Risk of TdP
+Droperidol | Known Risk of TdP
+Erythromycin | Known Risk of TdP
+Escitalopram | Known Risk of TdP
+Flecainide | Known Risk of TdP
+Fluconazole | Known Risk of TdP
+Halofantrine | Known Risk of TdP
+Haloperidol | Known Risk of TdP
+Hydroxychloroquine | Known Risk of TdP
+Ibutilide | Known Risk of TdP
+Levomethadyl acetate | Known Risk of TdP
+Methadone | Known Risk of TdP
+Moxifloxacin | Known Risk of TdP
+Ondansetron | Known Risk of TdP
+Oxaliplatin | Known Risk of TdP
+Pentamidine | Known Risk of TdP
+Pimozide | Known Risk of TdP
+Procainamide | Known Risk of TdP
+Propofol | Known Risk of TdP
+Quinidine | Known Risk of TdP
+Sotalol | Known Risk of TdP
+Sulpiride | Known Risk of TdP
+Thioridazine | Known Risk of TdP
+Vandetanib | Known Risk of TdP
+
+# Possible Risk of TdP
+Abarelix | Possible Risk of TdP
+Alfuzosin | Possible Risk of TdP
+Apomorphine | Possible Risk of TdP
+Aripiprazole | Possible Risk of TdP
+Asenapine | Possible Risk of TdP
+Atomoxetine | Possible Risk of TdP
+Bedaquiline | Possible Risk of TdP
+Clozapine | Possible Risk of TdP
+Crizotinib | Possible Risk of TdP
+Dasatinib | Possible Risk of TdP
+Delamanid | Possible Risk of TdP
+Desipramine | Possible Risk of TdP
+Dolasetron | Possible Risk of TdP
+Fingolimod | Possible Risk of TdP
+Granisetron | Possible Risk of TdP
+Iloperidone | Possible Risk of TdP
+Imatinib | Possible Risk of TdP
+Lapatinib | Possible Risk of TdP
+Lenvatinib | Possible Risk of TdP
+Lithium | Possible Risk of TdP
+Lurasidone | Possible Risk of TdP
+Maprotiline | Possible Risk of TdP
+Mirabegron | Possible Risk of TdP
+Mirtazapine | Possible Risk of TdP
+Nilotinib | Possible Risk of TdP
+Norfloxacin | Possible Risk of TdP
+Nortriptyline | Possible Risk of TdP
+Ofloxacin | Possible Risk of TdP
+Paliperidone | Possible Risk of TdP
+Pazopanib | Possible Risk of TdP
+Pimavanserin | Possible Risk of TdP
+Rilpivirine | Possible Risk of TdP
+Rivastigmine | Possible Risk of TdP
+Sorafenib | Possible Risk of TdP
+Sunitinib | Possible Risk of TdP
+Tacrolimus | Possible Risk of TdP
+Tamoxifen | Possible Risk of TdP
+Telithromycin | Possible Risk of TdP
+Tetrabenazine | Possible Risk of TdP
+Tizanidine | Possible Risk of TdP
+Tolterodine | Possible Risk of TdP
+Toremifene | Possible Risk of TdP
+Tramadol | Possible Risk of TdP
+Vardenafil | Possible Risk of TdP
+Vemurafenib | Possible Risk of TdP
+Venlafaxine | Possible Risk of TdP
+
+# Conditional Risk of TdP
+Abiraterone | Conditional Risk of TdP
+Amantadine | Conditional Risk of TdP
+Amisulpride | Conditional Risk of TdP
+Amitriptyline | Conditional Risk of TdP
+Amphotericin B | Conditional Risk of TdP
+Atazanavir | Conditional Risk of TdP
+Cimetidine | Conditional Risk of TdP
+Clofazimine | Conditional Risk of TdP
+Clomipramine | Conditional Risk of TdP
+Diltiazem | Conditional Risk of TdP
+Diphenhydramine | Conditional Risk of TdP
+Doxepin | Conditional Risk of TdP
+Esomeprazole | Conditional Risk of TdP
+Famotidine | Conditional Risk of TdP
+Fluoxetine | Conditional Risk of TdP
+Fluvoxamine | Conditional Risk of TdP
+Galantamine | Conditional Risk of TdP
+Hydroxyzine | Conditional Risk of TdP
+Indapamide | Conditional Risk of TdP
+Itraconazole | Conditional Risk of TdP
+Ketoconazole | Conditional Risk of TdP
+Lansoprazole | Conditional Risk of TdP
+Loperamide | Conditional Risk of TdP
+Metoclopramide | Conditional Risk of TdP
+Metronidazole | Conditional Risk of TdP
+Nelfinavir | Conditional Risk of TdP
+Olanzapine | Conditional Risk of TdP
+Omeprazole | Conditional Risk of TdP
+Pantoprazole | Conditional Risk of TdP
+Paroxetine | Conditional Risk of TdP
+Posaconazole | Conditional Risk of TdP
+Propafenone | Conditional Risk of TdP
+Quetiapine | Conditional Risk of TdP
+Ranolazine | Conditional Risk of TdP
+Risperidone | Conditional Risk of TdP
+Sertraline | Conditional Risk of TdP
+Solifenacin | Conditional Risk of TdP
+Telaprevir | Conditional Risk of TdP
+Trazodone | Conditional Risk of TdP
+Voriconazole | Conditional Risk of TdP
+Ziprasidone | Conditional Risk of TdP
+
+# Special Risk of TdP
+Albuterol | Special Risk
+Arformoterol | Special Risk
+Dexmethylphenidate | Special Risk
+Dobutamine | Special Risk
+Dopamine | Special Risk
+Ephedrine | Special Risk
+Fenfluramine | Special Risk
+Formoterol | Special Risk
+Indacaterol | Special Risk
+Methylphenidate | Special Risk
+Midodrine | Special Risk
+Norepinephrine | Special Risk
+Olodaterol | Special Risk
+Oxymetazoline | Special Risk
+Phentermine | Special Risk
+Phenylephrine | Special Risk
+Pseudoephedrine | Special Risk
+Salmeterol | Special Risk

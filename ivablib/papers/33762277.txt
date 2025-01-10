@@ -1,0 +1,358 @@
+1
+Aslam W, et al. BMJ Case Rep 2021;14:e239963. doi:10.1136/bcr-2020-239963Torsades de pointes in SARS-  CoV -2 (COVID-19) 
+pneumonia: medicine reconciliation and careful 
+monitoring of QTc interval may help prevent cardiac complications
+Waqas Aslam     ,1 Carla R Lamb,2 Nadia Ali3 Case report
+To cite: Aslam W, 
+Lamb CR, Ali N. BMJ Case 
+Rep 2021;14:e239963. doi:10.1136/bcr-2020-2399631Pulmonary and Critical Care 
+Medicine, Interventional 
+Pulmonology, University of California San Francisco, Fresno, California, USA
+2Pulmonary and Critical Care 
+Medicine, Interventional Pulmonology, Lahey Hospital and Medical Center, Burlington, Massachusetts, USA
+3Internal Medicine & Geriatrics, 
+Hebrew Senior Life, Harvard Medical School Affiliate, Roslindale, Massachusetts, USA
+Correspondence to
+Dr Waqas Aslam;  
+ 
+drwaqasaslam@
+ 
+yahoo.
+ 
+com
+Accepted 16 February 2021
+© BMJ Publishing Group Limited 2021. No commercial re-
+ use
+. See rights and 
+permissions. Published by BMJ.
+SUMMARY
+Hydroxychloroquine has been widely prescribed to treat patients with COVID-19 pneumonia. A 73-
+ year
+-
+ 0ld 
+woman with CO
+VID-19 pneumonia was treated with 
+dexamethasone and hydroxychloroquine. Her home medications, citalopram and donepezil, were continued. The ECG prior to starting hydroxychloroquine showed normal sinus rhythm with prolonged corrected QT (QTc) of 497 ms, due to citalopram and donepezil therapy. Repeat ECG on days 3 and 4 of hydroxychloroquine therapy showed significantly prolonged QTc of 557 ms and 538 ms, respectively, despite normal serum electrolytes. All QT-
+ prolonging medications 
+including hydro
+xychloroquine were discontinued on 
+day 4; however, she suffered a transient torsades de pointes lasting for about 15 s, which resolved before any intervention. QTc improved to 477 ms, after discontinuation of QT-
+ prolonging medications
+. The 
+patient had QTc prolongation and torsades de pointes due to therapy with multiple QT-
+ prolonging medications
+. 
+Medicine reconciliation and careful monitoring of QTc may help prevent cardiac complications in patients with COVID-19 treated with hydroxychloroquine.
+BACKGROUND
+Hydroxychloroquine is a safe and well-  tolerated 
+medication, used in the management of malaria 
+and connective tissue disorders 
+including rheu-
+matoid arthritis and systemic lupus erythema-tosus for decades.
+1 Hydroxychloroquine has been 
+widely prescribed in the past few months to treat patients with COVID-19 disease due to its anti-
+ 
+inflammatory and antiviral prop
+erties, especially 
+after Gautret et al2 showed significant reduction in 
+SARS-
+ CoV
+-2 viral load with hydroxychloroquine 
+therapy. The antiviral effect of hydroxychloroquine was proposed to be further reinforced by adding azithromycin to the regimen.
+2 We report an inter -
+esting case of corrected QT (QTc) prolongation and torsades de pointes in a patient with SARS-
+ CoV
+-2 
+(COVID-19) pneumonia, provoked by therapy with multiple QTc-
+ prolonging medications.
+CASE PRESENTATION
+A 73-  year -  old woman with a medical history 
+of diabetes mellitus type II, hyperlipidaemia, dementia, depression and gastro-
+ oesophageal 
+reflux disease was sent to the emergency 
+room (ER) 
+from an assisted living facility with fever 101.7°F and rhinorrhoea for 2 days. The patient was noted to be restless with intermittent agitation in the ER. On initial evaluation in the ER, she was febrile with temperature 100.2°F and hypotensive with a blood pressure of 89/53 mm Hg. Oxygen saturation was 90% on room air. She responded appropriately to fluid resuscitation with an improved blood pressure of 143/65 mm Hg after administration of 2 L 0.9% normal saline. Otherwise, the physical examination was unremarkable.
+INVESTIGATIONS
+Pertinent laboratory work-  up revealed leucopenia 
+(white cell count 2.94×109/L), lymphopenia (abso-
+lute lymphocyte count 0.71×109/L), mild throm-
+bocytopenia (platelet count 108×109/L), elevated 
+lactate (2.5 mmol/L), elevated blood glucose (185 mg/dL), elevated C reactive protein (19.5 mg/L), normal troponin I, normal renal and liver tests, and a negative influenza A and B test. Chest radio-graph showed few bilateral pulmonary infiltrates, suspicious for COVID-19. Nasopharyngeal swab for COVID-19 was obtained and she was admitted to the hospital with sepsis and acute hypoxic respi-ratory failure requiring oxygen supplementation at 2–3 L/min via nasal cannula. The patient’s home medications, including citalopram 20 mg daily, donepezil 10 mg daily and gabapentin 300 mg three times per day, were continued. The ECG prior to starting hydroxychloroquine showed normal sinus rhythm with a prolonged QTc of 497 ms (figure
+ 
+1), 
+due to citalopram and donepezil therapy. Coro-navirus SARS-
+ CoV
+-2 (COVID-19) test came back 
+positive and she was started on dexamethasone and hydroxychloroquine monotherapy for 5 days (800 mg for 1 day followed by 400 mg for 4 days). Azith-romycin was not started due to prolonged QTc. Her medical condition continued to decline with wors-ening hypoxia requiring medical intensive care unit admission. She initially required oxygen supple-mentation via non-
+ rebreather and high-
+ flow nasal 
+o
+xygen, followed by endotracheal intubation and 
+mechanical ventilation. She required fentanyl and propofol infusions for sedation. Echocardiogram revealed normal left and right ventricular function. Repeat ECG on days 3 and 4 of hydroxychloroquine therapy showed significantly prolonged QTc of 557 ms and 538 ms (figure
+ 
+2), respectively. Electrolytes 
+including potassium, magnesium and calcium were normal. All QTc-
+ prolonging 
+medications including copyright. on August 11, 2021 at India:BMJ-PG Sponsored. Protected by http://casereports.bmj.com/ BMJ Case Rep: first published as 10.1136/bcr-2020-239963 on 24 March 2021. Downloaded from 
+
+2 Aslam W, et al. BMJ Case Rep 2021;14:e239963. doi:10.1136/bcr-2020-239963Case report
+hydroxychloroquine were discontinued on day 4, however the 
+patient suffered a transient torsades de pointes lasting for about 15 s, which resolved spontaneously before any intervention. She had QTc prolongation and torsades de pointes, provoked by multiple QT-
+ prolonging 
+medications including citalopram, 
+donepezil, propofol and hydroxychloroquine. QTc improved to 477 ms (figure
+ 3
+) after discontinuation of hydroxychloroquine 
+and other QT-
+ prolonging medications. 
+Remdesevir was not 
+available at that time for treatment of COVID-19 pneumonia.
+TREATMENT
+QTc improved to 477 ms after discontinuation of hydroxychlo-roquine and other QT-
+ prolonging 
+medications. QTc was moni-
+tored closely with daily ECG. Serum electrolytes were closely monitored and repleted as appropriate.
+OUTCOME AND FOLLOW-UP
+The patient’s intensive care unit course was complicated by prolonged respiratory failure, methicillin-
+ resistant 
+Staphylo-
+coccus aureus pneumonia, metabolic encephalopathy, right lower extremity deep venous thrombus and upper gastroin-testinal bleed. She did not have any recurrence of torsades de pointes or any other ventricular arrhythmia. Unfortunately, she was transitioned to comfort care on day 18 of the intensive care unit stay after a failed extubation.
+DISCUSSION
+Hydroxychloroquine can cause acute and chronic toxicity. Potential adverse effects of hydroxychloroquine include gastro-intestinal disturbance, skin photosensitivity, retinopathy, cardiac toxicity, hypoglycaemia, neuropsychiatric effects including agitation, confusion and psychosis, and haemolysis, especially in patients with glucose-6-
+ phosphate dehydrogenase deficiency
+.3 4
+Cardiac complications from hydroxychloroquine are rare but 
+can be severe and life-
+ threatening. Hydro
+xychloroquine-
+ related 
+cardiac 
+adverse effects are conduction abnormalities, ventricular 
+hypertrophy, restrictive cardiomyopathy, heart failure, pulmo-nary arterial hypertension and valvular dysfunction.
+5 6 Various 
+cardiac conduction abnormalities include first-
+ degree atrioven
+-
+tricular block, second-
+ degree atrioventricular block, 
+complete 
+heart block, prolonged QTc, torsades de pointes and other ventricular arrhythmias.
+5 6 Risk factors for hydroxychloroquine-  
+associated cardia
+c arrhythmia are inherited long QT syndrome, 
+ischaemic heart disease, cardiomyopathy, congestive heart failure, history of ventricular arrhythmia, unexplained syncope, family history of premature sudden cardiac death, polypharmacy with QTc-
+ prolonging medications, electrolyte 
+abnormalities 
+(hypokalaemia, hypomagnesaemia, hypocalcaemia), hepatic and renal failure.
+7–9
+Hospitalised patients and those with risk factors for 
+hydroxychloroquine-
+ associated cardiac 
+arrhythmia should be 
+recommended an ECG before considering hydroxychloroquine therapy, unless they had one within the last 3 months.
+8 Patients 
+with normal QTc and no risk factors for cardiac toxicity can be treated without delay.
+8 9 Patients with slightly prolonged QTc 
+≥470 ms (men) or ≥480 ms (women) but QTc <500 ms should be treated with caution; with a repeat ECG in 48 and 96 hours to re-
+ 
+evaluate QTc.8 9 Patients with prolonged QTc ≥500 ms should 
+be reassessed after correction of electrolytes and discontinuation of other QT-
+ prolonging 
+medications.8 9 If QTc persists ≥500 ms, 
+evaluation of benefits and risks of therapy and expert consulta-tion may be considered.
+8 9 Patients on multiple QTc-  prolon ging 
+medications should have a repeat ECG in 48 hours; if QTc increases by ≥60 ms or becomes ≥500 ms, re-
+ evaluate 
+bene-
+fits and risks of therapy.8 9 Citalopram, donepezil and propofol 
+have all been associated with QTc prolongation and ventricular 
+Figure 1  ECG with prolonged QTc of 497 ms . BPM, beats per minute; 
+QTc, corrected QT.
+Figure 2  ECG with prolonged QTc of 538 ms . BPM, beats per minute; 
+QTc, corrected QT.
+Figure 3  ECG with QTc of 477 ms after discontinuation of QT -  
+prolonging medications
+. BPM, beats per minute; QTc, corrected QT.copyright. on August 11, 2021 at India:BMJ-PG Sponsored. Protected by http://casereports.bmj.com/ BMJ Case Rep: first published as 10.1136/bcr-2020-239963 on 24 March 2021. Downloaded from 
+
+3
+Aslam W, et al. BMJ Case Rep 2021;14:e239963. doi:10.1136/bcr-2020-239963Case report
+arrhythmia.10–13 Our patient received multiple QTc-  prolonging 
+medications including citalopram, 
+donepezil and propofol along 
+with hydroxychloroquine, which caused significant QTc prolon -
+gation and provoked torsades de pointes. Medicine recon-
+ciliation and careful monitoring of QTc can prevent cardiac complications in patients with COVID-19 treated with hydroxy -
+chloroquine. The role of hydroxychloroquine in COVID-19 has been evaluated in various clinical trials and recent studies do not support any clinical benefit of hydroxychloroquine therapy in COVID-19.
+14–17
+Learning points
+ ►Citalopram, donepezil and propofol can cause QT 
+prolongation and ventricular arrhythmia.
+ ►Hydroxychloroquine-  associated adverse effects include 
+gastrointestinal disturbance
+, skin photosensitivity, 
+retinopathy, cardiac toxicity, hypoglycaemia and neuropsychiatric adverse effects.
+ ►Hydroxychloroquine can cause cardiac conduction abnormalities including first-
+ degree and second-
+ degree 
+atrioventricular block,
+ complete heart block, prolonged 
+corrected QT (QTc), torsades de pointes and other ventricular arrhythmias.
+ ►Cardiac comorbidities, polypharmacy with QT-  prolonging 
+medications
+, electrolyte abnormalities, hepatic and renal 
+failure increase the risk of hydroxychloroquine-
+ associated 
+cardiac complications
+.
+ ►Medicine reconciliation and careful monitoring of QTc can prevent cardiac complications in patients with COVID-19 treated with hydroxychloroquine.
+ ►Recent studies do not support any clinical benefit of hydroxychloroquine therapy in COVID-19.
+Contributors  W A was involved in direct patient care with full access to the patient 
+data and drafted the initial manuscript. CRL and NA reviewed the manuscript, 
+provided feedback and helped in the final editing of the manuscript.
+Funding
+ T
+he authors have not declared a specific grant for this research from any 
+funding agency in the public, commercial or not-
+ for
+-
+ profit sectors
+.
+Competing interests
+ None declared.
+P
+atient consent for publication
+ Next of kin consent obtained.
+Pr
+ovenance and peer review
+ Not commissioned;
+ externally peer reviewed.
+This article is made freely available for use in accordance with BMJ’s website 
+terms and conditions for the duration of the covid-19 pandemic or until otherwise determined by BMJ. You may use, download and print the article for any lawful, 
+non-
+ commercial purpose (including text and data mining) provided that all copyright 
+notices and tr
+ade marks are retained.
+ORCID iDWaqas Aslam http://
+ 
+orcid.
+ 
+org/
+ 
+0000-
+ 
+0003-
+ 
+0096-
+ 
+5841
+REFERENCES
+ 1 Costedoat-  Chalumeau N , Hulot J-  S , Amoura Z, et al. Heart conduction disorders 
+related to antimalarials toxicity: an analysis of electrocardiograms in 85 patients 
+treated with hydroxychloroquine for connective tissue diseases. Rheumatology 2007;46:808–10.
+ 2
+ Gautret P
+, Lagier J-
+ C
+, Parola P , et al. Hydroxychloroquine and azithromycin as a 
+treatment of COVID-19: results of an open-
+ label non-
+ r
+andomized clinical trial. Int J 
+Antimicrob Agents 2020;56:105949.
+ 3
+ Juurlink DN
+. Safety considerations with chloroquine, hydroxychloroquine 
+and azithromycin in the management of SARS-
+ CoV
+-2 infection. CMAJ 
+2020;192:E450–3.
+ 4
+ Sinha N
+, Balayla G. Hydroxychloroquine and COVID-19. Postgrad Med J 
+2020;96:550–5.
+ 5
+ Chatre C
+, Roubille F , Vernhet H, et al. Cardiac complications attributed to 
+chloroquine and hydroxychloroquine: a systematic review of the literature. Drug Saf 2018;41:919–31.
+ 6
+ Chen C-
+ Y
+, Wang F-
+ L,
+ Lin C-
+ C
+. Chronic hydroxychloroquine use associated with QT 
+prolongation and refractory ventricular arrhythmia. Clin Toxicol 2006;44:173–5.
+ 7
+ Kapoor A,
+ Pandurangi U, Arora V , et al. Cardiovascular risks of hydroxychloroquine 
+in treatment and prophylaxis of COVID-19 patients: a scientific statement from the Indian heart rhythm Society. Indian Pacing Electrophysiol J 2020;20:117–20.
+ 8
+ Sapp JL,
+ Alqarawi W, MacIntyre CJ, et al. Guidance on minimizing risk of drug-
+ induced 
+ventricular arrhythmia during treatment of CO
+VID-19: a statement from the Canadian 
+heart rhythm Society. Can J Cardiol 2020;36:948–51.
+ 9
+ Giudicessi JR,
+ Noseworthy PA, Friedman PA, et al. Urgent guidance for navigating 
+and circumventing the QTc-
+ Prolonging and torsadogenic potential of possible 
+pharmacother
+apies for coronavirus disease 19 (COVID-19). Mayo Clin Proc 
+2020;95:1213–21.
+ 10
+ Beach SR,
+ Celano CM, Noseworthy PA, et al. QTc prolongation, torsades de pointes, 
+and psychotropic medications. Psychosomatics 2013;54:1–13.
+ 11
+ Alušík Štefan,
+ Paluch Z. [Citalopram and QT prolongation]. Vnitr Lek 2018;63:952–6.
+ 12
+ T
+akaya T, Okamoto M, Yodoi K, et al. Torsades de pointes with QT prolongation 
+related to donepezil use. J Cardiol 2009;54:507–11.
+ 13
+ Abrich 
+VA, Ramakrishna H, Mehta A, et al. The possible role of propofol in drug-
+ 
+induced torsades de pointes:
+ a real-
+ world single-
+ center analysis
+. Int J Cardiol 
+2017;232:243–6.
+ 14
+ Self 
+WH, Semler MW, Leither LM, et al. Effect of hydroxychloroquine on clinical status 
+at 14 days in hospitalized patients with COVID-19. JAMA 2020;324:2165.
+ 15
+ RECO
+VERY Collaborative Group, Horby P , Mafham M, et al. Effect of 
+hydroxychloroquine in hospitalized patients with Covid-19. N Engl J Med 2020;383:2030–40.
+ 16
+ Cav
+alcanti AB, Zampieri FG, Rosa RG. Hydroxychloroquine with or without 
+azithromycin in mild-
+ to-
+ moder
+ate COVID-19. N Engl J Med 2020;383:2041–52.
+ 17
+ Boulw
+are DR, Pullen MF , Bangdiwala AS, et al. A randomized trial of 
+hydroxychloroquine as postexposure prophylaxis for Covid-19. N Engl J Med 2020;383:517–25.
+Copyright 2021 BMJ Publishing Group. All rights reserved. For permission to reuse any of this content visit
+https://www.bmj.com/company/products-services/rights-and-licensing/permissions/BMJ Case Report Fellows may re-use this article for personal use and teaching without any further permission.
+Become a Fellow of BMJ Case Reports today and you can:
+ ►Submit as many cases as you lik
+e
+ ►Enjoy fast sympathetic peer review and r
+apid publication of accepted articles
+ ►Access all the published articles
+ ►Re-use any of the published material for personal use and teaching without further permission
+Customer Service
+If you have any further queries about your subscription,
+ please contact our customer services team on +44 (0) 207111 1105 or via email at support@bmj.com.
+Visit casereports.bmj.com for more articles like this and to become a Fellowcopyright. on August 11, 2021 at India:BMJ-PG Sponsored. Protected by http://casereports.bmj.com/ BMJ Case Rep: first published as 10.1136/bcr-2020-239963 on 24 March 2021. Downloaded from 
+

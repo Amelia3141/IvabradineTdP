@@ -1,0 +1,29 @@
+{
+  "pmid": "25186635",
+  "title": "QT prolongation associated with memantine in Alzheimer's disease.",
+  "abstract": "",
+  "journal": "Psychiatry and clinical neurosciences",
+  "pub_date": "2015 Apr",
+  "authors": [
+    "Takehara H",
+    "Suzuki Y",
+    "Someya T"
+  ],
+  "chemicals": [],
+  "mesh_terms": [
+    "Aged",
+    "Alzheimer Disease/*drug therapy",
+    "Arrhythmias, Cardiac/*chemically induced",
+    "Brugada Syndrome",
+    "Cardiac Conduction System Disease",
+    "Female",
+    "Heart Conduction System/*abnormalities",
+    "Humans",
+    "Memantine/*adverse effects/therapeutic use"
+  ],
+  "publication_types": [
+    "Case Reports",
+    "Letter"
+  ],
+  "doi": "10.1111/pcn.12236"
+}
