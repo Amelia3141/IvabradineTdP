@@ -23,7 +23,7 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
     ],
     python_requires=">=3.9",
     install_requires=[
@@ -32,6 +32,6 @@ setup(
         "pandas>=1.5.3",
         "biopython>=1.81",
         "requests>=2.28.2",
-        "beautifulsoup4>=4.12.2",
+        "numpy>=1.24.3",
     ],
 )

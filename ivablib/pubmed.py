@@ -2,7 +2,6 @@ from typing import List, Dict, Union, Optional, Any
 from Bio import Entrez, Medline
 import requests
 from bs4 import BeautifulSoup
-import arxiv
 from transformers import AutoTokenizer, AutoModel
 import torch
 import logging
@@ -185,28 +184,6 @@ class FullTextFetcher:
             logger.error(f"DOI retrieval error for {doi}: {e}")
             return None
 
-    def get_from_arxiv(self, query: str) -> List[Dict]:
-        """Get papers from arXiv"""
-        try:
-            client = arxiv.Client()
-            search = arxiv.Search(query=query, max_results=10)
-            
-            papers = []
-            for result in client.results(search):
-                paper_data = {
-                    'title': result.title,
-                    'abstract': result.summary,
-                    'full_text': result.pdf_url,
-                    'full_text_source': 'arxiv'
-                }
-                papers.append(paper_data)
-            
-            return papers
-            
-        except Exception as e:
-            logger.error(f"arXiv search error: {e}")
-            return []
-
     def get_from_biorxiv(self, query: str) -> List[Dict]:
         """Get papers from bioRxiv/medRxiv"""
         papers = []
@@ -295,7 +272,7 @@ class FullTextFetcher:
 def search_papers(drug_name: str) -> List[Dict[str, Union[str, Dict]]]:
     """
     Search for papers about a drug in PubMed, focusing on case reports and clinical trials.
-    Attempts to retrieve full text from PMC, DOI, arXiv, bioRxiv/medRxiv, and Sci-Hub.
+    Attempts to retrieve full text from PMC, DOI, bioRxiv/medRxiv, and Sci-Hub.
     
     Args:
         drug_name: Name of the drug to search for
@@ -362,17 +339,6 @@ def search_papers(drug_name: str) -> List[Dict[str, Union[str, Dict]]]:
                             continue
                     except Exception as e:
                         logger.warning(f"No article text found for DOI {paper['doi']}")
-
-                # Try arXiv search
-                if not paper["full_text_available"]:
-                    try:
-                        arxiv_text = search_arxiv(paper["title"])
-                        if arxiv_text:
-                            paper["full_text_available"] = True
-                            paper["full_text_source"] = "arxiv"
-                            continue
-                    except Exception as e:
-                        logger.error(f"arXiv search error: {e}")
 
                 # Try bioRxiv/medRxiv search
                 if not paper["full_text_available"]:
@@ -540,19 +506,6 @@ def get_doi_text(doi: str) -> Optional[str]:
     except Exception as e:
         logger.error(f"DOI retrieval error for {doi}: {e}")
         return None
-
-def search_arxiv(query: str) -> Optional[str]:
-    """Search arXiv for a paper by title and return its text if found."""
-    try:
-        client = arxiv.Client()
-        search = arxiv.Search(query=query, max_results=10)
-        
-        for result in client.results(search):
-            if result.title.lower() == query.lower():
-                return result.pdf_url
-    except Exception as e:
-        logger.error(f"arXiv search error: {e}")
-    return None
 
 def get_scihub_text(doi: str) -> Optional[str]:
     """Get full text from Sci-Hub as a last resort"""
