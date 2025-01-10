@@ -128,7 +128,9 @@ if analyze_button:
                     
                     with col2:
                         st.subheader("Risk Assessment")
-                        if analysis['theoretical_binding']:
+                        if analysis['crediblemeds_risk']:
+                            st.error("⚠️ Known risk of TdP (CredibleMeds)")
+                        elif analysis['theoretical_binding']:
                             st.warning("⚠️ Potential hERG binding detected")
                         else:
                             st.success("✅ No significant hERG binding predicted")

@@ -3,6 +3,8 @@ import requests
 import time
 import re
 import logging
+import os
+import pandas as pd
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from datetime import datetime
@@ -32,6 +34,7 @@ class DrugAnalyzer:
         """Initialize with NCBI credentials"""
         self.email = email
         self.api_key = api_key
+        self.crediblemeds_file = os.path.join(os.path.dirname(__file__), '..', 'data', 'crediblemeds_data.txt')
     
     def _get_molecular_weight(self, cid: int) -> Optional[float]:
         """Get molecular weight from PubChem"""
@@ -85,6 +88,21 @@ class DrugAnalyzer:
             logger.error(f"Error searching ChEMBL: {str(e)}")
             return None
 
+    def _check_crediblemeds(self, drug_name: str) -> bool:
+        """Check if drug is in CredibleMeds TdP risk list"""
+        try:
+            with open(self.crediblemeds_file, 'r') as f:
+                for line in f:
+                    if line.startswith('#'):
+                        continue
+                    parts = line.strip().split('|')
+                    if len(parts) == 2 and parts[0].strip().lower() == drug_name.lower():
+                        return True
+            return False
+        except Exception as e:
+            logger.error(f"Error checking CredibleMeds: {str(e)}")
+            return False
+
     def _calculate_concentrations(self, 
                                 doses: List[float], 
                                 molecular_weight: float,
@@ -117,6 +135,46 @@ class DrugAnalyzer:
         
         return concentrations
 
+    def _search_literature(self, drug_name: str) -> pd.DataFrame:
+        """Search PubChem literature for drug information"""
+        try:
+            url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{drug_name}/xrefs/PubMedID/JSON"
+            response = requests.get(url)
+            response.raise_for_status()
+            data = response.json()
+            
+            papers = []
+            if 'InformationList' in data and 'Information' in data['InformationList']:
+                pmids = data['InformationList']['Information'][0].get('PubMedID', [])
+                
+                for pmid in pmids[:10]:  # Limit to first 10 papers
+                    try:
+                        url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id={pmid}&retmode=json"
+                        response = requests.get(url)
+                        response.raise_for_status()
+                        paper_data = response.json()
+                        
+                        if 'result' in paper_data and str(pmid) in paper_data['result']:
+                            paper = paper_data['result'][str(pmid)]
+                            papers.append({
+                                'Title': paper.get('title', ''),
+                                'Authors': ', '.join(paper.get('authors', [])),
+                                'Journal': paper.get('source', ''),
+                                'Year': paper.get('pubdate', '').split()[0],
+                                'PMID': pmid
+                            })
+                        
+                        time.sleep(0.1)  # Rate limiting
+                        
+                    except Exception as e:
+                        logger.warning(f"Error fetching paper {pmid}: {str(e)}")
+                        continue
+            
+            return pd.DataFrame(papers)
+        except Exception as e:
+            logger.error(f"Error searching literature: {str(e)}")
+            return pd.DataFrame()
+
     def analyze_drug(self, drug_name: str, doses: List[float]) -> Dict:
         """Analyze a drug for hERG interactions"""
         try:
@@ -145,11 +203,14 @@ class DrugAnalyzer:
                 herg_ic50=herg_ic50
             )
             
+            # Check CredibleMeds risk
+            is_crediblemeds_risk = self._check_crediblemeds(drug_name)
+            
             # Determine if theoretical binding is likely
-            theoretical_binding = any(
-                c.ratio_theoretical and c.ratio_theoretical > 0.1 
-                for c in concentrations
-            ) if herg_ic50 else None
+            theoretical_binding = (
+                any(c.ratio_theoretical and c.ratio_theoretical > 0.1 for c in concentrations) 
+                if herg_ic50 else None
+            ) or is_crediblemeds_risk
             
             # Format concentrations for output
             concentration_data = [
@@ -165,9 +226,11 @@ class DrugAnalyzer:
                 "herg_source": "ChEMBL Database",
                 "concentrations": concentration_data,
                 "theoretical_binding": theoretical_binding,
+                "crediblemeds_risk": is_crediblemeds_risk,
                 "citations": [
                     "Mendez-Lucio O, et al. (2017). Computational Tools for HERG Channel Blockers Safety Assessment in Drug Discovery. Front Pharmacol.",
-                    "Gintant G, et al. (2016). Evolution of strategies to improve preclinical cardiac safety testing. Nat Rev Drug Discov."
+                    "Gintant G, et al. (2016). Evolution of strategies to improve preclinical cardiac safety testing. Nat Rev Drug Discov.",
+                    "Woosley RL, et al. www.Crediblemeds.org, QTdrugs List, AZCERT, Inc. 1822 Innovation Park Dr., Oro Valley, AZ 85755"
                 ]
             }
             
