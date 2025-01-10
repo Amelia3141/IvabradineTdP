@@ -94,9 +94,14 @@ class DrugAnalyzer:
             crediblemeds_file = os.path.join(data_dir, 'crediblemeds_data.txt')
             
             with open(crediblemeds_file, 'r') as f:
-                crediblemeds_drugs = [line.strip().lower() for line in f.readlines()]
-            
-            return drug_name.lower() in crediblemeds_drugs
+                for line in f:
+                    if line.startswith('#'):
+                        continue
+                    if '|' in line:
+                        drug, risk = [x.strip() for x in line.split('|')]
+                        if drug.lower() == drug_name.lower():
+                            return True
+            return False
         except Exception as e:
             logger.error(f"Error checking CredibleMeds: {str(e)}")
             return False
