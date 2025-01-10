@@ -19,6 +19,7 @@ if not logger.handlers:
 
 @dataclass
 class DrugConcentration:
+    dose: float
     theoretical_max: float  # μM
     plasma_concentration: float  # μM with 40% bioavailability
     ratio_theoretical: Optional[float] = None
@@ -159,46 +160,65 @@ class DrugAnalyzer:
         concentrations = []
         try:
             # Check if molecular weight is valid
-            if not molecular_weight or not isinstance(molecular_weight, (int, float)) or molecular_weight <= 0:
-                logger.warning(f"Invalid molecular weight: {molecular_weight}")
+            if molecular_weight is None:
+                logger.warning("No molecular weight available")
                 return [DrugConcentration(
+                    dose=dose,
                     theoretical_max=None,
                     plasma_concentration=None,
                     ratio_theoretical=None,
                     ratio_plasma=None
-                ) for _ in doses]
+                ) for dose in doses]
+                
+            # Convert molecular weight to float and validate
+            try:
+                molecular_weight = float(str(molecular_weight).strip())
+                if molecular_weight <= 0:
+                    raise ValueError("Molecular weight must be positive")
+            except (ValueError, TypeError) as e:
+                logger.warning("Invalid molecular weight {}: {}".format(molecular_weight, str(e)))
+                return [DrugConcentration(
+                    dose=dose,
+                    theoretical_max=None,
+                    plasma_concentration=None,
+                    ratio_theoretical=None,
+                    ratio_plasma=None
+                ) for dose in doses]
                 
             for dose in doses:
                 try:
                     # Convert dose from mg to μmol
-                    dose_in_mol = float(dose) / float(molecular_weight) * 1000.0
+                    dose_in_mol = float(str(dose).strip()) / molecular_weight * 1000.0
                     
                     # Calculate concentrations
-                    theoretical_max = dose_in_mol / 5.0  # Assuming 5L distribution volume
-                    plasma_conc = theoretical_max * 0.4  # 40% bioavailability
+                    theoretical_max = round(dose_in_mol / 5.0, 3)  # Assuming 5L distribution volume
+                    plasma_conc = round(theoretical_max * 0.4, 3)  # 40% bioavailability
                     
                     concentrations.append(DrugConcentration(
+                        dose=dose,
                         theoretical_max=theoretical_max,
                         plasma_concentration=plasma_conc,
                         ratio_theoretical=None,
                         ratio_plasma=None
                     ))
                 except (ValueError, TypeError, ZeroDivisionError) as e:
-                    logger.error(f"Error calculating concentration for dose {dose}: {str(e)}")
+                    logger.error("Error calculating concentration for dose {}: {}".format(dose, str(e)))
                     concentrations.append(DrugConcentration(
+                        dose=dose,
                         theoretical_max=None,
                         plasma_concentration=None,
                         ratio_theoretical=None,
                         ratio_plasma=None
                     ))
         except Exception as e:
-            logger.error(f"Error calculating concentrations: {str(e)}")
+            logger.error("Error calculating concentrations: {}".format(str(e)))
             concentrations = [DrugConcentration(
+                dose=dose,
                 theoretical_max=None,
                 plasma_concentration=None,
                 ratio_theoretical=None,
                 ratio_plasma=None
-            ) for _ in doses]
+            ) for dose in doses]
         return concentrations
 
     def analyze_drug(self, drug_name: str, doses: List[float]) -> Optional[DrugAnalysis]:
@@ -211,47 +231,46 @@ class DrugAnalyzer:
             # Get hERG data
             herg_ic50, herg_source = self.search_herg_data(drug_name)
             
-            # Calculate concentrations only if we have valid molecular weight
-            if molecular_weight and isinstance(molecular_weight, (int, float)) and molecular_weight > 0:
-                concentrations = self.calculate_concentrations(molecular_weight, doses)
-            else:
-                logger.warning(f"Cannot calculate concentrations: invalid molecular weight ({molecular_weight})")
-                concentrations = [DrugConcentration(
-                    theoretical_max=None,
-                    plasma_concentration=None,
-                    ratio_theoretical=None,
-                    ratio_plasma=None
-                ) for _ in doses]
+            # Calculate concentrations
+            concentrations = self.calculate_concentrations(molecular_weight, doses)
             
             # Calculate ratios if hERG IC50 is available
-            if herg_ic50 and isinstance(herg_ic50, (int, float)):
-                for conc in concentrations:
-                    try:
-                        if conc.theoretical_max and conc.theoretical_max > 0:
-                            conc.ratio_theoretical = float(herg_ic50) / float(conc.theoretical_max)
-                        if conc.plasma_concentration and conc.plasma_concentration > 0:
-                            conc.ratio_plasma = float(herg_ic50) / float(conc.plasma_concentration)
-                    except (ValueError, TypeError, ZeroDivisionError):
-                        conc.ratio_theoretical = None
-                        conc.ratio_plasma = None
+            if herg_ic50 is not None:
+                try:
+                    herg_ic50 = float(str(herg_ic50).strip())
+                    for conc in concentrations:
+                        try:
+                            if conc.theoretical_max is not None and conc.theoretical_max > 0:
+                                conc.ratio_theoretical = round(herg_ic50 / conc.theoretical_max, 3)
+                            if conc.plasma_concentration is not None and conc.plasma_concentration > 0:
+                                conc.ratio_plasma = round(herg_ic50 / conc.plasma_concentration, 3)
+                        except (ValueError, TypeError, ZeroDivisionError) as e:
+                            logger.error("Error calculating ratios: {}".format(str(e)))
+                            conc.ratio_theoretical = None
+                            conc.ratio_plasma = None
+                except (ValueError, TypeError) as e:
+                    logger.error("Invalid hERG IC50 value {}: {}".format(herg_ic50, str(e)))
             
             # Determine theoretical binding
             theoretical_binding = False
-            if herg_ic50 and isinstance(herg_ic50, (int, float)):
-                theoretical_binding = any(
-                    c.ratio_plasma and isinstance(c.ratio_plasma, (int, float)) and c.ratio_plasma < 1 
-                    for c in concentrations
-                )
+            if herg_ic50 is not None:
+                try:
+                    theoretical_binding = any(
+                        c.ratio_plasma is not None and c.ratio_plasma < 1 
+                        for c in concentrations
+                    )
+                except Exception as e:
+                    logger.error("Error determining theoretical binding: {}".format(str(e)))
             
             # Generate citations
             citations = []
             if cid:
                 citations.append(
-                    f"National Center for Biotechnology Information (2024). PubChem Compound Summary for CID {cid}, {drug_name}. "
-                    f"Retrieved January 10, 2024, from https://pubchem.ncbi.nlm.nih.gov/compound/{drug_name}"
+                    "National Center for Biotechnology Information (2024). PubChem Compound Summary for CID {}, {}. "
+                    "Retrieved January 10, 2024, from https://pubchem.ncbi.nlm.nih.gov/compound/{}".format(cid, drug_name, drug_name)
                 )
             if herg_source:
-                citations.append(f"hERG IC50 data source: {herg_source}")
+                citations.append("hERG IC50 data source: {}".format(herg_source))
             
             return DrugAnalysis(
                 name=drug_name,
@@ -265,5 +284,5 @@ class DrugAnalyzer:
             )
             
         except Exception as e:
-            logger.error(f"Error analyzing drug: {str(e)}")
+            logger.error("Error analyzing drug: {}".format(str(e)))
             return None

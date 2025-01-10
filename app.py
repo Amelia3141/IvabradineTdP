@@ -419,27 +419,43 @@ if "hERG Channel Activity" in analysis_sections:
                 if analysis["concentrations"]:
                     for conc in analysis["concentrations"]:
                         # Only show concentration data if we have valid values
-                        if conc['theoretical_max'] != "N/A" or conc['plasma_concentration'] != "N/A":
-                            st.markdown(f"""
-                            **For {conc['dose']} mg dose:**
-                            - Theoretical Maximum Concentration: {conc['theoretical_max']} {'μM' if conc['theoretical_max'] != 'N/A' else ''}
-                            - Estimated Plasma Concentration: {conc['plasma_concentration']} {'μM' if conc['plasma_concentration'] != 'N/A' else ''}
-                            - Theoretical Safety Ratio: {conc['ratio_theoretical']}
-                            - Plasma Safety Ratio: {conc['ratio_plasma']}
-                            """)
+                        if conc['theoretical_max'] is not None and conc['plasma_concentration'] is not None:
+                            st.markdown("""
+                            **For {0} mg dose:**
+                            - Theoretical Maximum Concentration: {1:.3f} μM
+                            - Estimated Plasma Concentration: {2:.3f} μM
+                            """.format(
+                                conc['dose'],
+                                conc['theoretical_max'],
+                                conc['plasma_concentration']
+                            ))
+                            
+                            # Only show ratios if hERG IC50 is available
+                            if analysis["herg_ic50"] != "N/A":
+                                st.markdown("""
+                                - Theoretical Safety Ratio: {0:.3f}
+                                - Plasma Safety Ratio: {1:.3f}
+                                """.format(
+                                    conc['ratio_theoretical'] if conc['ratio_theoretical'] is not None else 0,
+                                    conc['ratio_plasma'] if conc['ratio_plasma'] is not None else 0
+                                ))
                         else:
-                            st.info(f"Could not calculate concentrations for {conc['dose']} mg dose")
+                            st.info("Could not calculate concentrations for {} mg dose".format(conc['dose']))
                     
-                    if analysis["theoretical_binding"]:
-                        st.warning("⚠️ Potential hERG channel binding detected at therapeutic concentrations")
+                    # Only show binding prediction if we have hERG IC50
+                    if analysis["herg_ic50"] != "N/A":
+                        if analysis["theoretical_binding"]:
+                            st.warning("⚠️ Potential hERG channel binding detected at therapeutic concentrations")
+                        else:
+                            st.success("✅ No significant hERG channel binding predicted at therapeutic concentrations")
                     else:
-                        st.success("✅ No significant hERG channel binding predicted at therapeutic concentrations")
+                        st.info("Cannot predict hERG binding without IC50 data")
                 
                 # Display citations
                 if analysis.get("citations"):
                     st.markdown("### References")
                     for citation in analysis["citations"]:
-                        st.markdown(f"- {citation}")
+                        st.markdown("- {}".format(citation))
                 
                 st.markdown("</div>", unsafe_allow_html=True)
             else:
