@@ -1,14 +1,23 @@
-import streamlit as st
-import pandas as pd
-import plotly.graph_objects as go
-import plotly.express as px
+"""Streamlit app for analyzing TdP risk."""
 import os
+import sys
+from typing import Dict, List, Any, Optional
+import streamlit as st
+import plotly.graph_objects as go
 import requests
 from Bio import Entrez, Medline
-import re
-from typing import Dict, List
+
+# Add the project root directory to Python path
+project_root = os.path.dirname(os.path.abspath(__file__))
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
 from ivablib.herg_analyzer import DrugAnalyzer
 from ivablib.case_report_analyzer import CaseReportAnalyzer
+
+# Set NCBI credentials
+Entrez.email = "amelia.glasauer@gmail.com"
+Entrez.api_key = "8b23b0c60e6b8c8a40f2867c88a9d43c5f09"
 
 # Page config
 st.set_page_config(
@@ -16,13 +25,6 @@ st.set_page_config(
     page_icon="❤️",
     layout="wide"
 )
-
-# Set NCBI credentials
-NCBI_EMAIL = "ghhercock@gmail.com"
-NCBI_API_KEY = "d769d934dc8159bcc9ec9fc29c715a456008"
-
-# Set email for Entrez
-Entrez.email = NCBI_EMAIL
 
 # Custom CSS to ensure text visibility
 st.markdown("""
@@ -68,7 +70,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # Initialize analyzers
-drug_analyzer = DrugAnalyzer(NCBI_EMAIL, NCBI_API_KEY)
+drug_analyzer = DrugAnalyzer(Entrez.email, Entrez.api_key)
 
 # Main content
 st.title("TdP Risk Assessment")
@@ -308,8 +310,8 @@ def analyze_herg_activity(drug_name: str, doses: List[float]) -> Dict[str, Any]:
     try:
         # Initialize analyzer with NCBI credentials
         analyzer = DrugAnalyzer(
-            email="amelia.glasauer@gmail.com",
-            api_key="8b23b0c60e6b8c8a40f2867c88a9d43c5f09"
+            email=Entrez.email,
+            api_key=Entrez.api_key
         )
         
         # Analyze drug

@@ -150,12 +150,19 @@ class DrugAnalyzer:
                 
                 concentrations.append(DrugConcentration(
                     theoretical_max=theoretical_max,
-                    plasma_concentration=plasma_conc
+                    plasma_concentration=plasma_conc,
+                    ratio_theoretical=None,
+                    ratio_plasma=None
                 ))
         except (ValueError, TypeError) as e:
             logger.error(f"Error calculating concentrations: {str(e)}")
             # Return default concentrations if calculation fails
-            concentrations = [DrugConcentration(theoretical_max=0.0, plasma_concentration=0.0) for _ in doses]
+            concentrations = [DrugConcentration(
+                theoretical_max=0.0,
+                plasma_concentration=0.0,
+                ratio_theoretical=None,
+                ratio_plasma=None
+            ) for _ in doses]
         return concentrations
 
     def analyze_drug(self, drug_name: str, doses: List[float]) -> Optional[DrugAnalysis]:
