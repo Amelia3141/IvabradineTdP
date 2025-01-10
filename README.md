@@ -1,13 +1,21 @@
-# IvabradineTdP
+# Ivabradine TdP Risk Analyzer
 
-A Streamlit web application for analyzing Torsades de Pointes (TdP) risks associated with drugs using real-time PubMed data.
+A Streamlit web application for analyzing the Torsades de Pointes (TdP) risk of Ivabradine through hERG channel analysis and literature review.
 
 ## Features
 
-- Search and analyze PubMed case reports, cohort studies, and clinical trials
-- Check drug risk categories
-- Visualize risk assessment results
-- Real-time data fetching from PubMed
+- **hERG Channel Analysis**: 
+  - Retrieves hERG IC50 values from PubChem bioassays and bioactivity data
+  - Calculates theoretical and plasma concentrations
+  - Estimates TdP risk based on concentration ratios
+- **Literature Search**:
+  - Searches PubChem for ion channel data
+  - Analyzes bioassay results
+  - Retrieves bioactivity data
+- **Concentration Analysis**:
+  - Calculates theoretical maximum concentrations
+  - Estimates plasma concentrations with 40% bioavailability
+  - Computes hERG IC50 ratios
 
 ## Installation
 
@@ -22,15 +30,48 @@ cd IvabradineTdP
 pip install -r requirements.txt
 ```
 
-## Usage
+3. Configure NCBI credentials:
+Create a `.streamlit/secrets.toml` file with your NCBI credentials:
+```toml
+NCBI_EMAIL = "your.email@example.com"
+NCBI_API_KEY = "your_api_key"
+```
 
-Run the Streamlit app locally:
+4. Run the application:
 ```bash
 streamlit run app.py
 ```
 
-Or visit the deployed app at: https://ivabradine-tdp.streamlit.app
+## Usage
+
+1. Enter the drug name (e.g., "ivabradine")
+2. Input the doses to analyze
+3. View the analysis results:
+   - hERG IC50 value and source
+   - Concentration calculations
+   - TdP risk assessment
+   - Citations and references
+
+## Dependencies
+
+- streamlit
+- plotly
+- pandas
+- requests
+- beautifulsoup4
+- PyPDF2
+
+## Recent Updates
+
+- Switched to PubChem API for more comprehensive hERG data
+- Added bioassay and bioactivity searches
+- Improved concentration calculations
+- Enhanced error handling and logging
+
+## Contributing
+
+Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 
 ## License
 
-MIT License - see LICENSE file for details
+[MIT](https://choosealicense.com/licenses/mit/)
