@@ -256,79 +256,94 @@ class DrugAnalyzer:
 
     def analyze_drug(self, drug_name: str, doses: List[float]) -> Dict:
         """Complete drug analysis"""
+        # Initialize default response
+        response = {
+            'name': drug_name,
+            'cid': None,
+            'molecular_weight': None,
+            'herg_ic50': None,
+            'herg_source': None,
+            'concentrations': [],
+            'theoretical_binding': False,
+            'citations': []
+        }
+        
         try:
             # Get basic drug data
             cid = self.get_drug_cid(drug_name)
-            molecular_weight = self.get_molecular_weight(cid) if cid else None
+            if cid:
+                response['cid'] = cid
+                molecular_weight = self.get_molecular_weight(cid)
+                if molecular_weight:
+                    response['molecular_weight'] = molecular_weight
             
             # Get hERG data
             herg_ic50, herg_source = self.search_herg_data(drug_name)
+            if herg_ic50 is not None:
+                response['herg_ic50'] = herg_ic50
+                response['herg_source'] = herg_source
             
-            # Calculate concentrations
-            concentrations = []
-            if molecular_weight is not None:
-                concentrations = self.calculate_concentrations(molecular_weight, doses)
+            # Calculate concentrations if we have molecular weight
+            if response['molecular_weight'] is not None:
+                concentrations = self.calculate_concentrations(response['molecular_weight'], doses)
                 
-                # Calculate ratios if hERG IC50 is available
-                if herg_ic50 is not None:
-                    try:
-                        herg_ic50_float = float(str(herg_ic50).strip())
-                        for conc in concentrations:
-                            if conc.theoretical_max is not None and conc.plasma_concentration is not None:
-                                try:
-                                    if conc.theoretical_max > 0:
-                                        conc.ratio_theoretical = round(herg_ic50_float / conc.theoretical_max, 3)
-                                    if conc.plasma_concentration > 0:
-                                        conc.ratio_plasma = round(herg_ic50_float / conc.plasma_concentration, 3)
-                                except ZeroDivisionError:
-                                    logger.warning("Zero concentration values encountered")
-                    except (ValueError, TypeError) as e:
-                        logger.error("Invalid hERG IC50 value: {}".format(str(e)))
-            
-            # Format concentrations for output
-            formatted_concentrations = []
-            for conc in concentrations:
-                formatted_concentrations.append({
-                    'dose': conc.dose,
-                    'theoretical_max': conc.theoretical_max,
-                    'plasma_concentration': conc.plasma_concentration,
-                    'ratio_theoretical': conc.ratio_theoretical,
-                    'ratio_plasma': conc.ratio_plasma
-                })
-            
-            # Determine theoretical binding
-            theoretical_binding = False
-            if herg_ic50 is not None and concentrations:
-                theoretical_binding = any(
-                    c.ratio_plasma is not None and c.ratio_plasma < 1 
-                    for c in concentrations
-                )
+                # Format concentrations for output
+                formatted_concentrations = []
+                for conc in concentrations:
+                    conc_data = {
+                        'dose': conc.dose,
+                        'theoretical_max': conc.theoretical_max,
+                        'plasma_concentration': conc.plasma_concentration,
+                        'ratio_theoretical': None,
+                        'ratio_plasma': None
+                    }
+                    
+                    # Calculate ratios if we have hERG IC50
+                    if response['herg_ic50'] is not None:
+                        try:
+                            herg_ic50_float = float(str(response['herg_ic50']).strip())
+                            if (conc.theoretical_max is not None and 
+                                conc.plasma_concentration is not None):
+                                if conc.theoretical_max > 0:
+                                    conc_data['ratio_theoretical'] = round(
+                                        herg_ic50_float / conc.theoretical_max, 3
+                                    )
+                                if conc.plasma_concentration > 0:
+                                    conc_data['ratio_plasma'] = round(
+                                        herg_ic50_float / conc.plasma_concentration, 3
+                                    )
+                        except (ValueError, TypeError, ZeroDivisionError) as e:
+                            logger.warning("Error calculating ratios: {}".format(str(e)))
+                    
+                    formatted_concentrations.append(conc_data)
+                
+                response['concentrations'] = formatted_concentrations
+                
+                # Determine theoretical binding
+                if response['herg_ic50'] is not None:
+                    response['theoretical_binding'] = any(
+                        c['ratio_plasma'] is not None and c['ratio_plasma'] < 1 
+                        for c in formatted_concentrations
+                    )
             
             # Generate citations
             citations = []
-            if cid:
+            if response['cid']:
                 citations.append(
                     "National Center for Biotechnology Information (2024). PubChem Compound Summary for CID {}, {}. "
                     "Retrieved January 10, 2024, from https://pubchem.ncbi.nlm.nih.gov/compound/{}".format(
-                        cid, drug_name, drug_name
+                        response['cid'], drug_name, drug_name
                     )
                 )
-            if herg_source:
-                citations.append("hERG IC50 data source: {}".format(herg_source))
+            if response['herg_source']:
+                citations.append("hERG IC50 data source: {}".format(response['herg_source']))
+            response['citations'] = citations
             
-            return {
-                'name': drug_name,
-                'cid': cid,
-                'molecular_weight': molecular_weight,
-                'herg_ic50': herg_ic50,
-                'herg_source': herg_source,
-                'concentrations': formatted_concentrations,
-                'theoretical_binding': theoretical_binding,
-                'citations': citations
-            }
+            return response
             
         except Exception as e:
             logger.error("Error analyzing drug: {}".format(str(e)))
             return {
-                'error': "Error analyzing hERG activity: {}".format(str(e))
+                'error': "Error analyzing hERG activity: {}".format(str(e)),
+                'concentrations': []  # Ensure this is always present
             }
