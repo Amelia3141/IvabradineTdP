@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
-from ivablib.pubmed4125 import search_pubmed_case_reports, search_pubmed_cohort_studies, search_pubmed_clinical_trials
+from ivablib.pubmed import search_pubmed_case_reports, search_pubmed_cohort_studies, search_pubmed_clinical_trials
 from ivablib.pubchem import get_herg_activity
 
 # Page config
