@@ -173,3 +173,5 @@ if "hERG Activity" in analysis_sections:
             # Add visualization placeholder for hERG data
             st.markdown("### hERG Binding Analysis")
             st.info("Visualization of hERG channel binding characteristics will be added in future updates.")
+        except Exception as e:
+            st.error("Error analyzing hERG activity: " + str(e))
