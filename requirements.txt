@@ -1,7 +1,4 @@
 streamlit==1.29.0
 plotly==5.18.0
 pandas==1.5.3
-biopython==1.81
 requests==2.31.0
-beautifulsoup4==4.12.2
-urllib3==1.26.18
