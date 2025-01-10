@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from chembl_webresource_client.new_client import new_client
 import statistics
+from Bio import Entrez, Medline
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -55,8 +56,11 @@ class DrugAnalyzer:
             molecule = new_client.molecule
             activities = new_client.activity
             
-            # Search for the molecule
-            results = molecule.filter(molecule_synonyms__molecule_synonym__icontains=compound_name).only(['molecule_chembl_id'])
+            # Search for the molecule with fuzzy matching
+            results = molecule.filter(
+                molecule_synonyms__molecule_synonym__icontains=compound_name
+            ).only(['molecule_chembl_id', 'pref_name'])
+            
             if not results:
                 logger.warning(f"No ChEMBL results found for {compound_name}")
                 return None
@@ -64,6 +68,7 @@ class DrugAnalyzer:
             # Get activities for hERG
             herg_activities = []
             for mol in results:
+                logger.info(f"Checking molecule: {mol.get('pref_name')} ({mol['molecule_chembl_id']})")
                 acts = activities.filter(
                     molecule_chembl_id=mol['molecule_chembl_id'],
                     target_chembl_id='CHEMBL240',  # hERG
@@ -79,6 +84,7 @@ class DrugAnalyzer:
                             value = value
                         else:
                             continue
+                        logger.info(f"Found IC50: {value} μM")
                         herg_activities.append(value)
             
             if not herg_activities:
@@ -162,47 +168,57 @@ class DrugAnalyzer:
         return concentrations
 
     def _search_literature(self, drug_name: str) -> pd.DataFrame:
-        """Search PubChem literature for drug information"""
+        """Search PubMed for papers about drug and hERG/QT/arrhythmia"""
         try:
-            url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{drug_name}/xrefs/PubMedID/JSON"
-            response = requests.get(url)
-            response.raise_for_status()
-            data = response.json()
-            
+            # Set up Entrez
+            Entrez.email = self.email
+            if self.api_key:
+                Entrez.api_key = self.api_key
+
+            # Search PubMed
+            query = f"{drug_name} AND (hERG OR QT OR torsade OR arrhythmia)"
+            handle = Entrez.esearch(db="pubmed", term=query, retmax=10)
+            record = Entrez.read(handle)
+            handle.close()
+
+            if not record["IdList"]:
+                logger.warning("No papers found")
+                return pd.DataFrame()
+
+            # Get paper details
             papers = []
-            if 'InformationList' in data and 'Information' in data['InformationList']:
-                pmids = data['InformationList']['Information'][0].get('PubMedID', [])
-                
-                for pmid in pmids[:10]:  # Limit to first 10 papers
-                    try:
-                        url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id={pmid}&retmode=json"
-                        response = requests.get(url)
-                        response.raise_for_status()
-                        paper_data = response.json()
-                        
-                        if 'result' in paper_data and str(pmid) in paper_data['result']:
-                            paper = paper_data['result'][str(pmid)]
-                            papers.append({
-                                'Title': paper.get('title', ''),
-                                'Authors': ', '.join(paper.get('authors', [])),
-                                'Journal': paper.get('source', ''),
-                                'Year': paper.get('pubdate', '').split()[0],
-                                'PMID': pmid
-                            })
-                        
-                        time.sleep(0.1)  # Rate limiting
-                        
-                    except Exception as e:
-                        logger.warning(f"Error fetching paper {pmid}: {str(e)}")
+            for pmid in record["IdList"]:
+                try:
+                    time.sleep(0.5)  # Rate limit to avoid 429 errors
+                    handle = Entrez.efetch(db="pubmed", id=pmid, rettype="medline", retmode="text")
+                    record = Medline.read(handle)
+                    handle.close()
+
+                    if not isinstance(record, dict):
                         continue
-            
+
+                    paper = {
+                        'pmid': pmid,
+                        'title': record.get('TI', ''),
+                        'authors': ', '.join(record.get('AU', [])),  # Join authors into string
+                        'journal': record.get('JT', ''),
+                        'year': record.get('DP', '').split()[0] if record.get('DP') else '',
+                        'abstract': record.get('AB', '')
+                    }
+                    papers.append(paper)
+
+                except Exception as e:
+                    logger.warning(f"Error fetching paper {pmid}: {str(e)}")
+                    continue
+
             logger.info(f"Found {len(papers)} literature results")
             return pd.DataFrame(papers)
+
         except Exception as e:
             logger.error(f"Error searching literature: {str(e)}")
             return pd.DataFrame()
 
-    def analyze_drug(self, drug_name: str, doses: List[float]) -> Dict:
+    def analyze_drug(self, drug_name: str) -> Dict:
         """Analyze a drug for TdP risk"""
         try:
             logger.info(f"Starting analysis for {drug_name}")
@@ -233,4 +249,4 @@ class DrugAnalyzer:
             
         except Exception as e:
             logger.error(f"Error analyzing drug: {str(e)}")
-            raise
+            return {"error": str(e)}
