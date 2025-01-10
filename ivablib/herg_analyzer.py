@@ -87,33 +87,27 @@ class DrugAnalyzer:
             logger.error(f"Error searching ChEMBL: {str(e)}")
             return None
 
-    def _check_crediblemeds(self, drug_name: str) -> bool:
-        """Check if drug is in CredibleMeds list of known TdP risk drugs."""
+    def _check_crediblemeds(self, drug_name: str) -> Tuple[bool, str]:
+        """Check if drug is in CredibleMeds list of known TdP risk drugs.
+        Returns (is_risk, risk_category)"""
         try:
             data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
             crediblemeds_file = os.path.join(data_dir, 'crediblemeds_data.txt')
-            logger.info(f"Looking for CredibleMeds file at: {crediblemeds_file}")
-            logger.info(f"Checking drug: {drug_name}")
             
-            if not os.path.exists(crediblemeds_file):
-                logger.error(f"CredibleMeds file not found at: {crediblemeds_file}")
-                return False
-                
+            # Create a dictionary of drug names to risk categories for faster lookup
+            drug_risks = {}
             with open(crediblemeds_file, 'r') as f:
                 for line in f:
-                    if line.startswith('#'):
+                    if line.startswith('#') or '|' not in line:
                         continue
-                    if '|' in line:
-                        drug, risk = [x.strip() for x in line.split('|')]
-                        logger.info(f"Comparing {drug.lower()} with {drug_name.lower()}")
-                        if drug.lower() == drug_name.lower():
-                            logger.info(f"Found match! Risk: {risk}")
-                            return True
-            logger.info("No match found in CredibleMeds data")
-            return False
+                    drug, risk = [x.strip() for x in line.split('|')]
+                    drug_risks[drug.lower()] = risk
+
+            risk_category = drug_risks.get(drug_name.lower(), '')
+            return bool(risk_category), risk_category
         except Exception as e:
             logger.error(f"Error checking CredibleMeds: {str(e)}")
-            return False
+            return False, ''
 
     def _calculate_concentrations(self, 
                                 doses: List[float], 
@@ -215,14 +209,14 @@ class DrugAnalyzer:
                 herg_ic50=herg_ic50
             )
             
-            # Check CredibleMeds risk
-            is_crediblemeds_risk = self._check_crediblemeds(drug_name)
-            
+            # Check CredibleMeds
+            is_risk, risk_category = self._check_crediblemeds(drug_name)
+
             # Determine if theoretical binding is likely
             theoretical_binding = (
                 any(c.ratio_theoretical and c.ratio_theoretical > 0.1 for c in concentrations) 
                 if herg_ic50 else None
-            ) or is_crediblemeds_risk
+            ) or is_risk
             
             # Format concentrations for output
             concentration_data = [
@@ -238,7 +232,8 @@ class DrugAnalyzer:
                 "herg_source": "ChEMBL Database",
                 "concentrations": concentration_data,
                 "theoretical_binding": theoretical_binding,
-                "crediblemeds_risk": is_crediblemeds_risk,
+                "crediblemeds_risk": is_risk,
+                "risk_category": risk_category,
                 "citations": [
                     "Mendez-Lucio O, et al. (2017). Computational Tools for HERG Channel Blockers Safety Assessment in Drug Discovery. Front Pharmacol.",
                     "Gintant G, et al. (2016). Evolution of strategies to improve preclinical cardiac safety testing. Nat Rev Drug Discov.",

@@ -311,6 +311,52 @@ def build_pubmed_query(drug_names: List[str]) -> str:
     logger.info(f"Searching PubMed: {query}")
     return query
 
+def search_papers(query: str, email: str, api_key: Optional[str] = None) -> List[Dict]:
+    """Search PubMed for papers matching query"""
+    try:
+        Entrez.email = email
+        if api_key:
+            Entrez.api_key = api_key
+        
+        # Search PubMed
+        handle = Entrez.esearch(db="pubmed", term=query, retmax=10)
+        record = Entrez.read(handle)
+        handle.close()
+
+        if not record['IdList']:
+            return []
+
+        # Fetch details for each paper
+        papers = []
+        for pmid in record['IdList']:
+            try:
+                handle = Entrez.efetch(db="pubmed", id=pmid, rettype="medline", retmode="text")
+                record = Medline.read(handle)
+                handle.close()
+                
+                if not isinstance(record, dict):
+                    continue
+                    
+                paper = {
+                    'pmid': pmid,
+                    'title': record.get('TI', ''),
+                    'authors': record.get('AU', []),
+                    'journal': record.get('JT', ''),
+                    'year': record.get('DP', '').split()[0] if record.get('DP') else '',
+                    'abstract': record.get('AB', '')
+                }
+                papers.append(paper)
+                
+            except Exception as e:
+                logger.error(f"Error fetching paper {pmid}: {str(e)}")
+                continue
+                
+        return papers
+        
+    except Exception as e:
+        logger.error(f"Error searching PubMed: {str(e)}")
+        return []
+
 def search_papers(drug_name: str, output_dir: Optional[str] = None) -> List[Dict]:
     """Search for papers about a drug and download PDFs.
     
@@ -343,9 +389,7 @@ def search_papers(drug_name: str, output_dir: Optional[str] = None) -> List[Dict
     
     for attempt in range(max_retries):
         try:
-            handle = Entrez.esearch(db="pubmed", term=query, retmax=100)
-            record = Entrez.read(handle)
-            handle.close()
+            papers = search_papers(query, Entrez.email, Entrez.api_key)
             break
         except Exception as e:
             if attempt == max_retries - 1:
@@ -354,23 +398,9 @@ def search_papers(drug_name: str, output_dir: Optional[str] = None) -> List[Dict
             time.sleep(retry_delay)
             retry_delay *= 2  # exponential backoff
     
-    if not record["IdList"]:
+    if not papers:
         logger.warning("No papers found")
         return []
-    
-    # Get paper details
-    for attempt in range(max_retries):
-        try:
-            handle = Entrez.efetch(db="pubmed", id=record["IdList"], rettype="medline", retmode="text")
-            papers = list(Medline.parse(handle))
-            handle.close()
-            break
-        except Exception as e:
-            if attempt == max_retries - 1:
-                logger.error(f"Failed to fetch paper details after {max_retries} attempts: {e}")
-                return []
-            time.sleep(retry_delay)
-            retry_delay *= 2
     
     # Add PDF paths
     results = []

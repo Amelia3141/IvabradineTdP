@@ -10,7 +10,6 @@ import pandas as pd
 import time
 import json
 from typing import Dict, List, Optional, Tuple
-
 from ivablib.herg_analyzer import DrugAnalyzer
 
 # Page config
@@ -129,7 +128,9 @@ if analyze_button:
                     with col2:
                         st.subheader("Risk Assessment")
                         if analysis['crediblemeds_risk']:
-                            st.error("⚠️ Known risk of TdP (CredibleMeds)")
+                            risk_text = analysis['risk_category']
+                            st.error(f"⚠️ {risk_text} (CredibleMeds)")
+                            st.markdown("[View on CredibleMeds](https://crediblemeds.org)")
                         elif analysis['theoretical_binding']:
                             st.warning("⚠️ Potential hERG binding detected")
                         else:
