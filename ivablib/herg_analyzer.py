@@ -96,40 +96,51 @@ class DrugAnalyzer:
             handle.close()
             
             if not record['IdList']:
+                logger.info(f"No articles found for {drug_name}")
                 return None, None
                 
             # Get details for each article
-            handle = Entrez.efetch(db="pubmed", id=record['IdList'], rettype="medline", retmode="xml")
-            records = Entrez.read(handle)
+            handle = Entrez.efetch(db="pubmed", id=record['IdList'], rettype="medline", retmode="text")
+            records = Medline.parse(handle)
+            records = list(records)  # Convert iterator to list
             handle.close()
             
             # Look for IC50 values in abstracts
-            for article in records['PubmedArticle']:
+            for article in records:
                 try:
-                    abstract = article['MedlineCitation']['Article'].get('Abstract', {}).get('AbstractText', [''])[0]
+                    abstract = article.get('AB', '')  # AB is the Medline field for abstract
                     if not abstract:
                         continue
                         
-                    # Look for IC50 values
-                    ic50_pattern = r'IC50\s*(?:=|:|\s+of\s+)?\s*(\d+(?:\.\d+)?)\s*(?:±\s*\d+(?:\.\d+)?)?\s*(?:n|μ|micro)?M'
-                    match = re.search(ic50_pattern, abstract, re.IGNORECASE)
+                    # Look for IC50 values with different unit formats
+                    ic50_patterns = [
+                        r'IC50\s*(?:=|:|\s+of\s+)?\s*(\d+(?:\.\d+)?)\s*(?:±\s*\d+(?:\.\d+)?)?\s*(?:n|μ|micro)?M',
+                        r'IC50\s+value\s*(?:of|was|is)?\s*(\d+(?:\.\d+)?)\s*(?:±\s*\d+(?:\.\d+)?)?\s*(?:n|μ|micro)?M',
+                        r'hERG.*?(\d+(?:\.\d+)?)\s*(?:±\s*\d+(?:\.\d+)?)?\s*(?:n|μ|micro)?M.*?IC50',
+                        r'IC50.*?(\d+(?:\.\d+)?)\s*(?:±\s*\d+(?:\.\d+)?)?\s*(?:n|μ|micro)?M.*?hERG'
+                    ]
                     
-                    if match:
-                        ic50_value = float(match.group(1))
-                        # Get citation
-                        authors = article['MedlineCitation']['Article']['AuthorList']
-                        first_author = f"{authors[0].get('LastName', '')} {authors[0].get('ForeName', '')}"
-                        year = article['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate'].get('Year', '')
-                        title = article['MedlineCitation']['Article']['ArticleTitle']
-                        journal = article['MedlineCitation']['Article']['Journal']['Title']
-                        
-                        citation = f"{first_author} et al. ({year}). {title}. {journal}"
-                        return ic50_value, citation
-                        
+                    for pattern in ic50_patterns:
+                        match = re.search(pattern, abstract, re.IGNORECASE)
+                        if match:
+                            ic50_value = float(match.group(1))
+                            
+                            # Get citation
+                            authors = article.get('AU', [])
+                            first_author = authors[0] if authors else "Unknown"
+                            year = article.get('DP', '').split()[0] if article.get('DP') else ''
+                            title = article.get('TI', 'Unknown Title')
+                            journal = article.get('JT', 'Unknown Journal')
+                            
+                            citation = f"{first_author} et al. ({year}). {title}. {journal}"
+                            logger.info(f"Found hERG IC50 value: {ic50_value} μM")
+                            return ic50_value, citation
+                            
                 except Exception as e:
                     logger.error(f"Error processing article: {str(e)}")
                     continue
-                    
+            
+            logger.info(f"No hERG IC50 values found in literature for {drug_name}")
             return None, None
             
         except Exception as e:

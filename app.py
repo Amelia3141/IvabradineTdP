@@ -387,40 +387,44 @@ if "hERG Channel Activity" in analysis_sections:
             st.markdown("<div class='herg-data'>", unsafe_allow_html=True)
             
             if analysis["herg_ic50"] != "N/A":
-                st.markdown(f"**hERG IC50:** {analysis['herg_ic50']} μM")
-                if analysis["herg_source"] != "N/A":
-                    st.markdown(f"**Source:** {analysis['herg_source']}")
+                st.markdown(f"""
+                **hERG IC50:** {analysis['herg_ic50']} μM
+                **Source:** {analysis['herg_source']}
+                """)
             else:
                 st.warning("No hERG IC50 data found in literature.")
             
             st.markdown("</div>", unsafe_allow_html=True)
             
-            # Display concentration analysis
-            st.subheader("hERG Binding Analysis")
-            st.markdown("<div class='concentration-data'>", unsafe_allow_html=True)
-            
-            if analysis["concentrations"]:
-                for conc in analysis["concentrations"]:
-                    st.markdown(f"""
-                    **For {conc['dose']} mg dose:**
-                    - Theoretical Maximum Concentration: {conc['theoretical_max']} μM
-                    - Estimated Plasma Concentration: {conc['plasma_concentration']} μM
-                    - Theoretical Safety Ratio: {conc['ratio_theoretical']}
-                    - Plasma Safety Ratio: {conc['ratio_plasma']}
-                    """)
+            # Display concentration analysis if we have molecular weight
+            if analysis["molecular_weight"] != "N/A":
+                st.subheader("hERG Binding Analysis")
+                st.markdown("<div class='concentration-data'>", unsafe_allow_html=True)
                 
-                if analysis["theoretical_binding"]:
-                    st.warning("⚠️ Potential hERG channel binding detected at therapeutic concentrations")
-                else:
-                    st.success("✅ No significant hERG channel binding predicted at therapeutic concentrations")
-            
-            # Display citations
-            if analysis.get("citations"):
-                st.markdown("### References")
-                for citation in analysis["citations"]:
-                    st.markdown(f"- {citation}")
-            
-            st.markdown("</div>", unsafe_allow_html=True)
+                if analysis["concentrations"]:
+                    for conc in analysis["concentrations"]:
+                        st.markdown(f"""
+                        **For {conc['dose']} mg dose:**
+                        - Theoretical Maximum Concentration: {conc['theoretical_max']} μM
+                        - Estimated Plasma Concentration: {conc['plasma_concentration']} μM
+                        - Theoretical Safety Ratio: {conc['ratio_theoretical']}
+                        - Plasma Safety Ratio: {conc['ratio_plasma']}
+                        """)
+                    
+                    if analysis["theoretical_binding"]:
+                        st.warning("⚠️ Potential hERG channel binding detected at therapeutic concentrations")
+                    else:
+                        st.success("✅ No significant hERG channel binding predicted at therapeutic concentrations")
+                
+                # Display citations
+                if analysis.get("citations"):
+                    st.markdown("### References")
+                    for citation in analysis["citations"]:
+                        st.markdown(f"- {citation}")
+                
+                st.markdown("</div>", unsafe_allow_html=True)
+            else:
+                st.info("Could not calculate concentrations: molecular weight not available.")
             
     except Exception as e:
         st.error(f"Error analyzing hERG activity: {str(e)}")
