@@ -6,6 +6,8 @@ import streamlit as st
 import plotly.graph_objects as go
 import requests
 from Bio import Entrez, Medline
+import re
+import pandas as pd
 
 # Add the project root directory to Python path
 project_root = os.path.dirname(os.path.abspath(__file__))
@@ -16,8 +18,20 @@ from ivablib.herg_analyzer import DrugAnalyzer
 from ivablib.case_report_analyzer import CaseReportAnalyzer
 
 # Set NCBI credentials
-Entrez.email = "amelia.glasauer@gmail.com"
-Entrez.api_key = "8b23b0c60e6b8c8a40f2867c88a9d43c5f09"
+if 'NCBI_EMAIL' not in st.secrets or 'NCBI_API_KEY' not in st.secrets:
+    st.error("""
+    ⚠️ NCBI credentials not found in secrets.
+    
+    Please add your NCBI credentials to `.streamlit/secrets.toml`:
+    ```toml
+    NCBI_EMAIL = "your.email@example.com"
+    NCBI_API_KEY = "your-api-key"
+    ```
+    """)
+    st.stop()
+
+Entrez.email = st.secrets["NCBI_EMAIL"]
+Entrez.api_key = st.secrets["NCBI_API_KEY"]
 
 # Page config
 st.set_page_config(
