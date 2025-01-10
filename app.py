@@ -3,10 +3,12 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 import os
-from ivablib.herg_analyzer import DrugAnalyzer
 import requests
 from Bio import Entrez, Medline
 import re
+from typing import Dict
+from ivablib.herg_analyzer import DrugAnalyzer
+from ivablib.case_report_analyzer import CaseReportAnalyzer
 
 # Page config
 st.set_page_config(
@@ -27,20 +29,16 @@ st.markdown("""
     <style>
     .stMarkdown, .stText, p, h1, h2, h3, h4 {
         color: white !important;
-        font-weight: 500;
     }
-    .stMarkdown div {
-        background-color: rgba(255, 255, 255, 0.1);
-        padding: 10px;
-        border-radius: 5px;
-        margin: 5px 0;
-    }
-    th {
+    .stDataFrame {
         color: white !important;
+    }
+    .stDataFrame td, .stDataFrame th {
+        color: white !important;
+        background-color: rgba(255, 255, 255, 0.1) !important;
+    }
+    .stDataFrame th {
         font-weight: bold !important;
-    }
-    td {
-        color: white !important;
     }
     .risk-info {
         background-color: rgba(255, 255, 255, 0.1);
@@ -59,6 +57,12 @@ st.markdown("""
         padding: 15px;
         border-radius: 8px;
         margin: 5px 0;
+    }
+    .literature-data {
+        background-color: rgba(255, 255, 255, 0.1);
+        padding: 15px;
+        border-radius: 8px;
+        margin: 10px 0;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -92,6 +96,50 @@ def check_drug_risk(drug_name):
     }
     return risk_categories.get(drug_name, "Not Found in Database")
 
+def extract_clinical_data(text: str) -> Dict:
+    """Extract clinical data from text using regex patterns."""
+    data = {}
+    
+    # Age extraction
+    age_pattern = r'(\d+)[\s-]*(year|yr|y)[s\s-]*old'
+    age_match = re.search(age_pattern, text.lower())
+    data['Age'] = age_match.group(1) if age_match else None
+    
+    # Sex extraction
+    sex_pattern = r'\b(male|female)\b'
+    sex_match = re.search(sex_pattern, text.lower())
+    data['Sex'] = sex_match.group(1).capitalize() if sex_match else None
+    
+    # Dose extraction
+    dose_pattern = r'(\d+(?:\.\d+)?)\s*mg'
+    dose_match = re.search(dose_pattern, text.lower())
+    data['Oral Dose (mg)'] = dose_match.group(1) if dose_match else None
+    
+    # QT interval extraction
+    qt_pattern = r'QT(?:c)?\s*(?:interval)?\s*(?:of|was|is|=)?\s*(\d+)(?:\s*±\s*\d+)?\s*(?:ms|msec)'
+    qt_match = re.search(qt_pattern, text.lower())
+    data['Uncorrected QT (ms)'] = qt_match.group(1) if qt_match else None
+    
+    # QTc extraction
+    qtc_pattern = r'QTc\s*(?:interval)?\s*(?:of|was|is|=)?\s*(\d+)(?:\s*±\s*\d+)?\s*(?:ms|msec)'
+    qtc_match = re.search(qtc_pattern, text.lower())
+    data['QTc'] = qtc_match.group(1) if qtc_match else None
+    
+    # Heart rate extraction
+    hr_pattern = r'(?:heart rate|hr|pulse)\s*(?:of|was|is|=)?\s*(\d+)(?:\s*±\s*\d+)?\s*(?:bpm|beats per minute)'
+    hr_match = re.search(hr_pattern, text.lower())
+    data['Heart Rate (bpm)'] = hr_match.group(1) if hr_match else None
+    
+    # Blood pressure extraction
+    bp_pattern = r'(?:blood pressure|bp)\s*(?:of|was|is|=)?\s*(\d+/\d+)(?:\s*±\s*\d+)?\s*(?:mmHg)'
+    bp_match = re.search(bp_pattern, text.lower())
+    data['Blood Pressure (mmHg)'] = bp_match.group(1) if bp_match else None
+    
+    # TdP presence
+    data['Torsades de Pointes?'] = 'Yes' if re.search(r'\b(?:torsade|tdp)\b', text.lower()) else 'No'
+    
+    return data
+
 def search_pubmed_literature(drug_name: str) -> pd.DataFrame:
     """Search PubMed for TdP-related articles."""
     query = f"{drug_name} AND (Torsades de Pointes[Title/Abstract] OR TdP[Title/Abstract] OR QT prolongation[Title/Abstract])"
@@ -110,46 +158,74 @@ def search_pubmed_literature(drug_name: str) -> pd.DataFrame:
         records = Entrez.read(handle)
         handle.close()
         
-        # Extract relevant information with the desired columns
-        articles = []
+        # Extract relevant information
+        papers = []
         for article in records['PubmedArticle']:
             medline = article['MedlineCitation']
             article_data = medline['Article']
             
-            # Extract age and sex from abstract if available
-            abstract = article_data.get('Abstract', {}).get('AbstractText', [''])[0]
-            age_match = re.search(r'(\d+)[\s-]*(year|yr|y)[s\s-]*old', abstract.lower())
-            age = age_match.group(1) if age_match else None
+            # Extract authors
+            authors = article_data.get('AuthorList', [])
+            author_names = []
+            for author in authors:
+                if isinstance(author, dict):
+                    last_name = author.get('LastName', '')
+                    fore_name = author.get('ForeName', '')
+                    author_names.append(f"{last_name} {fore_name}")
             
-            sex_match = re.search(r'\b(male|female)\b', abstract.lower())
-            sex = sex_match.group(1).capitalize() if sex_match else None
+            # Get publication date
+            pub_date = article_data['Journal']['JournalIssue']['PubDate']
+            year = pub_date.get('Year', 'N/A')
             
-            # Extract other clinical information
-            dose_match = re.search(r'(\d+(?:\.\d+)?)\s*mg', abstract.lower())
-            oral_dose = dose_match.group(1) if dose_match else None
-            
-            articles.append({
-                'Case Report Title': article_data['ArticleTitle'],
-                'Age': age,
-                'Sex': sex,
-                'Oral Dose (mg)': oral_dose,
-                'theoretical max concentration (μM)': None,  # To be calculated
-                '40% bioavailability': None,  # To be calculated
-                'Theoretical hERG IC50 / Concentration μM': None,  # To be calculated
-                '40% Plasma': None,  # To be calculated
-                'Uncorrected QT (ms)': None,  # Extract if available
-                'QTc': None,  # Extract if available
-                'QTB': None,  # Extract if available
-                'QTF': None,  # Extract if available
-                'Heart Rate (bpm)': None,  # Extract if available
-                'Torsades de Pointes?': 'Yes' if 'torsade' in abstract.lower() or 'tdp' in abstract.lower() else 'No',
-                'Blood Pressure (mmHg)': None,  # Extract if available
-                'Medical History': None,  # Extract if available
-                'Medication History': None,  # Extract if available
-                'Course of Treatment': None  # Extract if available
+            papers.append({
+                'title': article_data['ArticleTitle'],
+                'authors': ', '.join(author_names) if author_names else 'No authors listed',
+                'year': year,
+                'journal': article_data['Journal'].get('Title', 'Journal not specified'),
+                'pmid': medline['PMID'],
+                'abstract': article_data.get('Abstract', {}).get('AbstractText', [''])[0]
             })
         
-        return pd.DataFrame(articles)
+        # Initialize case report analyzer
+        analyzer = CaseReportAnalyzer()
+        
+        # Analyze papers and create DataFrame
+        df = analyzer.analyze_papers(papers, drug_name)
+        
+        # Reorder columns to match desired order
+        column_order = [
+            'title', 'age', 'sex', 'qtc', 'qt_uncorrected',
+            'heart_rate', 'blood_pressure', 'had_tdp',
+            'patient_type', 'treatment_successful', 'treatment_duration',
+            'drug_combinations', 'authors', 'year', 'journal', 'pmid'
+        ]
+        
+        # Only include columns that exist in the DataFrame
+        existing_columns = [col for col in column_order if col in df.columns]
+        df = df[existing_columns]
+        
+        # Rename columns for display
+        column_names = {
+            'title': 'Case Report Title',
+            'age': 'Age',
+            'sex': 'Sex',
+            'qtc': 'QTc (ms)',
+            'qt_uncorrected': 'Uncorrected QT (ms)',
+            'heart_rate': 'Heart Rate (bpm)',
+            'blood_pressure': 'Blood Pressure (mmHg)',
+            'had_tdp': 'Torsades de Pointes?',
+            'patient_type': 'Patient Type',
+            'treatment_successful': 'Treatment Successful',
+            'treatment_duration': 'Treatment Duration',
+            'drug_combinations': 'Drug Combinations',
+            'authors': 'Authors',
+            'year': 'Year',
+            'journal': 'Journal',
+            'pmid': 'PMID'
+        }
+        df = df.rename(columns=column_names)
+        
+        return df
         
     except Exception as e:
         st.error(f"Error searching PubMed: {str(e)}")
@@ -281,7 +357,13 @@ if "Literature Analysis" in analysis_sections:
     with st.spinner("Searching PubMed literature..."):
         df = search_pubmed_literature(drug_name)
         if not df.empty:
-            st.markdown(f"<div style='color: white;'>Found {len(df)} relevant articles:</div>", unsafe_allow_html=True)
-            st.dataframe(df, use_container_width=True)
+            st.markdown(f"<div style='color: white;'>Found {len(df)} relevant case reports:</div>", unsafe_allow_html=True)
+            st.markdown("<div class='literature-data'>", unsafe_allow_html=True)
+            st.dataframe(
+                df,
+                use_container_width=True,
+                hide_index=True,
+            )
+            st.markdown("</div>", unsafe_allow_html=True)
         else:
             st.info("No relevant literature found.")
