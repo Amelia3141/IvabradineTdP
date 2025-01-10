@@ -2,8 +2,18 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
-from ivablib.pubmed import search_pubmed_case_reports, search_pubmed_cohort_studies, search_pubmed_clinical_trials
-from ivablib.pubchem import get_herg_activity
+import os
+import logging
+import requests
+import urllib3
+from bs4 import BeautifulSoup
+from Bio import Entrez, Medline
+from typing import List, Dict, Optional
+import sys
+import time
+
+# Set email for Entrez
+Entrez.email = "your.email@example.com"
 
 # Page config
 st.set_page_config(
@@ -123,6 +133,53 @@ def create_risk_gauge(risk_category):
         margin=dict(t=25, b=25, l=25, r=25)
     )
     return fig
+
+def search_pubmed_case_reports(drug_name):
+    """Search PubMed for case reports about the drug."""
+    query = f"{drug_name} AND (case report[Title/Abstract] OR case study[Title/Abstract]) AND (QT prolongation[Title/Abstract] OR Torsades de pointes[Title/Abstract] OR TdP[Title/Abstract])"
+    handle = Entrez.esearch(db="pubmed", term=query, retmax=100)
+    record = Entrez.read(handle)
+    handle.close()
+    
+    if not record['IdList']:
+        return pd.DataFrame()
+        
+    handle = Entrez.efetch(db="pubmed", id=record['IdList'], rettype="medline", retmode="text")
+    records = Medline.parse(handle)
+    return pd.DataFrame(list(records))
+
+def search_pubmed_cohort_studies(drug_name):
+    """Search PubMed for cohort studies about the drug."""
+    query = f"{drug_name} AND (cohort study[Title/Abstract]) AND (QT prolongation[Title/Abstract] OR Torsades de pointes[Title/Abstract] OR TdP[Title/Abstract])"
+    handle = Entrez.esearch(db="pubmed", term=query, retmax=100)
+    record = Entrez.read(handle)
+    handle.close()
+    
+    if not record['IdList']:
+        return pd.DataFrame()
+        
+    handle = Entrez.efetch(db="pubmed", id=record['IdList'], rettype="medline", retmode="text")
+    records = Medline.parse(handle)
+    return pd.DataFrame(list(records))
+
+def search_pubmed_clinical_trials(drug_name):
+    """Search PubMed for clinical trials about the drug."""
+    query = f"{drug_name} AND (clinical trial[Title/Abstract]) AND (QT prolongation[Title/Abstract] OR Torsades de pointes[Title/Abstract] OR TdP[Title/Abstract])"
+    handle = Entrez.esearch(db="pubmed", term=query, retmax=100)
+    record = Entrez.read(handle)
+    handle.close()
+    
+    if not record['IdList']:
+        return pd.DataFrame()
+        
+    handle = Entrez.efetch(db="pubmed", id=record['IdList'], rettype="medline", retmode="text")
+    records = Medline.parse(handle)
+    return pd.DataFrame(list(records))
+
+def get_herg_activity(drug_name):
+    """Get hERG activity data for the drug."""
+    # Add implementation for hERG activity data retrieval
+    pass
 
 # Main content
 if "Risk Category" in analysis_sections:
