@@ -25,15 +25,40 @@ Entrez.email = NCBI_EMAIL
 # Custom CSS to ensure text visibility
 st.markdown("""
     <style>
-    .stMarkdown, .stText, p, h1, h2, h3 {
-        color: black !important;
+    .stMarkdown, .stText, p, h1, h2, h3, h4 {
+        color: white !important;
+        font-weight: 500;
+    }
+    .stMarkdown div {
+        background-color: rgba(255, 255, 255, 0.1);
+        padding: 10px;
+        border-radius: 5px;
+        margin: 5px 0;
     }
     th {
-        color: black !important;
+        color: white !important;
         font-weight: bold !important;
     }
     td {
-        color: black !important;
+        color: white !important;
+    }
+    .risk-info {
+        background-color: rgba(255, 255, 255, 0.1);
+        padding: 15px;
+        border-radius: 8px;
+        margin: 10px 0;
+    }
+    .herg-data {
+        background-color: rgba(255, 255, 255, 0.1);
+        padding: 15px;
+        border-radius: 8px;
+        margin: 10px 0;
+    }
+    .concentration-data {
+        background-color: rgba(255, 255, 255, 0.1);
+        padding: 15px;
+        border-radius: 8px;
+        margin: 5px 0;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -163,7 +188,7 @@ if "Risk Category" in analysis_sections:
     }
     
     st.markdown(f"""
-    <div style='color: black;'>
+    <div class='risk-info'>
     <p><b>Risk Category:</b> {risk_category}</p>
     <p><b>Explanation:</b> {risk_explanations.get(risk_category, "")}</p>
     </div>
@@ -179,7 +204,7 @@ if "hERG Channel Activity" in analysis_sections:
         
         # Display hERG data
         st.markdown(f"""
-        <div style='color: black;'>
+        <div class='herg-data'>
         <p><b>Molecular Weight:</b> {f"{analysis.molecular_weight:.2f}" if analysis.molecular_weight else 'Not found'} g/mol</p>
         <p><b>hERG IC50:</b> {f"{analysis.herg_ic50:.2f}" if analysis.herg_ic50 else 'Not found'} μM</p>
         <p><b>Source:</b> {analysis.herg_source if analysis.herg_source else 'Not available'}</p>
@@ -188,10 +213,10 @@ if "hERG Channel Activity" in analysis_sections:
         
         # Display concentration data
         if any(analysis.concentrations) and analysis.molecular_weight:
-            st.markdown("<div style='color: black;'><h3>Concentration Analysis</h3></div>", unsafe_allow_html=True)
+            st.markdown("<div style='color: white;'><h3>Concentration Analysis</h3></div>", unsafe_allow_html=True)
             for i, conc in enumerate(analysis.concentrations):
                 st.markdown(f"""
-                <div style='color: black;'>
+                <div class='concentration-data'>
                 <p><b>Dose {doses[i]} mg:</b></p>
                 <ul>
                     <li>Theoretical Max: {f"{conc.theoretical_max:.2f}"} μM</li>
@@ -203,9 +228,9 @@ if "hERG Channel Activity" in analysis_sections:
         
         # Display citations
         if analysis.citations:
-            st.markdown("<div style='color: black;'><h3>References</h3></div>", unsafe_allow_html=True)
+            st.markdown("<div style='color: white;'><h3>References</h3></div>", unsafe_allow_html=True)
             for citation in analysis.citations:
-                st.markdown(f"<div style='color: black;'>{citation}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='color: white;'>{citation}</div>", unsafe_allow_html=True)
             
     except Exception as e:
         st.error(f"Error analyzing hERG activity: {str(e)}")
@@ -213,7 +238,7 @@ if "hERG Channel Activity" in analysis_sections:
     
     st.markdown("### hERG Binding Analysis", unsafe_allow_html=True)
     st.markdown("""
-    <div style='color: black;'>
+    <div style='color: white;'>
     <p>The concentration analysis shows:</p>
     <ul>
         <li><b>Theoretical Max:</b> Maximum theoretical concentration based on dose and distribution volume</li>
@@ -229,7 +254,7 @@ if "Literature Analysis" in analysis_sections:
     with st.spinner("Searching PubMed literature..."):
         df = search_pubmed_literature(drug_name)
         if not df.empty:
-            st.markdown(f"<div style='color: black;'>Found {len(df)} relevant articles:</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='color: white;'>Found {len(df)} relevant articles:</div>", unsafe_allow_html=True)
             st.dataframe(df, use_container_width=True)
         else:
             st.info("No relevant literature found.")
