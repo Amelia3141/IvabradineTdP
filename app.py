@@ -3,13 +3,17 @@ Streamlit app for analyzing TdP risk of Ivabradine
 """
 
 import streamlit as st
-import plotly.graph_objects as go
-import requests
-import re
 import pandas as pd
-import time
+import plotly.graph_objects as go
+from pathlib import Path
+import sys
+import os
 import json
 import logging
+
+# Add the parent directory to Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from ivablib.herg_analyzer import DrugAnalyzer
 from ivablib.pubmed4125 import analyze_literature
 
