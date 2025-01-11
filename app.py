@@ -9,6 +9,7 @@ import json
 import logging
 from typing import Dict, List, Optional, Tuple
 from ivablib import DrugAnalyzer
+from ivablib.case_report_analyzer import CaseReportAnalyzer
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -36,6 +37,7 @@ if 'analyzer' not in st.session_state:
         email=st.secrets["NCBI_EMAIL"],
         api_key=st.secrets["NCBI_API_KEY"]
     )
+    st.session_state.case_analyzer = CaseReportAnalyzer()
 if 'drug_name' not in st.session_state:
     st.session_state.drug_name = ""
 
@@ -105,40 +107,59 @@ if analyze_button and drug_name:
                     if literature.empty:
                         st.info("No relevant literature found.")
                     else:
-                        # Show summary table first
-                        st.write("Summary of Papers:")
-                        
-                        # Create a display dataframe with all needed columns
-                        display_df = literature[['title', 'journal', 'year', 'authors']].copy()
-                        display_df.columns = ['Title', 'Journal', 'Year', 'Authors']
-                        
-                        # Truncate long titles and authors for better display
-                        display_df['Title'] = display_df['Title'].str.slice(0, 100) + '...'
-                        display_df['Authors'] = display_df['Authors'].str.slice(0, 50) + '...'
-                        
-                        # Add index starting from 1
-                        display_df.index = range(1, len(display_df) + 1)
-                        
-                        # Display with full width and column config
-                        st.dataframe(
-                            display_df,
-                            use_container_width=True,
-                            column_config={
-                                "Title": st.column_config.TextColumn(width="large"),
-                                "Journal": st.column_config.TextColumn(width="medium"),
-                                "Year": st.column_config.NumberColumn(width="small"),
-                                "Authors": st.column_config.TextColumn(width="medium")
-                            }
+                        # Process case reports
+                        case_reports = st.session_state.case_analyzer.analyze_papers(
+                            literature.to_dict('records'),
+                            drug_name
                         )
+                        
+                        if not case_reports.empty:
+                            # Show summary table first
+                            st.write("Summary of Case Reports:")
+                            
+                            # Create a display dataframe with all needed columns
+                            display_df = case_reports[['title', 'journal', 'year', 'authors', 'age', 'sex', 'qtc', 'had_tdp']].copy()
+                            display_df.columns = ['Title', 'Journal', 'Year', 'Authors', 'Age', 'Sex', 'QTc', 'TdP']
+                            
+                            # Truncate long titles and authors for better display
+                            display_df['Title'] = display_df['Title'].str.slice(0, 100) + '...'
+                            display_df['Authors'] = display_df['Authors'].str.slice(0, 50) + '...'
+                            
+                            # Add index starting from 1
+                            display_df.index = range(1, len(display_df) + 1)
+                            
+                            # Display with full width and column config
+                            st.dataframe(
+                                display_df,
+                                use_container_width=True,
+                                column_config={
+                                    "Title": st.column_config.TextColumn(width="large"),
+                                    "Journal": st.column_config.TextColumn(width="medium"),
+                                    "Year": st.column_config.NumberColumn(width="small"),
+                                    "Authors": st.column_config.TextColumn(width="medium"),
+                                    "Age": st.column_config.NumberColumn(width="small"),
+                                    "Sex": st.column_config.TextColumn(width="small"),
+                                    "QTc": st.column_config.NumberColumn(width="small"),
+                                    "TdP": st.column_config.TextColumn(width="small")
+                                }
+                            )
                         
                         # Show detailed expandable list
                         st.write("\nDetailed Paper Information:")
-                        for idx, paper in literature.iterrows():
+                        for idx, paper in case_reports.iterrows():
                             with st.expander(f"{idx+1}. {paper['title']}"):
                                 st.write(f"**Authors:** {paper['authors']}")
                                 st.write(f"**Journal:** {paper['journal']} ({paper['year']})")
-                                if paper['abstract']:
-                                    st.write(f"**Abstract:** {paper['abstract']}")
+                                if paper['age'] or paper['sex']:
+                                    st.write(f"**Patient:** {paper['age']} years old, {paper['sex']}")
+                                if paper['qtc']:
+                                    st.write(f"**QTc:** {paper['qtc']} ms")
+                                if paper['had_tdp']:
+                                    st.write(f"**TdP:** {paper['had_tdp']}")
+                                if paper['treatment_successful']:
+                                    st.write(f"**Treatment Outcome:** {paper['treatment_successful']}")
+                                if paper['drug_combinations']:
+                                    st.write(f"**Drug Combinations:** {paper['drug_combinations']}")
                                 st.write(f"[View on PubMed](https://pubmed.ncbi.nlm.nih.gov/{paper['pmid']}/)")
     except Exception as e:
         st.error(f"Error analyzing drug: {str(e)}")
