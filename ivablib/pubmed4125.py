@@ -324,6 +324,128 @@ def build_pubmed_query(drug_names: List[str]) -> str:
     logger.info(f"Searching PubMed: {query}")
     return query
 
+def _search_pubmed(query: str) -> List[Dict]:
+    """Base function to search PubMed"""
+    try:
+        # Set up retries
+        max_attempts = 3
+        for attempt in range(max_attempts):
+            try:
+                # Search PubMed
+                handle = Entrez.esearch(db="pubmed", term=query, retmax=100)
+                record = Entrez.read(handle)
+                handle.close()
+
+                if not record["IdList"]:
+                    return []
+
+                # Fetch details
+                handle = Entrez.efetch(db="pubmed", id=record["IdList"], 
+                                     rettype="medline", retmode="text")
+                records = list(Medline.parse(handle))
+                handle.close()
+
+                return records
+
+            except Exception as e:
+                if attempt == max_attempts - 1:
+                    raise
+                time.sleep(2 ** attempt)  # Exponential backoff
+                continue
+
+    except Exception as e:
+        logger.error(f"Error searching PubMed: {str(e)}")
+        return []
+
+def search_pubmed_case_reports(drug_name: str) -> pd.DataFrame:
+    """Search PubMed for case reports about the drug."""
+    try:
+        query = f'"{drug_name}"[Title/Abstract] AND "case reports"[Publication Type] AND ("torsade de pointes" OR "qt prolongation")'
+        records = _search_pubmed(query)
+        return format_pubmed_results(records)
+    except Exception as e:
+        logger.error(f"Error in case reports search: {str(e)}")
+        return pd.DataFrame(columns=["Title", "Authors", "Journal", "Year", "PMID"])
+
+def search_pubmed_cohort_studies(drug_name: str) -> pd.DataFrame:
+    """Search PubMed for cohort studies about the drug."""
+    try:
+        query = f'"{drug_name}"[Title/Abstract] AND ("cohort studies"[MeSH Terms] OR "cohort"[Title/Abstract]) AND ("torsade de pointes" OR "qt prolongation")'
+        records = _search_pubmed(query)
+        return format_pubmed_results(records)
+    except Exception as e:
+        logger.error(f"Error in cohort studies search: {str(e)}")
+        return pd.DataFrame(columns=["Title", "Authors", "Journal", "Year", "PMID"])
+
+def search_pubmed_clinical_trials(drug_name: str) -> pd.DataFrame:
+    """Search PubMed for clinical trials about the drug."""
+    try:
+        query = f'"{drug_name}"[Title/Abstract] AND "clinical trial"[Publication Type] AND ("torsade de pointes" OR "qt prolongation")'
+        records = _search_pubmed(query)
+        return format_pubmed_results(records)
+    except Exception as e:
+        logger.error(f"Error in clinical trials search: {str(e)}")
+        return pd.DataFrame(columns=["Title", "Authors", "Journal", "Year", "PMID"])
+
+def format_pubmed_results(records: List[Dict]) -> pd.DataFrame:
+    """Format PubMed results into a DataFrame."""
+    results = []
+    for record in records:
+        try:
+            # Extract authors
+            authors = record.get("AU", [])
+            author_str = ", ".join(authors) if authors else "No authors listed"
+            
+            # Get year from date
+            date = record.get("DP", "")
+            year = date.split()[0] if date else "N/A"
+            
+            results.append({
+                "Title": record.get("TI", "No title available"),
+                "Authors": author_str,
+                "Journal": record.get("JT", "Journal not specified"),
+                "Year": year,
+                "PMID": record.get("PMID", "No PMID")
+            })
+        except Exception as e:
+            logger.error(f"Error processing record: {str(e)}")
+            continue
+            
+    return pd.DataFrame(results)
+
+def analyze_literature(drug_name: str) -> Dict:
+    """Analyze literature for a drug"""
+    if not HAVE_BIOPYTHON:
+        return {
+            "error": "Biopython not installed. Please install with: pip install biopython"
+        }
+        
+    try:
+        logger.info(f"Searching literature for {drug_name}")
+        
+        # Get all related drug names
+        drug_names = get_drug_names(drug_name)
+        logger.info(f"Found {len(drug_names)} drug names for {drug_name}: {drug_names}")
+        
+        # Build search query with all drug names
+        query = build_pubmed_query(drug_names)
+        logger.info(f"Searching PubMed: {query}")
+        
+        # Search different types of studies
+        case_reports = search_pubmed_case_reports(drug_name)
+        cohort_studies = search_pubmed_cohort_studies(drug_name)
+        clinical_trials = search_pubmed_clinical_trials(drug_name)
+        
+        return {
+            "case_reports": case_reports.to_dict('records'),
+            "cohort_studies": cohort_studies.to_dict('records'),
+            "clinical_trials": clinical_trials.to_dict('records')
+        }
+        
+    except Exception as e:
+        logger.error(f"Error analyzing literature: {str(e)}")
+        return {"error": str(e)}
+
 def search_papers(query: str, email: str, api_key: Optional[str] = None) -> List[Dict]:
     """Search PubMed for papers matching query"""
     try:
@@ -456,96 +578,6 @@ def search_papers(drug_name: str, output_dir: Optional[str] = None) -> List[Dict
     logger.info(f"Found {len(results)} papers with PDFs")
     return results
 
-def analyze_literature(drug_name: str, output_dir: Optional[str] = None) -> Dict:
-    """Analyze literature for a drug, including full text analysis"""
-    if not HAVE_BIOPYTHON:
-        return {
-            "error": "Biopython not installed. Please install with: pip install biopython"
-        }
-        
-    try:
-        # Set up output directory
-        if output_dir is None:
-            output_dir = os.path.join(os.getcwd(), 'papers', drug_name.lower())
-        os.makedirs(output_dir, exist_ok=True)
-        
-        results = {
-            'case_reports': [],
-            'cohort_studies': [],
-            'clinical_trials': [],
-            'full_texts': [],
-            'summary': {
-                'total_papers': 0,
-                'papers_with_text': 0,
-                'key_findings': []
-            }
-        }
-        
-        # Search different types of papers
-        logger.info(f"Searching literature for {drug_name}")
-        case_reports_df = search_pubmed_case_reports(drug_name)
-        cohort_studies_df = search_pubmed_cohort_studies(drug_name)
-        clinical_trials_df = search_pubmed_clinical_trials(drug_name)
-        
-        # Get full papers
-        papers = search_papers(drug_name, output_dir)
-        
-        # Process full texts
-        for paper in papers:
-            try:
-                if 'pdf_path' in paper:
-                    text = extract_text_from_pdf(paper['pdf_path'])
-                    if text:
-                        paper_data = {
-                            'pmid': paper.get('PMID', ''),
-                            'title': paper.get('TI', ''),
-                            'authors': paper.get('AU', []),
-                            'year': paper.get('DP', '').split()[0] if paper.get('DP') else '',
-                            'journal': paper.get('JT', ''),
-                            'abstract': paper.get('AB', ''),
-                            'full_text': text
-                        }
-                        results['full_texts'].append(paper_data)
-                        
-                        # Look for key findings in text
-                        findings = analyze_text_for_findings(text)
-                        if findings:
-                            results['summary']['key_findings'].extend(findings)
-                            
-            except Exception as e:
-                logger.error(f"Error processing paper {paper.get('TI', '')}: {e}")
-                continue
-        
-        # Convert DataFrames to lists of dicts for JSON serialization
-        results['case_reports'] = case_reports_df.to_dict('records')
-        results['cohort_studies'] = cohort_studies_df.to_dict('records')
-        results['clinical_trials'] = clinical_trials_df.to_dict('records')
-        
-        # Update summary
-        results['summary']['total_papers'] = (
-            len(results['case_reports']) + 
-            len(results['cohort_studies']) + 
-            len(results['clinical_trials'])
-        )
-        results['summary']['papers_with_text'] = len(results['full_texts'])
-        
-        return results
-        
-    except Exception as e:
-        logger.error(f"Error analyzing literature: {e}")
-        return {
-            'error': str(e),
-            'case_reports': [],
-            'cohort_studies': [],
-            'clinical_trials': [],
-            'full_texts': [],
-            'summary': {
-                'total_papers': 0,
-                'papers_with_text': 0,
-                'key_findings': []
-            }
-        }
-
 def analyze_text_for_findings(text: str) -> List[str]:
     """Analyze text for key findings related to TdP risk"""
     findings = []
@@ -570,100 +602,6 @@ def analyze_text_for_findings(text: str) -> List[str]:
         findings.append(f"Drug concentration: {match.group(1)} {match.group(2)}")
         
     return findings
-
-def search_pubmed_case_reports(drug_name):
-    """Search PubMed for case reports about the drug."""
-    try:
-        query = f'"{drug_name}"[Title/Abstract] AND "case reports"[Publication Type] AND ("torsade de pointes" OR "qt prolongation")'
-        handle = Entrez.esearch(db="pubmed", term=query, retmax=100)
-        record = Entrez.read(handle)
-        handle.close()
-
-        if not record["IdList"]:
-            return pd.DataFrame(columns=["Title", "Authors", "Journal", "Year", "PMID"])
-
-        handle = Entrez.efetch(db="pubmed", id=record["IdList"], rettype="medline", retmode="text")
-        records = Entrez.read(handle)["PubmedArticle"]
-        handle.close()
-
-        return format_pubmed_results(records)
-    except Exception as e:
-        print(f"Error in case reports search: {e}")
-        return pd.DataFrame(columns=["Title", "Authors", "Journal", "Year", "PMID"])
-
-def search_pubmed_cohort_studies(drug_name):
-    """Search PubMed for cohort studies about the drug."""
-    try:
-        query = f'"{drug_name}"[Title/Abstract] AND ("cohort studies"[MeSH Terms] OR "cohort"[Title/Abstract]) AND ("torsade de pointes" OR "qt prolongation")'
-        handle = Entrez.esearch(db="pubmed", term=query, retmax=100)
-        record = Entrez.read(handle)
-        handle.close()
-
-        if not record["IdList"]:
-            return pd.DataFrame(columns=["Title", "Authors", "Journal", "Year", "PMID"])
-
-        handle = Entrez.efetch(db="pubmed", id=record["IdList"], rettype="medline", retmode="text")
-        records = Entrez.read(handle)["PubmedArticle"]
-        handle.close()
-
-        return format_pubmed_results(records)
-    except Exception as e:
-        print(f"Error in cohort studies search: {e}")
-        return pd.DataFrame(columns=["Title", "Authors", "Journal", "Year", "PMID"])
-
-def search_pubmed_clinical_trials(drug_name):
-    """Search PubMed for clinical trials about the drug."""
-    try:
-        query = f'"{drug_name}"[Title/Abstract] AND "clinical trial"[Publication Type] AND ("torsade de pointes" OR "qt prolongation")'
-        handle = Entrez.esearch(db="pubmed", term=query, retmax=100)
-        record = Entrez.read(handle)
-        handle.close()
-
-        if not record["IdList"]:
-            return pd.DataFrame(columns=["Title", "Authors", "Journal", "Year", "PMID"])
-
-        handle = Entrez.efetch(db="pubmed", id=record["IdList"], rettype="medline", retmode="text")
-        records = Entrez.read(handle)["PubmedArticle"]
-        handle.close()
-
-        return format_pubmed_results(records)
-    except Exception as e:
-        print(f"Error in clinical trials search: {e}")
-        return pd.DataFrame(columns=["Title", "Authors", "Journal", "Year", "PMID"])
-
-def format_pubmed_results(records):
-    """Format PubMed results into a DataFrame."""
-    results = []
-    for article in records:
-        try:
-            medline = article["MedlineCitation"]
-            article_data = medline["Article"]
-            
-            # Extract authors safely
-            authors = article_data.get("AuthorList", [])
-            author_names = []
-            for author in authors:
-                if isinstance(author, dict):
-                    last_name = author.get("LastName", "")
-                    fore_name = author.get("ForeName", "")
-                    author_names.append(f"{last_name} {fore_name}")
-            
-            # Get publication date
-            pub_date = article_data["Journal"]["JournalIssue"]["PubDate"]
-            year = pub_date.get("Year", "N/A")
-            
-            results.append({
-                "Title": article_data.get("ArticleTitle", "No title available"),
-                "Authors": ", ".join(author_names) if author_names else "No authors listed",
-                "Journal": article_data["Journal"].get("Title", "Journal not specified"),
-                "Year": year,
-                "PMID": medline.get("PMID", "No PMID")
-            })
-        except Exception as e:
-            print(f"Error processing article: {e}")
-            continue
-            
-    return pd.DataFrame(results)
 
 def main():
     if len(sys.argv) != 2:
