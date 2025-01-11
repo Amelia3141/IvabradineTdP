@@ -58,7 +58,11 @@ class DrugAnalyzer:
                 molecule_synonyms__molecule_synonym__icontains=compound_name
             ).only(['molecule_chembl_id', 'pref_name'])
             
-            logger.info(f"Starting analysis for {compound_name}")
+            logger.info(f"Starting ChEMBL search for {compound_name}")
+            
+            if not results:
+                logger.info(f"No molecules found in ChEMBL for {compound_name}")
+                return None
             
             for result in results:
                 mol_id = result['molecule_chembl_id']
@@ -220,7 +224,6 @@ class DrugAnalyzer:
             
             # Get hERG data from ChEMBL
             ic50 = self._search_chembl_herg(drug_name)
-            logger.info(f"hERG IC50: {ic50}")
             
             # Check CredibleMeds
             is_risk, risk_category = self._check_crediblemeds(drug_name)
@@ -232,11 +235,11 @@ class DrugAnalyzer:
             
             result = {
                 'drug_name': drug_name,
-                'herg_ic50': ic50,
+                'herg_ic50': ic50 if ic50 is not None else "Not found",
+                'herg_source': 'ChEMBL Database' if ic50 is not None else 'No data available',
                 'crediblemeds_risk': is_risk,
                 'risk_category': risk_category,
-                'literature': literature,
-                'source': 'ChEMBL Database' if ic50 is not None else 'Unknown'
+                'literature': literature
             }
             
             logger.info(f"Analysis result: {result}")
