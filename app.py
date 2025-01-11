@@ -99,7 +99,7 @@ if analyze_button and drug_name:
                             risk_text = analysis.get('risk_category', 'Known Risk of TdP')
                             st.error(f"⚠️ {risk_text.title()} (CredibleMeds)")
                             st.markdown("[View on CredibleMeds](https://crediblemeds.org)")
-                        elif analysis.get('herg_ic50') and analysis['herg_ic50'] < 10:
+                        elif isinstance(analysis.get('herg_ic50'), (int, float)) and analysis['herg_ic50'] < 10:
                             st.warning("⚠️ Potential Risk: hERG IC50 < 10 μM")
                         else:
                             st.info("ℹ️ No known TdP risk data available")
