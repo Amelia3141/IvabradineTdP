@@ -7,3 +7,4 @@ PyPDF2>=3.0.0
 biopython>=1.81
 urllib3>=2.0.0
 chembl_webresource_client>=0.10.0
+aiohttp>=3.8.5
