@@ -6,4 +6,3 @@ beautifulsoup4>=4.12.2
 PyPDF2>=3.0.1
 biopython>=1.81
 urllib3>=1.26.20
-difflib>=3.5
