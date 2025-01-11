@@ -532,6 +532,116 @@ def search_pubmed_clinical_trials(drug_name):
         print(f"Error in clinical trials search: {e}")
         return pd.DataFrame(columns=["Title", "Authors", "Journal", "Year", "PMID"])
 
+def analyze_literature(drug_name: str, output_dir: Optional[str] = None) -> Dict:
+    """Analyze literature for a drug, including full text analysis"""
+    try:
+        # Set up output directory
+        if output_dir is None:
+            output_dir = os.path.join(os.getcwd(), 'papers', drug_name.lower())
+        os.makedirs(output_dir, exist_ok=True)
+        
+        results = {
+            'case_reports': [],
+            'cohort_studies': [],
+            'clinical_trials': [],
+            'full_texts': [],
+            'summary': {
+                'total_papers': 0,
+                'papers_with_text': 0,
+                'key_findings': []
+            }
+        }
+        
+        # Search different types of papers
+        logger.info(f"Searching literature for {drug_name}")
+        case_reports_df = search_pubmed_case_reports(drug_name)
+        cohort_studies_df = search_pubmed_cohort_studies(drug_name)
+        clinical_trials_df = search_pubmed_clinical_trials(drug_name)
+        
+        # Get full papers
+        papers = search_papers(drug_name, output_dir)
+        
+        # Process full texts
+        for paper in papers:
+            try:
+                if 'pdf_path' in paper:
+                    text = extract_text_from_pdf(paper['pdf_path'])
+                    if text:
+                        paper_data = {
+                            'pmid': paper.get('PMID', ''),
+                            'title': paper.get('TI', ''),
+                            'authors': paper.get('AU', []),
+                            'year': paper.get('DP', '').split()[0] if paper.get('DP') else '',
+                            'journal': paper.get('JT', ''),
+                            'abstract': paper.get('AB', ''),
+                            'full_text': text
+                        }
+                        results['full_texts'].append(paper_data)
+                        
+                        # Look for key findings in text
+                        findings = analyze_text_for_findings(text)
+                        if findings:
+                            results['summary']['key_findings'].extend(findings)
+                            
+            except Exception as e:
+                logger.error(f"Error processing paper {paper.get('TI', '')}: {e}")
+                continue
+        
+        # Convert DataFrames to lists of dicts for JSON serialization
+        results['case_reports'] = case_reports_df.to_dict('records')
+        results['cohort_studies'] = cohort_studies_df.to_dict('records')
+        results['clinical_trials'] = clinical_trials_df.to_dict('records')
+        
+        # Update summary
+        results['summary']['total_papers'] = (
+            len(results['case_reports']) + 
+            len(results['cohort_studies']) + 
+            len(results['clinical_trials'])
+        )
+        results['summary']['papers_with_text'] = len(results['full_texts'])
+        
+        return results
+        
+    except Exception as e:
+        logger.error(f"Error analyzing literature: {e}")
+        return {
+            'error': str(e),
+            'case_reports': [],
+            'cohort_studies': [],
+            'clinical_trials': [],
+            'full_texts': [],
+            'summary': {
+                'total_papers': 0,
+                'papers_with_text': 0,
+                'key_findings': []
+            }
+        }
+
+def analyze_text_for_findings(text: str) -> List[str]:
+    """Analyze text for key findings related to TdP risk"""
+    findings = []
+    
+    # Look for mentions of QT intervals
+    qt_pattern = r'QTc?\s*(?:interval)?\s*(?:was|increased|prolonged|of)\s*(\d+(?:\.\d+)?)\s*(?:ms|msec)'
+    qt_matches = re.finditer(qt_pattern, text, re.IGNORECASE)
+    for match in qt_matches:
+        qt_value = float(match.group(1))
+        if qt_value > 440:  # Clinically significant threshold
+            findings.append(f"QTc prolongation found: {qt_value} ms")
+            
+    # Look for TdP events
+    tdp_pattern = r'(?:torsade\s+de\s+pointes|TdP|torsades)\s+(?:was|were|occurred|developed|observed)'
+    if re.search(tdp_pattern, text, re.IGNORECASE):
+        findings.append("TdP event reported")
+        
+    # Look for drug concentrations
+    conc_pattern = r'(?:concentration|level)\s*(?:of|was|were)\s*(\d+(?:\.\d+)?)\s*(ng/ml|µg/ml|mg/l)'
+    conc_matches = re.finditer(conc_pattern, text, re.IGNORECASE)
+    for match in conc_matches:
+        findings.append(f"Drug concentration: {match.group(1)} {match.group(2)}")
+        
+    return findings
+
 def main():
     if len(sys.argv) != 2:
         print("Usage: python pubmed4125.py <drug_name>")

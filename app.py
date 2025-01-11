@@ -3,13 +3,15 @@ Streamlit app for analyzing TdP risk of Ivabradine
 """
 
 import streamlit as st
-import pandas as pd
 import plotly.graph_objects as go
+import requests
+import re
+import pandas as pd
+import time
 import json
 import logging
 from typing import Dict, List, Optional, Tuple
-from ivablib import DrugAnalyzer
-from ivablib.case_report_analyzer import CaseReportAnalyzer
+from ivablib.herg_analyzer import DrugAnalyzer
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -37,29 +39,78 @@ if 'analyzer' not in st.session_state:
         email=st.secrets["NCBI_EMAIL"],
         api_key=st.secrets["NCBI_API_KEY"]
     )
-    
-if 'case_analyzer' not in st.session_state:
-    st.session_state.case_analyzer = CaseReportAnalyzer()
-    
 if 'drug_name' not in st.session_state:
-    st.session_state.drug_name = ""
+    st.session_state.drug_name = "ivabradine"
+if 'dose' not in st.session_state:
+    st.session_state.dose = 5.0  # Default dose in mg
 
 # Sidebar inputs
 with st.sidebar:
     st.header("Analysis Parameters")
     
     # Drug selection
-    col1, col2 = st.columns([2,1])
-    with col1:
-        drug_name = st.text_input("Enter drug name:", value="", key="drug_input")
-        analyze_button = st.button("Analyze")
+    drug_name = st.text_input("Drug Name", value=st.session_state.drug_name)
+    
+    # Single dose input
+    dose = st.number_input("Dose (mg)", 
+                          value=st.session_state.dose,
+                          min_value=0.0,
+                          max_value=1000.0,
+                          step=0.5)
+    
+    # Update session state
+    st.session_state.drug_name = drug_name
+    st.session_state.dose = dose
+    
+    analyze_button = st.button("Analyze")
+
+def search_literature(drug_name: str) -> pd.DataFrame:
+    """Search PubChem literature for drug information"""
+    try:
+        url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{drug_name}/xrefs/PubMedID/JSON"
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+        
+        if 'InformationList' in data and 'Information' in data['InformationList']:
+            pmids = data['InformationList']['Information'][0].get('PubMedID', [])
+            
+            # Get details for each PubMed ID
+            papers = []
+            for pmid in pmids[:10]:  # Limit to first 10 papers
+                try:
+                    url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id={pmid}&retmode=json"
+                    response = requests.get(url)
+                    response.raise_for_status()
+                    paper_data = response.json()
+                    
+                    if 'result' in paper_data and str(pmid) in paper_data['result']:
+                        paper = paper_data['result'][str(pmid)]
+                        papers.append({
+                            'Title': paper.get('title', ''),
+                            'Authors': ', '.join(paper.get('authors', [])),
+                            'Journal': paper.get('source', ''),
+                            'Year': paper.get('pubdate', '').split()[0],
+                            'PMID': pmid
+                        })
+                    
+                    time.sleep(0.1)  # Rate limiting
+                    
+                except Exception as e:
+                    st.warning(f"Error fetching paper {pmid}: {str(e)}")
+                    continue
+            
+            return pd.DataFrame(papers)
+    except Exception as e:
+        st.error(f"Error searching literature: {str(e)}")
+        return pd.DataFrame()
 
 # Main content
-if analyze_button and drug_name:
+if analyze_button:
     try:
         with st.spinner("Analyzing drug..."):
             logger.info(f"Starting analysis for {drug_name}")
-            analysis = st.session_state.analyzer.analyze_drug(drug_name)
+            analysis = st.session_state.analyzer.analyze_drug(drug_name, [dose])
             logger.info(f"Analysis complete: {analysis}")
 
             if "error" in analysis:
@@ -73,189 +124,141 @@ if analyze_button and drug_name:
                     
                     with col1:
                         st.subheader("Drug Information")
-                        
-                        # Display hERG Analysis
-                        st.markdown("### hERG Analysis")
-                        herg_ic50 = analysis.get('herg_ic50')
-                        if isinstance(herg_ic50, (int, float)):
-                            st.metric("hERG IC50", f"{herg_ic50:.2f} μM")
-                            
-                            # Display risk ratio if available
-                            risk_ratio = analysis.get('risk_ratio')
-                            if risk_ratio:
-                                st.metric("hERG IC50/Concentration Ratio", f"{risk_ratio:.2f}")
-                                
-                                # Risk assessment based on ratio
-                                if risk_ratio < 1:
-                                    st.error("⚠️ High TdP Risk: Drug concentration exceeds hERG IC50")
-                                elif risk_ratio == 1:
-                                    st.warning("⚡ Moderate TdP Risk: Drug concentration equals hERG IC50")
-                                else:
-                                    st.success("✅ Low TdP Risk: Drug concentration below hERG IC50")
-                        else:
-                            st.metric("hERG IC50", "Not found")
-                        
-                        st.caption(f"Source: {analysis.get('herg_source', 'No data available')}")
-                        
+                        st.write(f"**PubChem CID:** {analysis.get('cid', 'Not found')}")
+                        st.write(f"**Molecular Weight:** {analysis.get('molecular_weight', 'Not found')} g/mol")
+                        st.write(f"**hERG IC50:** {analysis.get('herg_ic50', 'None')} μM")
+                        st.write(f"**Source:** {analysis.get('source', 'Unknown')}")
+                    
                     with col2:
                         st.subheader("Risk Assessment")
-                        
-                        # CredibleMeds Risk Assessment
                         if analysis.get('crediblemeds_risk'):
-                            risk_text = analysis.get('risk_category', 'Known Risk of TdP')
-                            if 'Known' in risk_text:
-                                st.error(f"⚠️ {risk_text}")
-                            elif 'Possible' in risk_text:
-                                st.warning(f"⚡ {risk_text}")
-                            elif 'Conditional' in risk_text:
-                                st.warning(f"⚡ {risk_text}")
-                            elif 'Special' in risk_text:
-                                st.info(f"ℹ️ {risk_text}")
+                            risk_text = analysis.get('risk_category', 'Known Risk')
+                            st.error(f"⚠️ {risk_text} (CredibleMeds)")
                             st.markdown("[View on CredibleMeds](https://crediblemeds.org)")
+                        elif analysis.get('theoretical_binding'):
+                            st.warning("⚠️ Potential hERG binding detected")
                         else:
-                            st.info("ℹ️ Not listed in CredibleMeds")
+                            st.success("✅ No significant hERG binding predicted")
                     
-                    # Literature Review Section
-                    if 'literature' in analysis and not analysis['literature'].empty:
-                        st.markdown("### Literature Review")
-                        
-                        try:
-                            papers = analysis['literature'].to_dict('records')
-                            
-                            # Initialize case report analyzer
-                            if 'case_analyzer' not in st.session_state:
-                                st.session_state.case_analyzer = CaseReportAnalyzer()
-                            
-                            # Process each paper
-                            case_reports = []
-                            for paper in papers:
-                                report = st.session_state.case_analyzer.analyze_paper(paper)
-                                if report:
-                                    case_reports.append(report)
-                            
-                            if case_reports:
-                                # Display summary statistics
-                                st.markdown("#### Summary")
-                                col1, col2, col3 = st.columns(3)
-                                
-                                with col1:
-                                    qtc_values = [r['qtc'] for r in case_reports if r.get('qtc')]
-                                    if qtc_values:
-                                        avg_qtc = sum(qtc_values) / len(qtc_values)
-                                        st.metric("Average QTc", f"{avg_qtc:.0f} ms")
-                                
-                                with col2:
-                                    hr_values = [r['heart_rate'] for r in case_reports if r.get('heart_rate')]
-                                    if hr_values:
-                                        avg_hr = sum(hr_values) / len(hr_values)
-                                        st.metric("Average Heart Rate", f"{avg_hr:.0f} bpm")
-                                
-                                with col3:
-                                    tdp_cases = sum(1 for r in case_reports if r.get('tdp_status') == 'Positive')
-                                    st.metric("TdP Cases", tdp_cases)
-                                
-                                # Display case reports table
-                                st.markdown("#### Case Reports")
-                                df = pd.DataFrame(case_reports)
-                                if not df.empty:
-                                    st.dataframe(df[['pmid', 'age', 'sex', 'qtc', 'heart_rate', 'tdp_status']])
-                                    
-                                    # Show details for each case
-                                    st.markdown("#### Detailed Reports")
-                                    for report in case_reports:
-                                        with st.expander(f"Case Report (PMID: {report['pmid']})"):
-                                            cols = st.columns(3)
-                                            with cols[0]:
-                                                if report.get('age'):
-                                                    st.metric("Age", f"{report['age']} years")
-                                                if report.get('sex'):
-                                                    st.metric("Sex", report['sex'])
-                                            with cols[1]:
-                                                if report.get('qtc'):
-                                                    st.metric("QTc", f"{report['qtc']} ms")
-                                                if report.get('heart_rate'):
-                                                    st.metric("Heart Rate", f"{report['heart_rate']} bpm")
-                                            with cols[2]:
-                                                if report.get('tdp_status') == 'Positive':
-                                                    st.error("⚠️ TdP: Positive")
-                                                elif report.get('tdp_status') == 'Negative':
-                                                    st.success("✅ TdP: Negative")
-                            else:
-                                st.info("No detailed case reports found in the literature.")
-                        except Exception as e:
-                            st.error(f"Error analyzing case reports: {str(e)}")
+                    # Concentration analysis
+                    st.subheader("Concentration Analysis")
+                    
+                    # Convert concentrations to DataFrame
+                    df = pd.DataFrame(analysis['concentrations'])
+                    df.columns = [
+                        'Dose (mg)',
+                        'Theoretical Max (μM)',
+                        'Plasma Concentration (μM)',
+                        'Theoretical/IC50 Ratio',
+                        'Plasma/IC50 Ratio'
+                    ]
+                    
+                    # Format numbers
+                    for col in df.columns[1:]:
+                        df[col] = df[col].apply(lambda x: f"{x:.2f}" if pd.notnull(x) else "N/A")
+                    
+                    st.dataframe(df)
+                    
+                    # Visualization
+                    st.subheader("Concentration vs IC50 Visualization")
+                    
+                    # Create traces for theoretical and plasma concentrations
+                    fig = go.Figure()
+                    
+                    # Add IC50 line if available
+                    if analysis['herg_ic50']:
+                        fig.add_hline(y=analysis['herg_ic50'], 
+                                    line_dash="dash", 
+                                    line_color="red",
+                                    annotation_text="hERG IC50")
+                    
+                    # Add concentration points
+                    fig.add_trace(go.Scatter(
+                        x=[dose],
+                        y=[float(df['Theoretical Max (μM)'].iloc[0]) if df['Theoretical Max (μM)'].iloc[0] != "N/A" else None],
+                        name="Theoretical Max",
+                        mode="markers",
+                        marker=dict(color='blue', size=10)
+                    ))
+                    
+                    fig.add_trace(go.Scatter(
+                        x=[dose],
+                        y=[float(df['Plasma Concentration (μM)'].iloc[0]) if df['Plasma Concentration (μM)'].iloc[0] != "N/A" else None],
+                        name="Plasma Concentration",
+                        mode="markers",
+                        marker=dict(color='green', size=10)
+                    ))
+                    
+                    fig.update_layout(
+                        title="Drug Concentrations vs hERG IC50",
+                        xaxis_title="Dose (mg)",
+                        yaxis_title="Concentration (μM)",
+                        showlegend=True
+                    )
+                    
+                    st.plotly_chart(fig)
+                    
+                    # Citations
+                    st.subheader("References")
+                    for citation in analysis['citations']:
+                        st.markdown(f"- {citation}")
                 
                 with tab2:
                     st.subheader("Literature Review")
-                    literature = analysis.get('literature', pd.DataFrame())
-                    if literature.empty:
-                        st.info("No relevant literature found.")
+                    literature = analysis.get('literature', {})
+                    
+                    if 'error' in literature:
+                        st.error(f"Error analyzing literature: {literature['error']}")
                     else:
-                        # Convert literature DataFrame to list of dicts with all fields
-                        literature_records = literature.to_dict('records')
+                        # Show summary
+                        summary = literature.get('summary', {})
+                        st.write(f"Found {summary.get('total_papers', 0)} papers ({summary.get('papers_with_text', 0)} with full text)")
                         
-                        # Process case reports
-                        try:
-                            case_reports = st.session_state.case_analyzer.analyze_papers(
-                                literature_records,
-                                drug_name
-                            )
-                            
-                            if not case_reports.empty:
-                                # Show summary table first
-                                st.write("Summary of Case Reports:")
-                                
-                                # Create a display dataframe with all needed columns
-                                display_df = case_reports[['title', 'journal', 'year', 'authors', 'age', 'sex', 'qtc', 'had_tdp']].copy()
-                                display_df.columns = ['Title', 'Journal', 'Year', 'Authors', 'Age', 'Sex', 'QTc', 'TdP']
-                                
-                                # Truncate long titles and authors for better display
-                                display_df['Title'] = display_df['Title'].str.slice(0, 100) + '...'
-                                display_df['Authors'] = display_df['Authors'].str.slice(0, 50) + '...'
-                                
-                                # Add index starting from 1
-                                display_df.index = range(1, len(display_df) + 1)
-                                
-                                # Display with full width and column config
-                                st.dataframe(
-                                    display_df,
-                                    use_container_width=True,
-                                    column_config={
-                                        "Title": st.column_config.TextColumn(width="large"),
-                                        "Journal": st.column_config.TextColumn(width="medium"),
-                                        "Year": st.column_config.NumberColumn(width="small"),
-                                        "Authors": st.column_config.TextColumn(width="medium"),
-                                        "Age": st.column_config.NumberColumn(width="small"),
-                                        "Sex": st.column_config.TextColumn(width="small"),
-                                        "QTc": st.column_config.NumberColumn(width="small"),
-                                        "TdP": st.column_config.TextColumn(width="small")
-                                    }
-                                )
-                            
-                                # Show detailed expandable list
-                                st.write("\nDetailed Paper Information:")
-                                for idx, paper in case_reports.iterrows():
-                                    with st.expander(f"{idx+1}. {paper['title']}"):
-                                        st.write(f"**Authors:** {paper['authors']}")
-                                        st.write(f"**Journal:** {paper['journal']} ({paper['year']})")
-                                        if paper['age'] or paper['sex']:
-                                            st.write(f"**Patient:** {paper['age']} years old, {paper['sex']}")
-                                        if paper['qtc']:
-                                            st.write(f"**QTc:** {paper['qtc']} ms")
-                                        if paper['had_tdp']:
-                                            st.write(f"**TdP:** {paper['had_tdp']}")
-                                        if paper['treatment_successful']:
-                                            st.write(f"**Treatment Outcome:** {paper['treatment_successful']}")
-                                        if paper['drug_combinations']:
-                                            st.write(f"**Drug Combinations:** {paper['drug_combinations']}")
-                                        st.write(f"[View on PubMed](https://pubmed.ncbi.nlm.nih.gov/{paper['pmid']}/)")
-                            else:
-                                st.info("No case reports with patient information found.")
-                        except Exception as e:
-                            st.error(f"Error analyzing case reports: {str(e)}")
-                            st.write("Showing raw literature results instead:")
-                            # Display raw literature as fallback
-                            st.dataframe(literature[['title', 'journal', 'year', 'authors']])
+                        # Show key findings
+                        if summary.get('key_findings'):
+                            st.subheader("Key Findings")
+                            for finding in summary['key_findings']:
+                                st.write(f"- {finding}")
+                        
+                        # Show papers by type
+                        col1, col2, col3 = st.columns(3)
+                        
+                        with col1:
+                            st.subheader("Case Reports")
+                            for paper in literature.get('case_reports', []):
+                                with st.expander(paper['Title']):
+                                    st.write(f"**Authors:** {paper['Authors']}")
+                                    st.write(f"**Journal:** {paper['Journal']} ({paper['Year']})")
+                                    st.write(f"[View on PubMed](https://pubmed.ncbi.nlm.nih.gov/{paper['PMID']}/)")
+                        
+                        with col2:
+                            st.subheader("Cohort Studies")
+                            for paper in literature.get('cohort_studies', []):
+                                with st.expander(paper['Title']):
+                                    st.write(f"**Authors:** {paper['Authors']}")
+                                    st.write(f"**Journal:** {paper['Journal']} ({paper['Year']})")
+                                    st.write(f"[View on PubMed](https://pubmed.ncbi.nlm.nih.gov/{paper['PMID']}/)")
+                        
+                        with col3:
+                            st.subheader("Clinical Trials")
+                            for paper in literature.get('clinical_trials', []):
+                                with st.expander(paper['Title']):
+                                    st.write(f"**Authors:** {paper['Authors']}")
+                                    st.write(f"**Journal:** {paper['Journal']} ({paper['Year']})")
+                                    st.write(f"[View on PubMed](https://pubmed.ncbi.nlm.nih.gov/{paper['PMID']}/)")
+                        
+                        # Show full text findings
+                        if literature.get('full_texts'):
+                            st.subheader("Full Text Analysis")
+                            for paper in literature['full_texts']:
+                                with st.expander(paper['title']):
+                                    st.write(f"**Authors:** {', '.join(paper['authors'])}")
+                                    st.write(f"**Journal:** {paper['journal']} ({paper['year']})")
+                                    st.write(f"**Abstract:** {paper['abstract']}")
+                                    if paper.get('full_text'):
+                                        with st.expander("Show Full Text"):
+                                            st.text(paper['full_text'])
+                    
     except Exception as e:
         st.error(f"Error analyzing drug: {str(e)}")
 else:

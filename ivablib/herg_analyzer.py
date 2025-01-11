@@ -10,7 +10,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from chembl_webresource_client.new_client import new_client
 import statistics
-from Bio import Entrez, Medline
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -36,26 +35,7 @@ class DrugAnalyzer:
         """Initialize with NCBI credentials"""
         self.email = email
         self.api_key = api_key
-        self.drug_name_corrections = {
-            'donezepil': 'donepezil',
-            'galantamin': 'galantamine',
-            'rivastigmin': 'rivastigmine',
-            'memantine': 'memantine',
-            'ivabradin': 'ivabradine'
-        }
-        
-    def _normalize_drug_name(self, drug_name):
-        """Normalize drug name to handle common misspellings."""
-        drug_name = drug_name.lower().strip()
-        # Check for exact matches in corrections
-        if drug_name in self.drug_name_corrections:
-            return self.drug_name_corrections[drug_name]
-        # Check for partial matches (e.g., if missing 'e' at end)
-        for misspelling, correct in self.drug_name_corrections.items():
-            if drug_name.startswith(misspelling) or misspelling.startswith(drug_name):
-                return correct
-        return drug_name
-        
+    
     def _get_molecular_weight(self, cid: int) -> Optional[float]:
         """Get molecular weight from PubChem"""
         try:
@@ -69,61 +49,47 @@ class DrugAnalyzer:
             logger.error(f"Error getting molecular weight: {str(e)}")
             return None
 
-    def _search_chembl_herg(self, compound_name: str) -> Dict:
-        """Search ChEMBL for hERG IC50 values."""
+    def _search_chembl_herg(self, compound_name: str) -> Optional[float]:
+        """Search ChEMBL for hERG IC50 values"""
         try:
             molecule = new_client.molecule
-            target = new_client.target
-            activity = new_client.activity
+            activities = new_client.activity
             
-            # Get hERG target
-            herg_target = 'CHEMBL240'  # This is the ChEMBL ID for hERG
-            
-            # Search for the drug
-            results = molecule.filter(
-                molecule_synonyms__molecule_synonym__icontains=compound_name
-            ).only(['molecule_chembl_id', 'pref_name'])
-            
-            logger.info(f"Starting ChEMBL search for {compound_name}")
-            
+            # Search for the molecule
+            results = molecule.filter(molecule_synonyms__molecule_synonym__icontains=compound_name).only(['molecule_chembl_id'])
             if not results:
-                logger.info(f"No molecules found in ChEMBL for {compound_name}")
-                return {'herg_ic50': None, 'source': None}
-            
-            # Check each molecule for hERG activity
+                logger.warning(f"No ChEMBL results found for {compound_name}")
+                return None
+                
+            # Get activities for hERG
+            herg_activities = []
             for mol in results:
-                logger.info(f"Checking molecule: {mol['pref_name']} ({mol['molecule_chembl_id']})")
-                
-                # Get IC50 values for hERG
-                activities = activity.filter(
+                acts = activities.filter(
                     molecule_chembl_id=mol['molecule_chembl_id'],
-                    target_chembl_id=herg_target,
-                    standard_type__iexact='IC50'
-                ).only(['standard_value', 'standard_units', 'standard_type'])
+                    target_chembl_id='CHEMBL240'  # hERG
+                ).only(['standard_value', 'standard_units'])
                 
-                ic50_values = []
-                for act in activities:
-                    if act['standard_value'] and act['standard_units'] == 'nM':
-                        # Convert nM to μM
-                        ic50_values.append(act['standard_value'] / 1000)
-                    elif act['standard_value']:
-                        ic50_values.append(act['standard_value'])
-                
-                if ic50_values:
-                    # Use median IC50 value if multiple exist
-                    median_ic50 = statistics.median(ic50_values)
-                    return {
-                        'herg_ic50': median_ic50,
-                        'source': f"ChEMBL: {mol['pref_name']} ({mol['molecule_chembl_id']})"
-                    }
+                for act in acts:
+                    if 'standard_value' in act and 'standard_units' in act:
+                        if act['standard_units'] == 'nM':
+                            herg_activities.append(float(act['standard_value']))
+                        elif act['standard_units'] == 'uM':
+                            herg_activities.append(float(act['standard_value']) * 1000)
             
-            return {'herg_ic50': None, 'source': None}
+            if not herg_activities:
+                logger.warning(f"No hERG activity data found for {compound_name}")
+                return None
+                
+            # Return median IC50
+            median_ic50 = statistics.median(herg_activities)
+            logger.info(f"Found hERG IC50 for {compound_name}: {median_ic50} nM")
+            return median_ic50
             
         except Exception as e:
             logger.error(f"Error searching ChEMBL: {str(e)}")
-            return {'herg_ic50': None, 'source': None}
+            return None
 
-    def _check_crediblemeds(self, drug_name: str) -> tuple[bool, str]:
+    def _check_crediblemeds(self, drug_name: str) -> Tuple[bool, str]:
         """Check if drug is in CredibleMeds list of known TdP risk drugs.
         Returns (is_risk, risk_category)"""
         try:
@@ -137,19 +103,10 @@ class DrugAnalyzer:
                 for line in f:
                     if line.startswith('#') or '|' not in line:
                         continue
-                    drug, risk = [x.strip().lower() for x in line.split('|')]
-                    drug_risks[drug] = risk
+                    drug, risk = [x.strip() for x in line.split('|')]
+                    drug_risks[drug.lower()] = risk
             
-            # Try exact match first
             risk_category = drug_risks.get(drug_name.lower(), '')
-            
-            # If no exact match, try partial match
-            if not risk_category:
-                for drug in drug_risks:
-                    if drug in drug_name.lower() or drug_name.lower() in drug:
-                        risk_category = drug_risks[drug]
-                        break
-            
             logger.info(f"CredibleMeds result for {drug_name}: {risk_category}")
             return bool(risk_category), risk_category
             
@@ -190,107 +147,130 @@ class DrugAnalyzer:
         logger.info(f"Calculated concentrations: {concentrations}")
         return concentrations
 
-    def _calculate_risk_ratio(self, herg_ic50, therapeutic_concentration=None):
-        """Calculate the hERG IC50 to therapeutic concentration ratio."""
-        if not isinstance(herg_ic50, (int, float)):
-            return None
-            
-        # If no therapeutic concentration provided, use default estimates
-        if therapeutic_concentration is None:
-            # Default to 1 μM if no specific concentration available
-            therapeutic_concentration = 1.0
-            
-        if therapeutic_concentration > 0:
-            return herg_ic50 / therapeutic_concentration
-        return None
-
     def _search_literature(self, drug_name: str) -> pd.DataFrame:
-        """Search PubMed for papers about drug and hERG/QT/arrhythmia"""
+        """Search PubChem literature for drug information"""
         try:
-            # Set up Entrez
-            Entrez.email = self.email
-            if self.api_key:
-                Entrez.api_key = self.api_key
-
-            # Search PubMed
-            query = f"{drug_name} AND (hERG OR QT OR torsade OR arrhythmia)"
-            handle = Entrez.esearch(db="pubmed", term=query, retmax=10)
-            record = Entrez.read(handle)
-            handle.close()
-
-            if not record["IdList"]:
-                logger.warning("No papers found")
-                return pd.DataFrame()
-
-            # Get paper details
+            url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{drug_name}/xrefs/PubMedID/JSON"
+            response = requests.get(url)
+            response.raise_for_status()
+            data = response.json()
+            
             papers = []
-            for pmid in record["IdList"]:
-                try:
-                    time.sleep(0.5)  # Rate limit to avoid 429 errors
-                    handle = Entrez.efetch(db="pubmed", id=pmid, rettype="medline", retmode="text")
-                    record = Medline.read(handle)
-                    handle.close()
-
-                    if not isinstance(record, dict):
+            if 'InformationList' in data and 'Information' in data['InformationList']:
+                pmids = data['InformationList']['Information'][0].get('PubMedID', [])
+                
+                for pmid in pmids[:10]:  # Limit to first 10 papers
+                    try:
+                        url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id={pmid}&retmode=json"
+                        response = requests.get(url)
+                        response.raise_for_status()
+                        paper_data = response.json()
+                        
+                        if 'result' in paper_data and str(pmid) in paper_data['result']:
+                            paper = paper_data['result'][str(pmid)]
+                            papers.append({
+                                'Title': paper.get('title', ''),
+                                'Authors': ', '.join(paper.get('authors', [])),
+                                'Journal': paper.get('source', ''),
+                                'Year': paper.get('pubdate', '').split()[0],
+                                'PMID': pmid
+                            })
+                        
+                        time.sleep(0.1)  # Rate limiting
+                        
+                    except Exception as e:
+                        logger.warning(f"Error fetching paper {pmid}: {str(e)}")
                         continue
-
-                    paper = {
-                        'pmid': pmid,
-                        'title': record.get('TI', ''),
-                        'authors': ', '.join(record.get('AU', [])),  # Join authors into string
-                        'journal': record.get('JT', ''),
-                        'year': record.get('DP', '').split()[0] if record.get('DP') else '',
-                        'abstract': record.get('AB', '')
-                    }
-                    papers.append(paper)
-
-                except Exception as e:
-                    logger.warning(f"Error fetching paper {pmid}: {str(e)}")
-                    continue
-
+            
             logger.info(f"Found {len(papers)} literature results")
             return pd.DataFrame(papers)
-
         except Exception as e:
             logger.error(f"Error searching literature: {str(e)}")
             return pd.DataFrame()
 
-    def analyze_drug(self, drug_name: str) -> Dict:
-        """Analyze a drug for TdP risk"""
+    def analyze_literature(self, drug_name: str) -> Dict:
+        """Analyze literature for drug information"""
         try:
-            # Normalize drug name
-            drug_name = self._normalize_drug_name(drug_name)
+            literature = self._search_literature(drug_name)
+            logger.info(f"Literature analysis complete")
+            return literature.to_dict(orient='records')
+        except Exception as e:
+            logger.error(f"Error analyzing literature: {str(e)}")
+            return {"error": str(e)}
+
+    def analyze_drug(self, drug_name: str, doses: Optional[List[float]] = None) -> Dict:
+        """Analyze a drug for hERG interactions"""
+        try:
             logger.info(f"Starting analysis for {drug_name}")
             
-            # Get hERG data from ChEMBL
-            herg_data = self._search_chembl_herg(drug_name)
-            herg_ic50 = herg_data['herg_ic50']
+            # Get drug info from PubChem
+            url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{drug_name}/cids/JSON"
+            response = requests.get(url)
+            data = response.json()
             
-            # Calculate risk ratio if hERG IC50 is available
-            risk_ratio = None
-            if isinstance(herg_ic50, (int, float)):
-                risk_ratio = self._calculate_risk_ratio(herg_ic50)
+            if "IdentifierList" not in data:
+                return {"error": f"Drug {drug_name} not found in PubChem"}
+            
+            cid = data["IdentifierList"]["CID"][0]
+            logger.info(f"Found CID {cid} for {drug_name}")
+            molecular_weight = self._get_molecular_weight(cid)
+            
+            if not molecular_weight:
+                return {"error": "Could not get molecular weight"}
+            
+            # Get hERG IC50 from ChEMBL
+            herg_ic50 = self._search_chembl_herg(drug_name)
+            logger.info(f"hERG IC50: {herg_ic50}")
+            
+            # Calculate concentrations if doses provided
+            concentrations = []
+            if doses:
+                concentrations = self._calculate_concentrations(
+                    doses=doses,
+                    molecular_weight=molecular_weight,
+                    herg_ic50=herg_ic50
+                )
             
             # Check CredibleMeds
             is_risk, risk_category = self._check_crediblemeds(drug_name)
+            logger.info(f"CredibleMeds: {is_risk}, {risk_category}")
             
-            # Get literature
-            literature = self._search_literature(drug_name)
+            # Analyze literature
+            literature = self.analyze_literature(drug_name)
+            logger.info(f"Literature analysis complete")
             
-            # Convert None to "Not found" for display
-            display_ic50 = "Not found" if herg_ic50 is None else herg_ic50
+            # Determine if theoretical binding is likely
+            theoretical_binding = False
+            if concentrations:
+                theoretical_binding = any(c.ratio_theoretical and c.ratio_theoretical > 0.1 for c in concentrations)
             
-            return {
-                'drug_name': drug_name,
-                'herg_ic50': display_ic50,
-                'herg_source': herg_data['source'] if herg_data['source'] else 'No data available',
-                'risk_ratio': risk_ratio,
-                'crediblemeds_risk': is_risk,
-                'risk_category': risk_category,
-                'literature': literature,
-                'source': herg_data['source'] if herg_data['source'] else 'No data available'  # Keep for backwards compatibility
+            # Format concentration results
+            concentration_results = []
+            for c in concentrations:
+                concentration_results.append({
+                    "dose": c.dose,
+                    "theoretical": c.theoretical_max,
+                    "plasma": c.plasma_concentration,
+                    "ratio_theoretical": c.ratio_theoretical,
+                    "ratio_plasma": c.ratio_plasma
+                })
+            
+            result = {
+                "name": drug_name,
+                "cid": cid,
+                "molecular_weight": molecular_weight,
+                "herg_ic50": herg_ic50,
+                "source": "ChEMBL Database",
+                "crediblemeds_risk": is_risk,
+                "risk_category": risk_category,
+                "theoretical_binding": theoretical_binding,
+                "concentrations": concentration_results,
+                "literature": literature
             }
             
+            logger.info(f"Analysis result: {result}")
+            return result
+            
         except Exception as e:
-            logger.error(f"Error analyzing drug: {str(e)}")
+            logger.error(f"Error analyzing drug: {e}")
             return {"error": str(e)}
