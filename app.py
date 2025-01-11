@@ -72,37 +72,83 @@ if analyze_button and drug_name:
                     col1, col2 = st.columns(2)
                     
                     with col1:
-                        st.header("Drug Information")
+                        st.subheader("Drug Information")
                         
-                        # Display hERG IC50 with source
-                        herg_ic50 = analysis.get('herg_ic50')
-                        herg_source = analysis.get('herg_source', 'No data available')
-                        
-                        # Check if hERG IC50 is a number before formatting
-                        if isinstance(herg_ic50, (int, float)):
-                            st.metric("hERG IC50", f"{herg_ic50:.2f} μM")
-                        else:
-                            st.metric("hERG IC50", str(herg_ic50))
-                        
-                        st.caption(f"Source: {herg_source}")
+                        # Display hERG IC50
+                        st.markdown("### hERG Analysis")
+                        if isinstance(analysis.get('herg_ic50'), (int, float)):
+                            st.metric("hERG IC50", f"{analysis['herg_ic50']:.2f} μM")
                             
-                        # Add more drug information here if available
-                        if analysis.get('drug_info'):
-                            st.write("**Additional Information:**")
-                            for key, value in analysis['drug_info'].items():
-                                if key not in ['herg_ic50', 'herg_source']:
-                                    st.write(f"**{key.replace('_', ' ').title()}:** {value}")
-                    
+                            # Display risk ratio
+                            if analysis.get('risk_ratio'):
+                                st.metric("hERG IC50/Concentration Ratio", f"{analysis['risk_ratio']:.2f}")
+                                
+                                # Color-coded risk box for hERG ratio
+                                if analysis['risk_ratio'] < 1:
+                                    st.error("⚠️ High Risk: Drug concentration exceeds hERG IC50")
+                                elif analysis['risk_ratio'] == 1:
+                                    st.warning("⚡ Moderate Risk: Drug concentration equals hERG IC50")
+                                else:
+                                    st.success("✅ Low Risk: Drug concentration below hERG IC50")
+                        else:
+                            st.metric("hERG IC50", "Not found")
+                        
+                        st.caption(f"Source: {analysis.get('herg_source', 'No data available')}")
+                        
                     with col2:
                         st.subheader("Risk Assessment")
+                        
+                        # CredibleMeds Risk Display
                         if analysis.get('crediblemeds_risk'):
                             risk_text = analysis.get('risk_category', 'Known Risk of TdP')
-                            st.error(f"⚠️ {risk_text.title()} (CredibleMeds)")
+                            if 'Known' in risk_text:
+                                st.error(f"⚠️ {risk_text} (CredibleMeds)")
+                            elif 'Possible' in risk_text or 'Probable' in risk_text:
+                                st.warning(f"⚡ {risk_text} (CredibleMeds)")
+                            elif 'Conditional' in risk_text:
+                                st.warning(f"⚡ {risk_text} (CredibleMeds)")
+                            elif 'Special' in risk_text:
+                                st.info(f"ℹ️ {risk_text} (CredibleMeds)")
                             st.markdown("[View on CredibleMeds](https://crediblemeds.org)")
-                        elif isinstance(analysis.get('herg_ic50'), (int, float)) and analysis['herg_ic50'] < 10:
-                            st.warning("⚠️ Potential Risk: hERG IC50 < 10 μM")
                         else:
-                            st.info("ℹ️ No known TdP risk data available")
+                            st.info("ℹ️ No known TdP risk data in CredibleMeds")
+                            
+                    # Literature Review Section
+                    if 'literature' in analysis and not analysis['literature'].empty:
+                        st.markdown("### Literature Review")
+                        
+                        # Initialize case report analyzer if not already done
+                        if 'case_analyzer' not in st.session_state:
+                            st.session_state.case_analyzer = CaseReportAnalyzer()
+                        
+                        try:
+                            # Convert DataFrame to list of dictionaries for processing
+                            papers = analysis['literature'].to_dict('records')
+                            
+                            # Analyze case reports
+                            case_reports = st.session_state.case_analyzer.analyze_papers(papers)
+                            
+                            if case_reports:
+                                # Create a summary table
+                                summary_df = pd.DataFrame(case_reports)
+                                st.markdown("#### Case Report Summary")
+                                st.dataframe(summary_df[['age', 'sex', 'qtc', 'tdp_status', 'heart_rate']])
+                                
+                                # Show detailed reports
+                                st.markdown("#### Detailed Case Reports")
+                                for report in case_reports:
+                                    with st.expander(f"Case Report (PMID: {report.get('pmid', 'N/A')})"):
+                                        st.write(f"Age: {report.get('age', 'Not reported')}")
+                                        st.write(f"Sex: {report.get('sex', 'Not reported')}")
+                                        st.write(f"QTc: {report.get('qtc', 'Not reported')}")
+                                        st.write(f"Heart Rate: {report.get('heart_rate', 'Not reported')}")
+                                        st.write(f"TdP Status: {report.get('tdp_status', 'Not reported')}")
+                            else:
+                                st.warning("No detailed case reports found in the literature.")
+                        except Exception as e:
+                            st.error(f"Error analyzing case reports: {str(e)}")
+                            st.write("Showing raw literature results instead:")
+                            st.dataframe(analysis['literature'])
                 
                 with tab2:
                     st.subheader("Literature Review")

@@ -185,6 +185,20 @@ class DrugAnalyzer:
         logger.info(f"Calculated concentrations: {concentrations}")
         return concentrations
 
+    def _calculate_risk_ratio(self, herg_ic50, therapeutic_concentration=None):
+        """Calculate the hERG IC50 to therapeutic concentration ratio."""
+        if not isinstance(herg_ic50, (int, float)):
+            return None
+            
+        # If no therapeutic concentration provided, use default estimates
+        if therapeutic_concentration is None:
+            # Default to 1 μM if no specific concentration available
+            therapeutic_concentration = 1.0
+            
+        if therapeutic_concentration > 0:
+            return herg_ic50 / therapeutic_concentration
+        return None
+
     def _search_literature(self, drug_name: str) -> pd.DataFrame:
         """Search PubMed for papers about drug and hERG/QT/arrhythmia"""
         try:
@@ -244,31 +258,32 @@ class DrugAnalyzer:
             logger.info(f"Starting analysis for {drug_name}")
             
             # Get hERG data from ChEMBL
-            ic50 = self._search_chembl_herg(drug_name)
+            herg_ic50 = self._search_chembl_herg(drug_name)
+            
+            # Calculate risk ratio if hERG IC50 is available
+            risk_ratio = None
+            if isinstance(herg_ic50, (int, float)):
+                risk_ratio = self._calculate_risk_ratio(herg_ic50)
             
             # Check CredibleMeds
             is_risk, risk_category = self._check_crediblemeds(drug_name)
-            logger.info(f"CredibleMeds: {is_risk}, {risk_category}")
             
             # Get literature
             literature = self._search_literature(drug_name)
-            logger.info(f"Found {len(literature)} literature results")
             
             # Convert None to "Not found" for display
-            display_ic50 = "Not found" if ic50 is None else ic50
+            display_ic50 = "Not found" if herg_ic50 is None else herg_ic50
             
-            result = {
+            return {
                 'drug_name': drug_name,
                 'herg_ic50': display_ic50,
-                'herg_source': 'ChEMBL Database' if ic50 is not None else 'No data available',
+                'herg_source': 'ChEMBL Database' if herg_ic50 is not None else 'No data available',
+                'risk_ratio': risk_ratio,
                 'crediblemeds_risk': is_risk,
                 'risk_category': risk_category,
                 'literature': literature,
-                'source': 'ChEMBL Database' if ic50 is not None else 'No data available'  # Keep for backwards compatibility
+                'source': 'ChEMBL Database' if herg_ic50 is not None else 'No data available'  # Keep for backwards compatibility
             }
-            
-            logger.info(f"Analysis result: {result}")
-            return result
             
         except Exception as e:
             logger.error(f"Error analyzing drug: {str(e)}")

@@ -4,6 +4,8 @@ import re
 import logging
 import pandas as pd
 from typing import List, Dict, Any, Optional
+import os
+import PyPDF2
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -29,6 +31,71 @@ class CaseReportAnalyzer:
             'drug_combination': re.compile(r'(?:with|plus|and|combination)\s+(amiodarone|flecainide|beta.?blocker|metoprolol|propranolol|sotalol)', re.IGNORECASE)
         }
         
+    def _extract_heart_rate(self, text):
+        """Extract heart rate from text."""
+        hr_patterns = [
+            r'heart rate (?:of |was |is )?(\d+)(?:\s*(?:bpm|beats per minute))?',
+            r'HR (?:of |was |is )?(\d+)(?:\s*(?:bpm|beats per minute))?',
+            r'pulse (?:of |was |is )?(\d+)(?:\s*(?:bpm|beats per minute))?'
+        ]
+        
+        for pattern in hr_patterns:
+            match = re.search(pattern, text.lower())
+            if match:
+                try:
+                    hr = int(match.group(1))
+                    if 20 <= hr <= 300:  # Reasonable heart rate range
+                        return hr
+                except ValueError:
+                    continue
+        return None
+
+    def _extract_qtc(self, text):
+        """Extract QTc interval from text."""
+        qtc_patterns = [
+            r'qtc (?:of |was |is )?(\d+)(?:\s*(?:ms|msec|milliseconds))?',
+            r'corrected qt (?:of |was |is )?(\d+)(?:\s*(?:ms|msec|milliseconds))?',
+            r'qt interval (?:of |was |is )?(\d+)(?:\s*(?:ms|msec|milliseconds))?'
+        ]
+        
+        for pattern in qtc_patterns:
+            match = re.search(pattern, text.lower())
+            if match:
+                try:
+                    qtc = int(match.group(1))
+                    if 300 <= qtc <= 700:  # Reasonable QTc range
+                        return qtc
+                except ValueError:
+                    continue
+        return None
+
+    def _extract_tdp_status(self, text):
+        """Extract TdP status from text."""
+        tdp_indicators = {
+            'positive': [
+                'torsade', 'tdp', 'torsades de pointes',
+                'polymorphic ventricular tachycardia'
+            ],
+            'negative': [
+                'no torsade', 'without tdp', 'no evidence of tdp',
+                'no polymorphic ventricular tachycardia'
+            ]
+        }
+        
+        text = text.lower()
+        
+        # Check for explicit negatives first
+        for neg in tdp_indicators['negative']:
+            if neg in text:
+                return 'Negative'
+                
+        # Then check for positives
+        for pos in tdp_indicators['positive']:
+            if pos in text:
+                return 'Positive'
+                
+        return 'Not reported'
+
     def extract_value(self, text: str, pattern: re.Pattern) -> Optional[str]:
         """Extract a value from text using a compiled regex pattern."""
         if not text:
@@ -69,9 +136,9 @@ class CaseReportAnalyzer:
             # Extract basic information
             age = self.extract_value(text, self.patterns['age'])
             sex = self.extract_value(text, self.patterns['sex'])
-            qtc = self.extract_value(text, self.patterns['qtc'])
+            qtc = self._extract_qtc(text)
             qt = self.extract_value(text, self.patterns['qt_uncorrected'])
-            hr = self.extract_value(text, self.patterns['heart_rate'])
+            hr = self._extract_heart_rate(text)
             bp = self.extract_value(text, self.patterns['blood_pressure'])
             
             # Extract additional information
@@ -81,7 +148,7 @@ class CaseReportAnalyzer:
             drug_combinations = self.extract_all_matches(text, self.patterns['drug_combination'])
             
             # Check for TdP
-            had_tdp = bool(self.patterns['had_tdp'].search(text))
+            had_tdp = self._extract_tdp_status(text)
             
             # Clean up numeric values
             try:
@@ -119,7 +186,7 @@ class CaseReportAnalyzer:
                     'qt_uncorrected': qt,
                     'heart_rate': hr,
                     'blood_pressure': bp,
-                    'had_tdp': 'Yes' if had_tdp else 'No',
+                    'had_tdp': had_tdp,
                     'patient_type': patient_type.title() if patient_type else None,
                     'treatment_successful': 'Yes' if outcome else 'No',
                     'treatment_duration': treatment_duration,
