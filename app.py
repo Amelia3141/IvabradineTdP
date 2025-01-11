@@ -94,6 +94,14 @@ if analyze_button and drug_name:
                     if literature.empty:
                         st.info("No relevant literature found.")
                     else:
+                        # Show summary table first
+                        st.write("Summary of Papers:")
+                        display_df = literature[['title', 'journal', 'year']].copy()
+                        display_df.columns = ['Title', 'Journal', 'Year']
+                        st.dataframe(display_df, use_container_width=True)
+                        
+                        # Show detailed expandable list
+                        st.write("\nDetailed Paper Information:")
                         for _, paper in literature.iterrows():
                             with st.expander(paper['title']):
                                 st.write(f"**Authors:** {paper['authors']}")
