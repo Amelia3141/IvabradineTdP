@@ -2,37 +2,24 @@ import os
 import logging
 import pandas as pd
 import requests
-import urllib3
 from bs4 import BeautifulSoup
-try:
-    from Bio import Entrez
-    from Bio import Medline
-    HAVE_BIOPYTHON = True
-except ImportError:
-    HAVE_BIOPYTHON = False
-    logging.warning("Biopython not found. Literature analysis will be limited.")
-
+import re
+import json
+from Bio import Entrez
+import PyPDF2
+import io
+import logging
+from urllib.parse import urljoin
 from typing import List, Dict, Optional
 import sys
 import time
-import re
-from urllib.parse import quote
-try:
-    import PyPDF2
-    HAVE_PYPDF2 = True
-except ImportError:
-    HAVE_PYPDF2 = False
-    logging.warning("PyPDF2 not found. PDF analysis will be limited.")
-
 import difflib
 import csv
-import asyncio
-import aiohttp
-from functools import lru_cache
-import hashlib
+import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor
 
 # Suppress SSL warnings
-urllib3.disable_warnings()
+requests.packages.urllib3.disable_warnings()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -40,123 +27,112 @@ logger = logging.getLogger(__name__)
 
 # Set your email and API key for NCBI from environment variables
 logger.info("Setting up NCBI credentials")
-if HAVE_BIOPYTHON:
-    Entrez.email = os.environ.get('NCBI_EMAIL', 'your@email.com')
-    Entrez.api_key = os.environ.get('NCBI_API_KEY')
-    logger.info(f"Using email: {Entrez.email}")
-    logger.info("NCBI credentials set up")
+Entrez.email = os.environ.get('NCBI_EMAIL', 'your@email.com')
+Entrez.api_key = os.environ.get('NCBI_API_KEY')
+logger.info(f"Using email: {Entrez.email}")
+logger.info("NCBI credentials set up")
 
-async def get_full_text_async(pmid: str, session: aiohttp.ClientSession) -> Optional[str]:
-    """Get full text of a paper asynchronously"""
+def get_full_text(pmid, doi=None):
+    """Get full text from PMC, Crossref, or Sci-Hub in that order."""
+    text = None
+    source = None
+
+    # Try PMC first
     try:
-        # Try PMC first
-        async with session.get(f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pmc&id={pmid}&rettype=txt&retmode=text") as resp:
-            if resp.status == 200:
-                text = await resp.text()
-                if text and len(text) > 100:
-                    logger.info(f"Got {pmid} from PMC")
-                    return text
-
-        # Get DOI from PubMed
-        async with session.get(f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id={pmid}&rettype=xml&retmode=text") as resp:
-            if resp.status != 200:
-                return None
-                
-            xml = await resp.text()
-            doi_match = re.search(r'<ELocationID EIdType="doi">(.*?)</ELocationID>', xml)
-            if not doi_match:
-                return None
-                
-            doi = doi_match.group(1)
-            
-            # Try Crossref
-            async with session.get(f"https://api.crossref.org/works/{doi}") as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    if 'message' in data and 'URL' in data['message']:
-                        pdf_url = data['message']['URL']
-                        try:
-                            async with session.get(pdf_url) as pdf_resp:
-                                if pdf_resp.status == 200:
-                                    pdf_data = await pdf_resp.read()
-                                    with open('temp.pdf', 'wb') as f:
-                                        f.write(pdf_data)
-                                    text = extract_text_from_pdf('temp.pdf')
-                                    os.remove('temp.pdf')
-                                    if text:
-                                        logger.info(f"Got {pmid} from Crossref")
-                                        return text
-                        except Exception as e:
-                            logger.warning(f"Error downloading PDF from Crossref for {pmid}: {str(e)}")
-            
-            # Finally try Sci-Hub
-            text = await get_from_scihub_async(doi, session)
+        pmc_id = get_pmcid_from_pmid(pmid)
+        if pmc_id:
+            text = get_pmc_text(pmc_id)
             if text:
-                logger.info(f"Got {pmid} from Sci-Hub")
-                return text
-                
-        return None
-        
+                source = 'PMC'
+                return text, source
     except Exception as e:
-        logger.error(f"Error getting full text for {pmid}: {str(e)}")
-        return None
+        logging.error(f"Error getting PMC text for {pmid}: {e}")
 
-async def get_from_scihub_async(doi: str, session: aiohttp.ClientSession) -> Optional[str]:
-    """Get paper from Sci-Hub asynchronously"""
+    # Try Crossref next if we have a DOI
+    if doi:
+        try:
+            crossref_text = get_crossref_text(doi)
+            if crossref_text:
+                text = crossref_text
+                source = 'Crossref'
+                return text, source
+        except Exception as e:
+            logging.error(f"Error getting Crossref text for {doi}: {e}")
+
+    # Finally try Sci-Hub
     try:
-        scihub_url = f"https://sci-hub.se/{doi}"
-        async with session.get(scihub_url) as resp:
-            if resp.status != 200:
-                return None
-                
-            html = await resp.text()
-            pdf_match = re.search(r'<embed type="application/pdf" src="(.*?)"', html)
-            if not pdf_match:
-                return None
-                
-            pdf_url = pdf_match.group(1)
-            if not pdf_url.startswith('http'):
-                pdf_url = f"https:{pdf_url}"
-                
-            async with session.get(pdf_url) as pdf_resp:
-                if pdf_resp.status != 200:
-                    return None
-                    
-                pdf_data = await pdf_resp.read()
-                with open('temp.pdf', 'wb') as f:
-                    f.write(pdf_data)
-                    
-                text = extract_text_from_pdf('temp.pdf')
-                os.remove('temp.pdf')
-                return text
-                
+        scihub_text = get_scihub_text(pmid, doi)
+        if scihub_text:
+            text = scihub_text
+            source = 'Sci-Hub'
+            return text, source
     except Exception as e:
-        logger.error(f"Error getting from Sci-Hub: {str(e)}")
-        return None
+        logging.error(f"Error getting Sci-Hub text for {pmid}: {e}")
 
-async def get_texts_parallel(pmids: List[str]) -> Dict[str, str]:
-    """Get full texts for multiple PMIDs in parallel"""
-    async with aiohttp.ClientSession() as session:
-        tasks = [get_full_text_async(pmid, session) for pmid in pmids]
-        results = await asyncio.gather(*tasks)
-        return {pmid: text for pmid, text in zip(pmids, results) if text}
+    return text, source
 
-def extract_text_from_pdf(pdf_path: str) -> Optional[str]:
-    """Extract text from PDF file"""
+def get_pmcid_from_pmid(pmid):
+    """Convert PMID to PMCID using NCBI's ID converter."""
     try:
-        with open(pdf_path, 'rb') as file:
-            # Create PDF reader object
-            pdf_reader = PyPDF2.PdfReader(file)
-            
-            # Extract text from all pages
+        url = f"https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/?tool=my_tool&email=my.email@example.com&ids={pmid}&format=json"
+        response = requests.get(url)
+        data = response.json()
+        if 'records' in data and data['records']:
+            return data['records'][0].get('pmcid')
+    except Exception as e:
+        logging.error(f"Error converting PMID to PMCID: {e}")
+    return None
+
+def get_pmc_text(pmcid):
+    """Get full text from PMC."""
+    try:
+        url = f"https://www.ncbi.nlm.nih.gov/pmc/articles/{pmcid}/"
+        response = requests.get(url)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        article_text = soup.find('div', {'class': 'jig-ncbiinpagenav'})
+        if article_text:
+            return article_text.get_text()
+    except Exception as e:
+        logging.error(f"Error getting PMC text: {e}")
+    return None
+
+def get_crossref_text(doi):
+    """Get full text using DOI from Crossref."""
+    try:
+        url = f"https://api.crossref.org/works/{doi}"
+        response = requests.get(url)
+        data = response.json()
+        if 'message' in data and 'URL' in data['message']:
+            publisher_url = data['message']['URL']
+            response = requests.get(publisher_url)
+            soup = BeautifulSoup(response.text, 'html.parser')
+            article_text = soup.find('div', {'class': ['article-body', 'main-content']})
+            if article_text:
+                return article_text.get_text()
+    except Exception as e:
+        logging.error(f"Error getting Crossref text: {e}")
+    return None
+
+def get_scihub_text(pmid, doi=None):
+    """Get full text from Sci-Hub."""
+    try:
+        identifier = doi if doi else pmid
+        url = f"https://sci-hub.se/{identifier}"
+        response = requests.get(url)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        pdf_url = soup.find('iframe', {'id': 'pdf'})
+        if pdf_url:
+            pdf_url = urljoin('https://sci-hub.se/', pdf_url['src'])
+            pdf_response = requests.get(pdf_url)
+            pdf_file = io.BytesIO(pdf_response.content)
+            pdf_reader = PyPDF2.PdfReader(pdf_file)
             text = ""
             for page in pdf_reader.pages:
-                text += page.extract_text() + "\n"
-                
+                text += page.extract_text()
             return text
     except Exception as e:
-        logger.warning(f"Failed to extract text from PDF {pdf_path}: {e}")
-        return None
+        logging.error(f"Error getting Sci-Hub text: {e}")
+    return None
 
 def get_drug_names(drug_name: str) -> List[str]:
     """Get all related drug names from the drugnames.csv file"""
@@ -254,7 +230,7 @@ def _search_pubmed(query: str) -> List[Dict]:
                 # Fetch details
                 handle = Entrez.efetch(db="pubmed", id=record["IdList"], 
                                      rettype="medline", retmode="text")
-                records = list(Medline.parse(handle))
+                records = list(Entrez.parse(handle, 'medline'))
                 handle.close()
 
                 return records
@@ -295,27 +271,54 @@ def format_pubmed_results(records: List[Dict]) -> pd.DataFrame:
             
     return pd.DataFrame(results)
 
+def get_texts_parallel(pmids):
+    """Get full texts for multiple PMIDs in parallel using ThreadPoolExecutor"""
+    texts = {}
+    
+    def fetch_single_text(pmid):
+        try:
+            # Get DOI from PubMed
+            handle = Entrez.efetch(db="pubmed", id=pmid, rettype="xml", retmode="text")
+            xml = handle.read()
+            handle.close()
+            
+            doi_match = re.search(r'<ELocationID EIdType="doi">(.*?)</ELocationID>', str(xml))
+            doi = doi_match.group(1) if doi_match else None
+            
+            text, source = get_full_text(pmid, doi)
+            if text:
+                logger.info(f"Got text for {pmid} from {source}")
+                return pmid, text
+            return None
+        except Exception as e:
+            logger.error(f"Error fetching text for {pmid}: {e}")
+            return None
+
+    # Use ThreadPoolExecutor to run requests in parallel
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = [executor.submit(fetch_single_text, pmid) for pmid in pmids]
+        for future in concurrent.futures.as_completed(futures):
+            result = future.result()
+            if result:
+                pmid, text = result
+                texts[pmid] = text
+                
+    return texts
+
 def analyze_literature(drug_name: str) -> Dict:
     """Analyze literature for a drug"""
-    if not HAVE_BIOPYTHON:
-        return {
-            "error": "Biopython not installed. Please install with: pip install biopython"
-        }
-        
     try:
         logger.info(f"Searching literature for {drug_name}")
         
         # Only search for case reports
         case_reports = search_pubmed_case_reports(drug_name)
         
-        # Get full text papers and analyze them
-        papers_to_analyze = []
         if not case_reports.empty:
             # Get PMIDs
             pmids = [p for p in case_reports['PMID'].tolist() if p != 'No PMID']
             
-            # Get texts in parallel
-            texts = asyncio.run(get_texts_parallel(pmids))
+            # Get texts in parallel using ThreadPoolExecutor
+            texts = get_texts_parallel(pmids)
             
             # Create paper objects
             for _, paper in case_reports.iterrows():
