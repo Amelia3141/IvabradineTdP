@@ -69,10 +69,17 @@ class DrugAnalyzer:
             logger.error(f"Error getting molecular weight: {str(e)}")
             return None
 
-    def _search_chembl_herg(self, compound_name: str) -> Optional[float]:
+    def _search_chembl_herg(self, compound_name: str) -> Dict:
         """Search ChEMBL for hERG IC50 values."""
         try:
             molecule = new_client.molecule
+            target = new_client.target
+            activity = new_client.activity
+            
+            # Get hERG target
+            herg_target = 'CHEMBL240'  # This is the ChEMBL ID for hERG
+            
+            # Search for the drug
             results = molecule.filter(
                 molecule_synonyms__molecule_synonym__icontains=compound_name
             ).only(['molecule_chembl_id', 'pref_name'])
@@ -81,42 +88,40 @@ class DrugAnalyzer:
             
             if not results:
                 logger.info(f"No molecules found in ChEMBL for {compound_name}")
-                return None
+                return {'herg_ic50': None, 'source': None}
             
-            for result in results:
-                mol_id = result['molecule_chembl_id']
-                mol_name = result['pref_name']
-                logger.info(f"Checking molecule: {mol_name} ({mol_id})")
+            # Check each molecule for hERG activity
+            for mol in results:
+                logger.info(f"Checking molecule: {mol['pref_name']} ({mol['molecule_chembl_id']})")
                 
-                # Get hERG activity
-                activities = new_client.activity.filter(
-                    molecule_chembl_id=mol_id,
-                    target_chembl_id='CHEMBL240',  # hERG
+                # Get IC50 values for hERG
+                activities = activity.filter(
+                    molecule_chembl_id=mol['molecule_chembl_id'],
+                    target_chembl_id=herg_target,
                     standard_type__iexact='IC50'
                 ).only(['standard_value', 'standard_units', 'standard_type'])
                 
                 ic50_values = []
-                for activity in activities:
-                    if activity.get('standard_value') is not None and activity.get('standard_units') == 'nM':
-                        try:
-                            # Convert from nM to μM
-                            ic50_values.append(float(activity['standard_value']) / 1000)
-                        except (ValueError, TypeError) as e:
-                            logger.warning(f"Could not convert IC50 value: {e}")
-                            continue
+                for act in activities:
+                    if act['standard_value'] and act['standard_units'] == 'nM':
+                        # Convert nM to μM
+                        ic50_values.append(act['standard_value'] / 1000)
+                    elif act['standard_value']:
+                        ic50_values.append(act['standard_value'])
                 
                 if ic50_values:
-                    # Use median of all values
+                    # Use median IC50 value if multiple exist
                     median_ic50 = statistics.median(ic50_values)
-                    logger.info(f"Found hERG IC50: {median_ic50} μM")
-                    return median_ic50
+                    return {
+                        'herg_ic50': median_ic50,
+                        'source': f"ChEMBL: {mol['pref_name']} ({mol['molecule_chembl_id']})"
+                    }
             
-            logger.info("No hERG activity data found")
-            return None
+            return {'herg_ic50': None, 'source': None}
             
         except Exception as e:
             logger.error(f"Error searching ChEMBL: {str(e)}")
-            return None
+            return {'herg_ic50': None, 'source': None}
 
     def _check_crediblemeds(self, drug_name: str) -> tuple[bool, str]:
         """Check if drug is in CredibleMeds list of known TdP risk drugs.
@@ -258,7 +263,8 @@ class DrugAnalyzer:
             logger.info(f"Starting analysis for {drug_name}")
             
             # Get hERG data from ChEMBL
-            herg_ic50 = self._search_chembl_herg(drug_name)
+            herg_data = self._search_chembl_herg(drug_name)
+            herg_ic50 = herg_data['herg_ic50']
             
             # Calculate risk ratio if hERG IC50 is available
             risk_ratio = None
@@ -277,12 +283,12 @@ class DrugAnalyzer:
             return {
                 'drug_name': drug_name,
                 'herg_ic50': display_ic50,
-                'herg_source': 'ChEMBL Database' if herg_ic50 is not None else 'No data available',
+                'herg_source': herg_data['source'] if herg_data['source'] else 'No data available',
                 'risk_ratio': risk_ratio,
                 'crediblemeds_risk': is_risk,
                 'risk_category': risk_category,
                 'literature': literature,
-                'source': 'ChEMBL Database' if herg_ic50 is not None else 'No data available'  # Keep for backwards compatibility
+                'source': herg_data['source'] if herg_data['source'] else 'No data available'  # Keep for backwards compatibility
             }
             
         except Exception as e:

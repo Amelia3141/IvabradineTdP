@@ -74,22 +74,24 @@ if analyze_button and drug_name:
                     with col1:
                         st.subheader("Drug Information")
                         
-                        # Display hERG IC50
+                        # Display hERG Analysis
                         st.markdown("### hERG Analysis")
-                        if isinstance(analysis.get('herg_ic50'), (int, float)):
-                            st.metric("hERG IC50", f"{analysis['herg_ic50']:.2f} μM")
+                        herg_ic50 = analysis.get('herg_ic50')
+                        if isinstance(herg_ic50, (int, float)):
+                            st.metric("hERG IC50", f"{herg_ic50:.2f} μM")
                             
-                            # Display risk ratio
-                            if analysis.get('risk_ratio'):
-                                st.metric("hERG IC50/Concentration Ratio", f"{analysis['risk_ratio']:.2f}")
+                            # Display risk ratio if available
+                            risk_ratio = analysis.get('risk_ratio')
+                            if risk_ratio:
+                                st.metric("hERG IC50/Concentration Ratio", f"{risk_ratio:.2f}")
                                 
-                                # Color-coded risk box for hERG ratio
-                                if analysis['risk_ratio'] < 1:
-                                    st.error("⚠️ High Risk: Drug concentration exceeds hERG IC50")
-                                elif analysis['risk_ratio'] == 1:
-                                    st.warning("⚡ Moderate Risk: Drug concentration equals hERG IC50")
+                                # Risk assessment based on ratio
+                                if risk_ratio < 1:
+                                    st.error("⚠️ High TdP Risk: Drug concentration exceeds hERG IC50")
+                                elif risk_ratio == 1:
+                                    st.warning("⚡ Moderate TdP Risk: Drug concentration equals hERG IC50")
                                 else:
-                                    st.success("✅ Low Risk: Drug concentration below hERG IC50")
+                                    st.success("✅ Low TdP Risk: Drug concentration below hERG IC50")
                         else:
                             st.metric("hERG IC50", "Not found")
                         
@@ -98,39 +100,33 @@ if analyze_button and drug_name:
                     with col2:
                         st.subheader("Risk Assessment")
                         
-                        # CredibleMeds Risk Display
+                        # CredibleMeds Risk Assessment
                         if analysis.get('crediblemeds_risk'):
                             risk_text = analysis.get('risk_category', 'Known Risk of TdP')
                             if 'Known' in risk_text:
-                                st.error(f"⚠️ {risk_text} (CredibleMeds)")
-                            elif 'Possible' in risk_text or 'Probable' in risk_text:
-                                st.warning(f"⚡ {risk_text} (CredibleMeds)")
+                                st.error(f"⚠️ {risk_text}")
+                            elif 'Possible' in risk_text:
+                                st.warning(f"⚡ {risk_text}")
                             elif 'Conditional' in risk_text:
-                                st.warning(f"⚡ {risk_text} (CredibleMeds)")
+                                st.warning(f"⚡ {risk_text}")
                             elif 'Special' in risk_text:
-                                st.info(f"ℹ️ {risk_text} (CredibleMeds)")
+                                st.info(f"ℹ️ {risk_text}")
                             st.markdown("[View on CredibleMeds](https://crediblemeds.org)")
                         else:
-                            st.info("ℹ️ No known TdP risk data in CredibleMeds")
-                            
+                            st.info("ℹ️ Not listed in CredibleMeds")
+                    
                     # Literature Review Section
                     if 'literature' in analysis and not analysis['literature'].empty:
                         st.markdown("### Literature Review")
                         
                         try:
-                            # Convert DataFrame to list of dictionaries for processing
                             papers = analysis['literature'].to_dict('records')
                             
-                            # Display raw literature results in a table
-                            st.markdown("#### Literature Search Results")
-                            display_df = analysis['literature'][['pmid', 'title', 'journal', 'year']]
-                            st.dataframe(display_df)
-                            
-                            # Initialize case report analyzer if not already done
+                            # Initialize case report analyzer
                             if 'case_analyzer' not in st.session_state:
                                 st.session_state.case_analyzer = CaseReportAnalyzer()
                             
-                            # Analyze case reports
+                            # Process each paper
                             case_reports = []
                             for paper in papers:
                                 report = st.session_state.case_analyzer.analyze_paper(paper)
@@ -138,68 +134,56 @@ if analyze_button and drug_name:
                                     case_reports.append(report)
                             
                             if case_reports:
-                                # Create a summary table
-                                st.markdown("#### Case Report Analysis")
-                                summary_data = []
-                                for report in case_reports:
-                                    summary_data.append({
-                                        'PMID': report.get('pmid', 'N/A'),
-                                        'Age': report.get('age', 'Not reported'),
-                                        'Sex': report.get('sex', 'Not reported'),
-                                        'QTc (ms)': report.get('qtc', 'Not reported'),
-                                        'Heart Rate': report.get('heart_rate', 'Not reported'),
-                                        'TdP Status': report.get('tdp_status', 'Not reported')
-                                    })
+                                # Display summary statistics
+                                st.markdown("#### Summary")
+                                col1, col2, col3 = st.columns(3)
                                 
-                                if summary_data:
-                                    summary_df = pd.DataFrame(summary_data)
-                                    st.dataframe(summary_df)
+                                with col1:
+                                    qtc_values = [r['qtc'] for r in case_reports if r.get('qtc')]
+                                    if qtc_values:
+                                        avg_qtc = sum(qtc_values) / len(qtc_values)
+                                        st.metric("Average QTc", f"{avg_qtc:.0f} ms")
+                                
+                                with col2:
+                                    hr_values = [r['heart_rate'] for r in case_reports if r.get('heart_rate')]
+                                    if hr_values:
+                                        avg_hr = sum(hr_values) / len(hr_values)
+                                        st.metric("Average Heart Rate", f"{avg_hr:.0f} bpm")
+                                
+                                with col3:
+                                    tdp_cases = sum(1 for r in case_reports if r.get('tdp_status') == 'Positive')
+                                    st.metric("TdP Cases", tdp_cases)
+                                
+                                # Display case reports table
+                                st.markdown("#### Case Reports")
+                                df = pd.DataFrame(case_reports)
+                                if not df.empty:
+                                    st.dataframe(df[['pmid', 'age', 'sex', 'qtc', 'heart_rate', 'tdp_status']])
                                     
-                                    # Show statistics
-                                    st.markdown("#### Summary Statistics")
-                                    col1, col2, col3 = st.columns(3)
-                                    
-                                    with col1:
-                                        qtc_values = [r.get('qtc') for r in case_reports if isinstance(r.get('qtc'), (int, float))]
-                                        if qtc_values:
-                                            st.metric("Average QTc", f"{sum(qtc_values)/len(qtc_values):.0f} ms")
-                                            
-                                    with col2:
-                                        hr_values = [r.get('heart_rate') for r in case_reports if isinstance(r.get('heart_rate'), (int, float))]
-                                        if hr_values:
-                                            st.metric("Average Heart Rate", f"{sum(hr_values)/len(hr_values):.0f} bpm")
-                                            
-                                    with col3:
-                                        tdp_cases = len([r for r in case_reports if r.get('tdp_status') == 'Positive'])
-                                        if tdp_cases > 0:
-                                            st.metric("TdP Cases", tdp_cases)
-                                    
-                                    # Show detailed reports
-                                    st.markdown("#### Detailed Case Reports")
+                                    # Show details for each case
+                                    st.markdown("#### Detailed Reports")
                                     for report in case_reports:
-                                        with st.expander(f"Case Report (PMID: {report.get('pmid', 'N/A')})"):
-                                            if report.get('age'):
-                                                st.write(f"🧑 Age: {report['age']}")
-                                            if report.get('sex'):
-                                                st.write(f"⚧ Sex: {report['sex']}")
-                                            if report.get('qtc'):
-                                                st.write(f"📈 QTc: {report['qtc']} ms")
-                                            if report.get('heart_rate'):
-                                                st.write(f"💓 Heart Rate: {report['heart_rate']} bpm")
-                                            if report.get('tdp_status'):
-                                                status = report['tdp_status']
-                                                if status == 'Positive':
+                                        with st.expander(f"Case Report (PMID: {report['pmid']})"):
+                                            cols = st.columns(3)
+                                            with cols[0]:
+                                                if report.get('age'):
+                                                    st.metric("Age", f"{report['age']} years")
+                                                if report.get('sex'):
+                                                    st.metric("Sex", report['sex'])
+                                            with cols[1]:
+                                                if report.get('qtc'):
+                                                    st.metric("QTc", f"{report['qtc']} ms")
+                                                if report.get('heart_rate'):
+                                                    st.metric("Heart Rate", f"{report['heart_rate']} bpm")
+                                            with cols[2]:
+                                                if report.get('tdp_status') == 'Positive':
                                                     st.error("⚠️ TdP: Positive")
-                                                elif status == 'Negative':
+                                                elif report.get('tdp_status') == 'Negative':
                                                     st.success("✅ TdP: Negative")
-                                                else:
-                                                    st.info("ℹ️ TdP: Not reported")
                             else:
                                 st.info("No detailed case reports found in the literature.")
                         except Exception as e:
                             st.error(f"Error analyzing case reports: {str(e)}")
-                            st.write("Showing raw literature results instead:")
-                            st.dataframe(analysis['literature'])
                 
                 with tab2:
                     st.subheader("Literature Review")
