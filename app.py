@@ -73,20 +73,21 @@ if analyze_button and drug_name:
                         st.subheader("Drug Information")
                         if analysis.get('herg_ic50'):
                             st.write(f"**hERG IC50:** {analysis['herg_ic50']:.2f} μM")
+                            st.write(f"**Source:** ChEMBL Database")
                         else:
                             st.write("**hERG IC50:** Not found")
-                        st.write(f"**Source:** {analysis.get('source', 'Unknown')}")
+                            st.write("**Source:** No data available")
                     
                     with col2:
                         st.subheader("Risk Assessment")
                         if analysis.get('crediblemeds_risk'):
-                            risk_text = analysis.get('risk_category', 'Known Risk')
-                            st.error(f"⚠️ {risk_text} (CredibleMeds)")
+                            risk_text = analysis.get('risk_category', 'Known Risk of TdP')
+                            st.error(f"⚠️ {risk_text.title()} (CredibleMeds)")
                             st.markdown("[View on CredibleMeds](https://crediblemeds.org)")
-                        elif analysis.get('herg_ic50') and analysis['herg_ic50'] < 10:  # Less than 10 μM is concerning
-                            st.warning("⚠️ Potential hERG binding detected")
+                        elif analysis.get('herg_ic50') and analysis['herg_ic50'] < 10:
+                            st.warning("⚠️ Potential Risk: hERG IC50 < 10 μM")
                         else:
-                            st.success("✅ No significant hERG binding predicted")
+                            st.info("ℹ️ No known TdP risk data available")
                 
                 with tab2:
                     st.subheader("Literature Review")

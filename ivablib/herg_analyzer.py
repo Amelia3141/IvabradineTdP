@@ -51,50 +51,45 @@ class DrugAnalyzer:
             return None
 
     def _search_chembl_herg(self, compound_name: str) -> Optional[float]:
-        """Search ChEMBL for hERG IC50 values"""
+        """Search ChEMBL for hERG IC50 values."""
         try:
             molecule = new_client.molecule
-            activities = new_client.activity
-            
-            # Search for the molecule with fuzzy matching
             results = molecule.filter(
                 molecule_synonyms__molecule_synonym__icontains=compound_name
             ).only(['molecule_chembl_id', 'pref_name'])
             
-            if not results:
-                logger.warning(f"No ChEMBL results found for {compound_name}")
-                return None
+            logger.info(f"Starting analysis for {compound_name}")
+            
+            for result in results:
+                mol_id = result['molecule_chembl_id']
+                mol_name = result['pref_name']
+                logger.info(f"Checking molecule: {mol_name} ({mol_id})")
                 
-            # Get activities for hERG
-            herg_activities = []
-            for mol in results:
-                logger.info(f"Checking molecule: {mol.get('pref_name')} ({mol['molecule_chembl_id']})")
-                acts = activities.filter(
-                    molecule_chembl_id=mol['molecule_chembl_id'],
+                # Get hERG activity
+                activities = new_client.activity.filter(
+                    molecule_chembl_id=mol_id,
                     target_chembl_id='CHEMBL240',  # hERG
                     standard_type__iexact='IC50'
                 ).only(['standard_value', 'standard_units', 'standard_type'])
                 
-                for act in acts:
-                    if 'standard_value' in act and 'standard_units' in act:
-                        value = float(act['standard_value'])
-                        if act['standard_units'].lower() == 'nm':
-                            value = value / 1000  # Convert to μM
-                        elif act['standard_units'].lower() == 'um':
-                            value = value
-                        else:
+                ic50_values = []
+                for activity in activities:
+                    if activity.get('standard_value') is not None and activity.get('standard_units') == 'nM':
+                        try:
+                            # Convert from nM to μM
+                            ic50_values.append(float(activity['standard_value']) / 1000)
+                        except (ValueError, TypeError) as e:
+                            logger.warning(f"Could not convert IC50 value: {e}")
                             continue
-                        logger.info(f"Found IC50: {value} μM")
-                        herg_activities.append(value)
-            
-            if not herg_activities:
-                logger.warning(f"No hERG activity data found for {compound_name}")
-                return None
                 
-            # Return median IC50
-            median_ic50 = statistics.median(herg_activities)
-            logger.info(f"Found hERG IC50 for {compound_name}: {median_ic50} μM")
-            return median_ic50
+                if ic50_values:
+                    # Use median of all values
+                    median_ic50 = statistics.median(ic50_values)
+                    logger.info(f"Found hERG IC50: {median_ic50} μM")
+                    return median_ic50
+            
+            logger.info("No hERG activity data found")
+            return None
             
         except Exception as e:
             logger.error(f"Error searching ChEMBL: {str(e)}")
