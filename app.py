@@ -117,34 +117,85 @@ if analyze_button and drug_name:
                     if 'literature' in analysis and not analysis['literature'].empty:
                         st.markdown("### Literature Review")
                         
-                        # Initialize case report analyzer if not already done
-                        if 'case_analyzer' not in st.session_state:
-                            st.session_state.case_analyzer = CaseReportAnalyzer()
-                        
                         try:
                             # Convert DataFrame to list of dictionaries for processing
                             papers = analysis['literature'].to_dict('records')
                             
+                            # Display raw literature results in a table
+                            st.markdown("#### Literature Search Results")
+                            display_df = analysis['literature'][['pmid', 'title', 'journal', 'year']]
+                            st.dataframe(display_df)
+                            
+                            # Initialize case report analyzer if not already done
+                            if 'case_analyzer' not in st.session_state:
+                                st.session_state.case_analyzer = CaseReportAnalyzer()
+                            
                             # Analyze case reports
-                            case_reports = st.session_state.case_analyzer.analyze_papers(papers)
+                            case_reports = []
+                            for paper in papers:
+                                report = st.session_state.case_analyzer.analyze_paper(paper)
+                                if report:
+                                    case_reports.append(report)
                             
                             if case_reports:
                                 # Create a summary table
-                                summary_df = pd.DataFrame(case_reports)
-                                st.markdown("#### Case Report Summary")
-                                st.dataframe(summary_df[['age', 'sex', 'qtc', 'tdp_status', 'heart_rate']])
-                                
-                                # Show detailed reports
-                                st.markdown("#### Detailed Case Reports")
+                                st.markdown("#### Case Report Analysis")
+                                summary_data = []
                                 for report in case_reports:
-                                    with st.expander(f"Case Report (PMID: {report.get('pmid', 'N/A')})"):
-                                        st.write(f"Age: {report.get('age', 'Not reported')}")
-                                        st.write(f"Sex: {report.get('sex', 'Not reported')}")
-                                        st.write(f"QTc: {report.get('qtc', 'Not reported')}")
-                                        st.write(f"Heart Rate: {report.get('heart_rate', 'Not reported')}")
-                                        st.write(f"TdP Status: {report.get('tdp_status', 'Not reported')}")
+                                    summary_data.append({
+                                        'PMID': report.get('pmid', 'N/A'),
+                                        'Age': report.get('age', 'Not reported'),
+                                        'Sex': report.get('sex', 'Not reported'),
+                                        'QTc (ms)': report.get('qtc', 'Not reported'),
+                                        'Heart Rate': report.get('heart_rate', 'Not reported'),
+                                        'TdP Status': report.get('tdp_status', 'Not reported')
+                                    })
+                                
+                                if summary_data:
+                                    summary_df = pd.DataFrame(summary_data)
+                                    st.dataframe(summary_df)
+                                    
+                                    # Show statistics
+                                    st.markdown("#### Summary Statistics")
+                                    col1, col2, col3 = st.columns(3)
+                                    
+                                    with col1:
+                                        qtc_values = [r.get('qtc') for r in case_reports if isinstance(r.get('qtc'), (int, float))]
+                                        if qtc_values:
+                                            st.metric("Average QTc", f"{sum(qtc_values)/len(qtc_values):.0f} ms")
+                                            
+                                    with col2:
+                                        hr_values = [r.get('heart_rate') for r in case_reports if isinstance(r.get('heart_rate'), (int, float))]
+                                        if hr_values:
+                                            st.metric("Average Heart Rate", f"{sum(hr_values)/len(hr_values):.0f} bpm")
+                                            
+                                    with col3:
+                                        tdp_cases = len([r for r in case_reports if r.get('tdp_status') == 'Positive'])
+                                        if tdp_cases > 0:
+                                            st.metric("TdP Cases", tdp_cases)
+                                    
+                                    # Show detailed reports
+                                    st.markdown("#### Detailed Case Reports")
+                                    for report in case_reports:
+                                        with st.expander(f"Case Report (PMID: {report.get('pmid', 'N/A')})"):
+                                            if report.get('age'):
+                                                st.write(f"🧑 Age: {report['age']}")
+                                            if report.get('sex'):
+                                                st.write(f"⚧ Sex: {report['sex']}")
+                                            if report.get('qtc'):
+                                                st.write(f"📈 QTc: {report['qtc']} ms")
+                                            if report.get('heart_rate'):
+                                                st.write(f"💓 Heart Rate: {report['heart_rate']} bpm")
+                                            if report.get('tdp_status'):
+                                                status = report['tdp_status']
+                                                if status == 'Positive':
+                                                    st.error("⚠️ TdP: Positive")
+                                                elif status == 'Negative':
+                                                    st.success("✅ TdP: Negative")
+                                                else:
+                                                    st.info("ℹ️ TdP: Not reported")
                             else:
-                                st.warning("No detailed case reports found in the literature.")
+                                st.info("No detailed case reports found in the literature.")
                         except Exception as e:
                             st.error(f"Error analyzing case reports: {str(e)}")
                             st.write("Showing raw literature results instead:")
