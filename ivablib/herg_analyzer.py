@@ -233,13 +233,17 @@ class DrugAnalyzer:
             literature = self._search_literature(drug_name)
             logger.info(f"Found {len(literature)} literature results")
             
+            # Convert None to "Not found" for display
+            display_ic50 = "Not found" if ic50 is None else ic50
+            
             result = {
                 'drug_name': drug_name,
-                'herg_ic50': ic50 if ic50 is not None else "Not found",
+                'herg_ic50': display_ic50,
                 'herg_source': 'ChEMBL Database' if ic50 is not None else 'No data available',
                 'crediblemeds_risk': is_risk,
                 'risk_category': risk_category,
-                'literature': literature
+                'literature': literature,
+                'source': 'ChEMBL Database' if ic50 is not None else 'No data available'  # Keep for backwards compatibility
             }
             
             logger.info(f"Analysis result: {result}")
