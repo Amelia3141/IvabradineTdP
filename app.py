@@ -73,27 +73,50 @@ if analyze_button:
                 tab1, tab2 = st.tabs(["Drug Analysis", "Literature Review"])
                 
                 with tab1:
-                    col1, col2 = st.columns(2)
+                    st.subheader("Drug Analysis")
                     
-                    with col1:
-                        st.subheader("Drug Information")
-                        st.write(f"**PubChem CID:** {analysis.get('cid', 'Not found')}")
-                        st.write(f"**Molecular Weight:** {analysis.get('molecular_weight', 'Not found')} g/mol")
-                        st.write(f"**hERG IC50:** {analysis.get('herg_ic50', 'None')} μM")
-                        st.write(f"**Source:** {analysis.get('source', 'Unknown')}")
-                        
-                        if 'theoretical_max' in analysis:
-                            st.subheader("Concentration Analysis")
-                            st.write(f"**Dose:** {analysis['dose']} mg")
-                            st.write(f"**Theoretical Max:** {analysis['theoretical_max']:.2f} μM")
-                            st.write(f"**Plasma Concentration:** {analysis['plasma_concentration']:.2f} μM")
-                            if analysis.get('ratio_theoretical'):
-                                st.write(f"**Theoretical/IC50 Ratio:** {analysis['ratio_theoretical']:.2f}")
-                            if analysis.get('ratio_plasma'):
-                                st.write(f"**Plasma/IC50 Ratio:** {analysis['ratio_plasma']:.2f}")
+                    # CredibleMeds Box
+                    with st.expander("CredibleMeds Status", expanded=True):
+                        credible_meds = analysis.get('credible_meds', {})
+                        if credible_meds:
+                            st.write(f"**Category:** {credible_meds.get('category', 'Unknown')}")
+                            st.write(f"**Risk Level:** {credible_meds.get('risk_level', 'Unknown')}")
+                            if credible_meds.get('notes'):
+                                st.write("**Notes:**")
+                                st.write(credible_meds['notes'])
+                        else:
+                            st.write("No CredibleMeds data available")
                     
-                    with col2:
-                        st.subheader("Risk Assessment")
+                    # hERG Binding Box
+                    with st.expander("hERG Binding Prediction", expanded=True):
+                        herg = analysis.get('herg', {})
+                        if herg:
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.metric("IC50 Value", f"{herg.get('ic50', 'Unknown')} μM")
+                            with col2:
+                                st.metric("Safety Ratio", f"{herg.get('safety_ratio', 'Unknown')}x")
+                                
+                            if herg.get('notes'):
+                                st.write("**Notes:**")
+                                st.write(herg['notes'])
+                        else:
+                            st.write("No hERG binding data available")
+                    
+                    # Drug Concentration Box
+                    with st.expander("Drug Concentrations", expanded=True):
+                        conc = analysis.get('concentrations', {})
+                        if conc:
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.metric("Therapeutic Concentration", f"{conc.get('therapeutic', 'Unknown')} μM")
+                            with col2:
+                                st.metric("Maximum Concentration", f"{conc.get('max', 'Unknown')} μM")
+                        else:
+                            st.write("No concentration data available")
+                    
+                    # Risk Assessment Box
+                    with st.expander("Risk Assessment", expanded=True):
                         if analysis.get('crediblemeds_risk'):
                             risk_text = analysis.get('risk_category', 'Known Risk')
                             st.error(f"⚠️ {risk_text} (CredibleMeds)")
