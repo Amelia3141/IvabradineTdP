@@ -37,7 +37,10 @@ if 'analyzer' not in st.session_state:
         email=st.secrets["NCBI_EMAIL"],
         api_key=st.secrets["NCBI_API_KEY"]
     )
+    
+if 'case_analyzer' not in st.session_state:
     st.session_state.case_analyzer = CaseReportAnalyzer()
+    
 if 'drug_name' not in st.session_state:
     st.session_state.drug_name = ""
 
