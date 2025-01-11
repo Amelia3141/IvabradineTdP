@@ -36,7 +36,26 @@ class DrugAnalyzer:
         """Initialize with NCBI credentials"""
         self.email = email
         self.api_key = api_key
-    
+        self.drug_name_corrections = {
+            'donezepil': 'donepezil',
+            'galantamin': 'galantamine',
+            'rivastigmin': 'rivastigmine',
+            'memantine': 'memantine',
+            'ivabradin': 'ivabradine'
+        }
+        
+    def _normalize_drug_name(self, drug_name):
+        """Normalize drug name to handle common misspellings."""
+        drug_name = drug_name.lower().strip()
+        # Check for exact matches in corrections
+        if drug_name in self.drug_name_corrections:
+            return self.drug_name_corrections[drug_name]
+        # Check for partial matches (e.g., if missing 'e' at end)
+        for misspelling, correct in self.drug_name_corrections.items():
+            if drug_name.startswith(misspelling) or misspelling.startswith(drug_name):
+                return correct
+        return drug_name
+        
     def _get_molecular_weight(self, cid: int) -> Optional[float]:
         """Get molecular weight from PubChem"""
         try:
@@ -220,6 +239,8 @@ class DrugAnalyzer:
     def analyze_drug(self, drug_name: str) -> Dict:
         """Analyze a drug for TdP risk"""
         try:
+            # Normalize drug name
+            drug_name = self._normalize_drug_name(drug_name)
             logger.info(f"Starting analysis for {drug_name}")
             
             # Get hERG data from ChEMBL
