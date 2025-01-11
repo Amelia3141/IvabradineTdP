@@ -26,8 +26,8 @@ class DrugConcentration:
     dose: float  # mg
     theoretical_max: float  # μM
     plasma_concentration: float  # μM
-    ratio_theoretical: Optional[float] = None  # Theoretical/IC50
-    ratio_plasma: Optional[float] = None  # Plasma/IC50
+    ratio_theoretical: Optional[float]  # ratio to IC50
+    ratio_plasma: Optional[float]  # ratio to IC50
 
 class DrugAnalyzer:
     """Class for analyzing drug properties and hERG interactions"""
@@ -44,68 +44,11 @@ class DrugAnalyzer:
             response = requests.get(url)
             response.raise_for_status()
             data = response.json()
-            mw = float(data["PropertyTable"]["Properties"][0]["MolecularWeight"])
-            logger.info(f"Got molecular weight for CID {cid}: {mw}")
-            return mw
+            logger.info(f"Got molecular weight for CID {cid}: {data['PropertyTable']['Properties'][0]['MolecularWeight']}")
+            return float(data["PropertyTable"]["Properties"][0]["MolecularWeight"])
         except Exception as e:
-            logger.error(f"Error getting molecular weight: {e}")
+            logger.error(f"Error getting molecular weight: {str(e)}")
             return None
-
-    def _calculate_concentrations(self, 
-                                dose: float,  # mg
-                                molecular_weight: float,  # g/mol
-                                herg_ic50: Optional[float] = None,  # μM
-                                volume_of_distribution: float = 100.0,  # L
-                                bioavailability: float = 0.4) -> DrugConcentration:
-        """Calculate theoretical and plasma concentrations
-        
-        Args:
-            dose: Drug dose in mg
-            molecular_weight: Molecular weight in g/mol
-            herg_ic50: hERG IC50 in μM
-            volume_of_distribution: Volume of distribution in L
-            bioavailability: Fraction of drug that reaches systemic circulation
-            
-        Returns:
-            DrugConcentration object with calculated values
-        """
-        try:
-            # Convert mg to μmol
-            dose_umol = (dose * 1000) / molecular_weight
-            
-            # Calculate theoretical maximum concentration (μM)
-            # C = dose / volume
-            theoretical_max = dose_umol / volume_of_distribution
-            
-            # Calculate plasma concentration accounting for bioavailability
-            plasma_concentration = theoretical_max * bioavailability
-            
-            # Calculate ratios if IC50 is available
-            # Ratio > 1 means concentration exceeds IC50
-            ratio_theoretical = None
-            ratio_plasma = None
-            if herg_ic50:
-                ratio_theoretical = theoretical_max / herg_ic50
-                ratio_plasma = plasma_concentration / herg_ic50
-            
-            conc = DrugConcentration(
-                dose=dose,
-                theoretical_max=theoretical_max,
-                plasma_concentration=plasma_concentration,
-                ratio_theoretical=ratio_theoretical,
-                ratio_plasma=ratio_plasma
-            )
-            
-            logger.info(f"Calculated concentrations for {dose}mg: {conc}")
-            return conc
-            
-        except Exception as e:
-            logger.error(f"Error calculating concentrations: {e}")
-            return DrugConcentration(
-                dose=dose,
-                theoretical_max=0,
-                plasma_concentration=0
-            )
 
     def _search_chembl_herg(self, compound_name: str) -> Optional[float]:
         """Search ChEMBL for hERG IC50 values"""
@@ -171,6 +114,42 @@ class DrugAnalyzer:
         except Exception as e:
             logger.error(f"Error checking CredibleMeds: {str(e)}")
             return False, ''
+
+    def _calculate_concentrations(self, 
+                                molecular_weight: float,
+                                herg_ic50: Optional[float] = None,
+                                dose: float = 5.0,  # mg
+                                volume_of_distribution: float = 100.0,  # L
+                                bioavailability: float = 0.4) -> DrugConcentration:
+        """Calculate theoretical and plasma concentrations for a single dose"""
+        try:
+            # Convert mg to μmol
+            dose_umol = (dose * 1000) / molecular_weight
+            
+            # Calculate theoretical maximum concentration (μM)
+            theoretical_max = dose_umol / volume_of_distribution
+            
+            # Calculate plasma concentration with bioavailability
+            plasma_concentration = theoretical_max * bioavailability
+            
+            # Calculate ratios if IC50 is available
+            ratio_theoretical = theoretical_max / herg_ic50 if herg_ic50 else None
+            ratio_plasma = plasma_concentration / herg_ic50 if herg_ic50 else None
+            
+            concentration = DrugConcentration(
+                dose=dose,
+                theoretical_max=theoretical_max,
+                plasma_concentration=plasma_concentration,
+                ratio_theoretical=ratio_theoretical,
+                ratio_plasma=ratio_plasma
+            )
+            
+            logger.info(f"Calculated concentrations: {concentration}")
+            return concentration
+            
+        except Exception as e:
+            logger.error(f"Error calculating concentrations: {str(e)}")
+            return None
 
     def _search_literature(self, drug_name: str) -> pd.DataFrame:
         """Search PubChem literature for drug information"""
@@ -251,21 +230,19 @@ class DrugAnalyzer:
             is_risk, risk_category = self._check_crediblemeds(drug_name)
             logger.info(f"CredibleMeds: {is_risk}, {risk_category}")
             
-            # Calculate concentrations
-            concentrations = None
-            if dose and molecular_weight:
-                concentrations = self._calculate_concentrations(
-                    dose=dose,
+            # Calculate concentrations if dose provided
+            concentration = None
+            if dose is not None:
+                concentration = self._calculate_concentrations(
                     molecular_weight=molecular_weight,
-                    herg_ic50=herg_ic50
+                    herg_ic50=herg_ic50,
+                    dose=dose
                 )
             
-            # Determine binding risk
-            theoretical_binding = False
-            if concentrations and concentrations.ratio_theoretical:
-                theoretical_binding = concentrations.ratio_theoretical > 0.1
-            elif is_risk:
-                theoretical_binding = True
+            # Determine if theoretical binding is likely
+            theoretical_binding = is_risk
+            if concentration and concentration.ratio_theoretical:
+                theoretical_binding = theoretical_binding or concentration.ratio_theoretical > 0.1
             
             result = {
                 "name": drug_name,
@@ -275,15 +252,18 @@ class DrugAnalyzer:
                 "source": "ChEMBL Database",
                 "crediblemeds_risk": is_risk,
                 "risk_category": risk_category,
-                "theoretical_binding": theoretical_binding,
-                "concentrations": {
-                    "dose_mg": concentrations.dose if concentrations else None,
-                    "theoretical_uM": concentrations.theoretical_max if concentrations else None,
-                    "plasma_uM": concentrations.plasma_concentration if concentrations else None,
-                    "theoretical_ratio": concentrations.ratio_theoretical if concentrations else None,
-                    "plasma_ratio": concentrations.ratio_plasma if concentrations else None
-                } if concentrations else None
+                "theoretical_binding": theoretical_binding
             }
+            
+            # Add concentration data if available
+            if concentration:
+                result.update({
+                    "dose": concentration.dose,
+                    "theoretical_max": concentration.theoretical_max,
+                    "plasma_concentration": concentration.plasma_concentration,
+                    "ratio_theoretical": concentration.ratio_theoretical,
+                    "ratio_plasma": concentration.ratio_plasma
+                })
             
             logger.info(f"Analysis result: {result}")
             return result
