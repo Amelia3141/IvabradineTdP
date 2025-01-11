@@ -413,6 +413,64 @@ def format_pubmed_results(records: List[Dict]) -> pd.DataFrame:
             
     return pd.DataFrame(results)
 
+def get_full_text(pmid: str, output_dir: str) -> Optional[str]:
+    """Get full text of a paper from PubMed Central, Crossref, or Sci-Hub"""
+    try:
+        # First try PubMed Central
+        handle = Entrez.efetch(db="pmc", id=pmid, rettype="txt", retmode="text")
+        text = handle.read()
+        if text and len(text) > 100:  # Basic check to ensure we got meaningful text
+            logger.info(f"Got full text from PubMed Central for {pmid}")
+            return text
+            
+        # If not in PMC, try getting DOI from PubMed
+        handle = Entrez.efetch(db="pubmed", id=pmid, rettype="xml", retmode="text")
+        records = Entrez.read(handle)
+        if records['PubmedArticle']:
+            article = records['PubmedArticle'][0]['MedlineCitation']['Article']
+            if 'ELocationID' in article:
+                for eloc in article['ELocationID']:
+                    if eloc.attributes['EIdType'] == 'doi':
+                        doi = str(eloc)
+                        
+                        # Try Crossref first
+                        try:
+                            crossref_url = f"https://api.crossref.org/works/{doi}"
+                            response = requests.get(crossref_url)
+                            if response.status_code == 200:
+                                data = response.json()
+                                if 'URL' in data['message']:
+                                    pdf_url = data['message']['URL']
+                                    response = requests.get(pdf_url)
+                                    if response.status_code == 200:
+                                        pdf_path = os.path.join(output_dir, f"{pmid}_crossref.pdf")
+                                        with open(pdf_path, 'wb') as f:
+                                            f.write(response.content)
+                                        text = extract_text_from_pdf(pdf_path)
+                                        if text:
+                                            logger.info(f"Got full text from Crossref for {pmid}")
+                                            return text
+                        except Exception as e:
+                            logger.warning(f"Error getting full text from Crossref for {pmid}: {str(e)}")
+                        
+                        # Finally try Sci-Hub
+                        try:
+                            pdf_path = get_from_scihub(doi, output_dir, f"{pmid}_scihub.pdf")
+                            if pdf_path:
+                                text = extract_text_from_pdf(pdf_path)
+                                if text:
+                                    logger.info(f"Got full text from Sci-Hub for {pmid}")
+                                    return text
+                        except Exception as e:
+                            logger.warning(f"Error getting full text from Sci-Hub for {pmid}: {str(e)}")
+        
+        logger.warning(f"Could not get full text for {pmid}")
+        return None
+        
+    except Exception as e:
+        logger.error(f"Error getting full text for {pmid}: {str(e)}")
+        return None
+
 def analyze_literature(drug_name: str) -> Dict:
     """Analyze literature for a drug"""
     if not HAVE_BIOPYTHON:
@@ -446,19 +504,17 @@ def analyze_literature(drug_name: str) -> Dict:
                         if pmid == 'No PMID':
                             continue
                             
-                        # Get PDF from Sci-Hub
-                        pdf_path = get_from_scihub(pmid, os.getcwd(), f"{pmid}.pdf")
-                        if pdf_path:
-                            text = extract_text_from_pdf(pdf_path)
-                            if text:
-                                papers_to_analyze.append({
-                                    'pmid': pmid,
-                                    'title': paper['Title'],
-                                    'authors': paper['Authors'].split(', '),
-                                    'year': paper['Year'],
-                                    'journal': paper['Journal'],
-                                    'full_text': text
-                                })
+                        # Try to get full text from various sources
+                        text = get_full_text(pmid, os.getcwd())
+                        if text:
+                            papers_to_analyze.append({
+                                'pmid': pmid,
+                                'title': paper['Title'],
+                                'authors': paper['Authors'].split(', '),
+                                'year': paper['Year'],
+                                'journal': paper['Journal'],
+                                'full_text': text
+                            })
                     except Exception as e:
                         logger.error(f"Error getting full text for {pmid}: {str(e)}")
                         continue
