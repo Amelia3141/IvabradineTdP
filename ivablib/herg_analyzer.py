@@ -69,7 +69,7 @@ class DrugAnalyzer:
                 molecule_activities = activities.filter(
                     target_chembl_id='CHEMBL240',  # hERG
                     molecule_chembl_id=result['molecule_chembl_id'],
-                    standard_type__iregex='(IC50|Ki)'
+                    standard_type__in=['IC50', 'Ki']
                 ).only(['standard_value', 'standard_units'])
                 
                 for activity in molecule_activities:
@@ -92,15 +92,23 @@ class DrugAnalyzer:
         """Check if drug is in CredibleMeds database"""
         try:
             # Load CredibleMeds data
-            crediblemeds_file = os.path.join(os.path.dirname(__file__), 'data', 'crediblemeds.json')
-            with open(crediblemeds_file, 'r') as f:
-                crediblemeds_data = json.load(f)
+            crediblemeds_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'crediblemeds_data.txt')
             
-            # Search for drug
+            if not os.path.exists(crediblemeds_file):
+                logger.error(f"CredibleMeds data file not found at {crediblemeds_file}")
+                return False, ''
+            
+            # Search for drug in file
             drug_lower = drug_name.lower()
-            for drug in crediblemeds_data:
-                if drug_lower == drug['name'].lower():
-                    return True, drug.get('category', 'Known Risk')
+            with open(crediblemeds_file, 'r') as f:
+                for line in f:
+                    if line.startswith('#') or not line.strip():
+                        continue
+                    if '|' not in line:
+                        continue
+                    drug, category = [x.strip() for x in line.split('|')]
+                    if drug_lower == drug.lower():
+                        return True, category
             
             return False, ''
             
