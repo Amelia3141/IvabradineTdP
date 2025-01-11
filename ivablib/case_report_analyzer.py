@@ -4,6 +4,8 @@ import re
 import logging
 import pandas as pd
 from typing import List, Dict, Any, Optional
+import os
+import PyPDF2
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -36,11 +38,8 @@ class CaseReportAnalyzer:
             
         match = pattern.search(text)
         if match:
-            # Get all groups that matched
-            groups = [g for g in match.groups() if g is not None]
-            if groups:
-                # Return the first non-None group
-                return groups[0].strip()
+            # Return the first non-None group
+            return next((g for g in match.groups() if g is not None), None)
         return None
         
     def extract_all_matches(self, text: str, pattern: re.Pattern) -> List[str]:
@@ -49,18 +48,15 @@ class CaseReportAnalyzer:
             return []
             
         matches = pattern.finditer(text)
-        results = []
-        for m in matches:
-            groups = [g for g in m.groups() if g is not None]
-            if groups:
-                results.append(groups[0].strip())
-        return results
+        return [next((g for g in m.groups() if g is not None), '') for m in matches]
         
     def analyze_paper(self, paper: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Analyze a single paper for case report information."""
         try:
-            # Combine title and abstract for analysis
-            text = f"{paper.get('title', '')} {paper.get('abstract', '')}"
+            # Get text from full text if available, otherwise use title and abstract
+            text = paper.get('full_text', '')
+            if not text:
+                text = f"{paper.get('title', '')} {paper.get('abstract', '')}"
             
             # Skip if no meaningful text to analyze
             if not text.strip():
@@ -83,41 +79,19 @@ class CaseReportAnalyzer:
             # Check for TdP
             had_tdp = bool(self.patterns['had_tdp'].search(text))
             
-            # Clean up numeric values
-            try:
-                age = float(age) if age and age.isdigit() else None
-            except (ValueError, TypeError):
-                age = None
-                
-            try:
-                qtc = float(qtc) if qtc and qtc.isdigit() else None
-            except (ValueError, TypeError):
-                qtc = None
-                
-            try:
-                qt = float(qt) if qt and qt.isdigit() else None
-            except (ValueError, TypeError):
-                qt = None
-                
-            try:
-                hr = float(hr) if hr and hr.isdigit() else None
-            except (ValueError, TypeError):
-                hr = None
-            
             # Only return if we found some relevant information
             if any([age, sex, qtc, qt, hr, bp, had_tdp, patient_type, outcome, treatment_duration, drug_combinations]):
                 return {
                     'title': paper.get('title', ''),
-                    'authors': paper.get('authors', ''),
+                    'authors': paper.get('authors', []),
                     'year': paper.get('year'),
                     'journal': paper.get('journal', ''),
-                    'doi': paper.get('doi', ''),
                     'pmid': paper.get('pmid', ''),
-                    'age': age,
+                    'age': float(age) if age and age.isdigit() else None,
                     'sex': sex.title() if sex else None,
-                    'qtc': qtc,
-                    'qt_uncorrected': qt,
-                    'heart_rate': hr,
+                    'qtc': float(qtc) if qtc and qtc.isdigit() else None,
+                    'qt_uncorrected': float(qt) if qt and qt.isdigit() else None,
+                    'heart_rate': float(hr) if hr and hr.isdigit() else None,
                     'blood_pressure': bp,
                     'had_tdp': 'Yes' if had_tdp else 'No',
                     'patient_type': patient_type.title() if patient_type else None,
@@ -141,22 +115,46 @@ class CaseReportAnalyzer:
                     results.append(result)
                     
             # Convert to DataFrame
-            df = pd.DataFrame(results) if results else pd.DataFrame(columns=['title', 'authors', 'year', 'journal', 'doi', 'pmid', 'age', 'sex', 'qtc', 'qt_uncorrected', 'heart_rate', 'blood_pressure', 'had_tdp', 'patient_type', 'treatment_successful', 'treatment_duration', 'drug_combinations', 'drug'])
+            df = pd.DataFrame(results) if results else pd.DataFrame()
             
             # Add drug name
             if not df.empty:
                 df['drug'] = drug_name
+                
+                # Reorder columns for better display
+                column_order = [
+                    'title', 'year', 'authors', 'journal', 'pmid',
+                    'drug', 'had_tdp', 'qtc', 'qt_uncorrected',
+                    'heart_rate', 'blood_pressure', 'age', 'sex',
+                    'patient_type', 'treatment_successful',
+                    'treatment_duration', 'drug_combinations'
+                ]
+                df = df[column_order]
             
             return df
             
         except Exception as e:
             logger.error(f"Error analyzing papers: {str(e)}")
-            return pd.DataFrame(columns=['title', 'authors', 'year', 'journal', 'doi', 'pmid', 'age', 'sex', 'qtc', 'qt_uncorrected', 'heart_rate', 'blood_pressure', 'had_tdp', 'patient_type', 'treatment_successful', 'treatment_duration', 'drug_combinations', 'drug'])
+            return pd.DataFrame()  # Return empty DataFrame on error
 
 def analyze_papers(papers: List[Dict[str, Any]], drug_name: str) -> pd.DataFrame:
     """Analyze a list of papers and create a case report table."""
     analyzer = CaseReportAnalyzer()
     return analyzer.analyze_papers(papers, drug_name)
+
+def clean_text(text: str) -> str:
+    """Clean and normalize text extracted from PDF."""
+    if not text:
+        return ""
+        
+    # Remove excessive whitespace
+    text = re.sub(r'\s+', ' ', text)
+    
+    # Fix common PDF extraction issues
+    text = text.replace('- ', '')  # Remove hyphenation
+    text = text.replace('•', '- ')  # Convert bullets to dashes
+    
+    return text.strip()
 
 def convert_pdf_to_text(pdf_path: str) -> Optional[str]:
     """Convert a PDF file to text and save it"""
@@ -167,7 +165,8 @@ def convert_pdf_to_text(pdf_path: str) -> Optional[str]:
         # Skip if text file already exists
         if os.path.exists(text_path):
             logger.info(f"Text file already exists: {text_path}")
-            return text_path
+            with open(text_path, 'r', encoding='utf-8') as f:
+                return f.read()
             
         logger.info(f"Converting PDF to text: {pdf_path}")
         
@@ -213,7 +212,7 @@ def convert_pdf_to_text(pdf_path: str) -> Optional[str]:
                 with open(text_path, 'w', encoding='utf-8') as f:
                     f.write(text.strip())
                 logger.info(f"Saved text to: {text_path}")
-                return text_path
+                return text.strip()
                     
             except Exception as e:
                 logger.error(f"Error reading PDF {pdf_path}: {e}")

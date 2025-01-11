@@ -436,10 +436,43 @@ def analyze_literature(drug_name: str) -> Dict:
         cohort_studies = search_pubmed_cohort_studies(drug_name)
         clinical_trials = search_pubmed_clinical_trials(drug_name)
         
+        # Get full text papers and analyze them
+        papers_to_analyze = []
+        for paper_type in [case_reports, cohort_studies, clinical_trials]:
+            if not paper_type.empty:
+                for _, paper in paper_type.iterrows():
+                    try:
+                        pmid = paper['PMID']
+                        if pmid == 'No PMID':
+                            continue
+                            
+                        # Get PDF from Sci-Hub
+                        pdf_path = get_from_scihub(pmid, os.getcwd(), f"{pmid}.pdf")
+                        if pdf_path:
+                            text = extract_text_from_pdf(pdf_path)
+                            if text:
+                                papers_to_analyze.append({
+                                    'pmid': pmid,
+                                    'title': paper['Title'],
+                                    'authors': paper['Authors'].split(', '),
+                                    'year': paper['Year'],
+                                    'journal': paper['Journal'],
+                                    'full_text': text
+                                })
+                    except Exception as e:
+                        logger.error(f"Error getting full text for {pmid}: {str(e)}")
+                        continue
+        
+        # Analyze papers using CaseReportAnalyzer
+        from .case_report_analyzer import analyze_papers
+        analysis_results = analyze_papers(papers_to_analyze, drug_name)
+        
         return {
             "case_reports": case_reports.to_dict('records'),
             "cohort_studies": cohort_studies.to_dict('records'),
-            "clinical_trials": clinical_trials.to_dict('records')
+            "clinical_trials": clinical_trials.to_dict('records'),
+            "full_texts": papers_to_analyze,
+            "analysis": analysis_results.to_dict('records') if not analysis_results.empty else []
         }
         
     except Exception as e:

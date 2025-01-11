@@ -116,48 +116,45 @@ class DrugAnalyzer:
             logger.error(f"Error checking CredibleMeds: {str(e)}")
             return False, ''
 
-    def _calculate_concentrations(self, 
-                                molecular_weight: float,
-                                herg_ic50: Optional[float] = None,
-                                dose: float = 5.0,  # mg
-                                volume_of_distribution: float = 100.0,  # L
-                                bioavailability: float = 0.4) -> Optional[DrugConcentration]:
-        """Calculate theoretical and plasma concentrations for a single dose"""
+    def _calculate_concentrations(self, dose_mg: float, molecular_weight: float, herg_ic50: Optional[float] = None) -> DrugConcentration:
+        """Calculate drug concentrations and safety ratios"""
         try:
-            if not molecular_weight or molecular_weight <= 0:
-                logger.error("Invalid molecular weight")
-                return None
+            # Default parameters
+            distribution_volume = 5  # L
+            bioavailability = 0.4   # 40%
             
-            # Convert mg to μmol
-            dose_umol = (dose * 1000) / molecular_weight
+            # Convert dose from mg to μmol
+            dose_ug = dose_mg * 1000  # convert mg to μg
+            dose_umol = dose_ug / molecular_weight
             
-            # Calculate theoretical maximum concentration (μM)
-            theoretical_max = dose_umol / volume_of_distribution
+            # Calculate concentrations in μM
+            theoretical_max = dose_umol / distribution_volume
+            plasma_conc = theoretical_max * bioavailability
             
-            # Calculate plasma concentration with bioavailability
-            plasma_concentration = theoretical_max * bioavailability
+            # Calculate safety ratios if hERG IC50 is available
+            theoretical_ratio = None
+            plasma_ratio = None
+            if herg_ic50 is not None:
+                theoretical_ratio = herg_ic50 / theoretical_max
+                plasma_ratio = herg_ic50 / plasma_conc
             
-            # Calculate ratios if IC50 is available
-            ratio_theoretical = None
-            ratio_plasma = None
-            if herg_ic50 and herg_ic50 > 0:
-                ratio_theoretical = theoretical_max / herg_ic50
-                ratio_plasma = plasma_concentration / herg_ic50
-            
-            concentration = DrugConcentration(
-                dose=float(dose),
-                theoretical_max=float(theoretical_max),
-                plasma_concentration=float(plasma_concentration),
-                ratio_theoretical=float(ratio_theoretical) if ratio_theoretical is not None else None,
-                ratio_plasma=float(ratio_plasma) if ratio_plasma is not None else None
+            return DrugConcentration(
+                dose=dose_mg,
+                theoretical_max=theoretical_max,
+                plasma_concentration=plasma_conc,
+                ratio_theoretical=theoretical_ratio,
+                ratio_plasma=plasma_ratio
             )
-            
-            logger.info(f"Calculated concentrations: {concentration}")
-            return concentration
             
         except Exception as e:
             logger.error(f"Error calculating concentrations: {str(e)}")
-            return None
+            return DrugConcentration(
+                dose=dose_mg,
+                theoretical_max=None,
+                plasma_concentration=None,
+                ratio_theoretical=None,
+                ratio_plasma=None
+            )
 
     def _search_literature(self, drug_name: str) -> pd.DataFrame:
         """Search PubChem literature for drug information"""
@@ -242,9 +239,9 @@ class DrugAnalyzer:
             concentration = None
             if dose is not None:
                 concentration = self._calculate_concentrations(
+                    dose_mg=float(dose),
                     molecular_weight=molecular_weight,
-                    herg_ic50=herg_ic50,
-                    dose=float(dose)
+                    herg_ic50=herg_ic50
                 )
             
             # Determine if theoretical binding is likely

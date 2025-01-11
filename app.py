@@ -110,54 +110,57 @@ if analyze_button:
                     if 'error' in literature:
                         st.error(f"Error analyzing literature: {literature['error']}")
                     else:
-                        # Show summary
-                        summary = literature.get('summary', {})
-                        st.write(f"Found {summary.get('total_papers', 0)} papers ({summary.get('papers_with_text', 0)} with full text)")
-                        
-                        # Show key findings
-                        if summary.get('key_findings'):
-                            st.subheader("Key Findings")
-                            for finding in summary['key_findings']:
-                                st.write(f"- {finding}")
+                        # Show analysis results first
+                        analysis_results = literature.get('analysis', [])
+                        if analysis_results:
+                            st.subheader("Case Report Analysis")
+                            df = pd.DataFrame(analysis_results)
+                            st.dataframe(df, use_container_width=True)
+                            
+                            # Show statistics
+                            st.subheader("Summary Statistics")
+                            col1, col2, col3 = st.columns(3)
+                            
+                            with col1:
+                                tdp_cases = len([x for x in analysis_results if x.get('had_tdp') == 'Yes'])
+                                st.metric("TdP Cases", tdp_cases)
+                                
+                            with col2:
+                                avg_qtc = pd.DataFrame(analysis_results)['qtc'].mean()
+                                if not pd.isna(avg_qtc):
+                                    st.metric("Average QTc", f"{avg_qtc:.0f} ms")
+                                    
+                            with col3:
+                                success_rate = len([x for x in analysis_results if x.get('treatment_successful') == 'Yes']) / len(analysis_results) * 100
+                                st.metric("Treatment Success Rate", f"{success_rate:.0f}%")
                         
                         # Show papers by type
+                        st.subheader("Literature Search Results")
                         col1, col2, col3 = st.columns(3)
                         
                         with col1:
                             st.subheader("Case Reports")
-                            for paper in literature.get('case_reports', []):
-                                with st.expander(paper['Title']):
-                                    st.write(f"**Authors:** {paper['Authors']}")
-                                    st.write(f"**Journal:** {paper['Journal']} ({paper['Year']})")
-                                    st.write(f"[View on PubMed](https://pubmed.ncbi.nlm.nih.gov/{paper['PMID']}/)")
+                            if literature.get('case_reports'):
+                                df = pd.DataFrame(literature['case_reports'])
+                                st.dataframe(df, use_container_width=True)
+                            else:
+                                st.write("No case reports found")
                         
                         with col2:
                             st.subheader("Cohort Studies")
-                            for paper in literature.get('cohort_studies', []):
-                                with st.expander(paper['Title']):
-                                    st.write(f"**Authors:** {paper['Authors']}")
-                                    st.write(f"**Journal:** {paper['Journal']} ({paper['Year']})")
-                                    st.write(f"[View on PubMed](https://pubmed.ncbi.nlm.nih.gov/{paper['PMID']}/)")
+                            if literature.get('cohort_studies'):
+                                df = pd.DataFrame(literature['cohort_studies'])
+                                st.dataframe(df, use_container_width=True)
+                            else:
+                                st.write("No cohort studies found")
                         
                         with col3:
                             st.subheader("Clinical Trials")
-                            for paper in literature.get('clinical_trials', []):
-                                with st.expander(paper['Title']):
-                                    st.write(f"**Authors:** {paper['Authors']}")
-                                    st.write(f"**Journal:** {paper['Journal']} ({paper['Year']})")
-                                    st.write(f"[View on PubMed](https://pubmed.ncbi.nlm.nih.gov/{paper['PMID']}/)")
-                        
-                        # Show full text findings
-                        if literature.get('full_texts'):
-                            st.subheader("Full Text Analysis")
-                            for paper in literature['full_texts']:
-                                with st.expander(paper['title']):
-                                    st.write(f"**Authors:** {', '.join(paper['authors'])}")
-                                    st.write(f"**Journal:** {paper['journal']} ({paper['year']})")
-                                    st.write(f"**Abstract:** {paper['abstract']}")
-                                    if paper.get('full_text'):
-                                        with st.expander("Show Full Text"):
-                                            st.text(paper['full_text'])
+                            if literature.get('clinical_trials'):
+                                df = pd.DataFrame(literature['clinical_trials'])
+                                st.dataframe(df, use_container_width=True)
+                            else:
+                                st.write("No clinical trials found")
                     
     except Exception as e:
         st.error(f"Error analyzing drug: {str(e)}")
