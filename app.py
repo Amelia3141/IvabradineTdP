@@ -3,15 +3,12 @@ Streamlit app for analyzing TdP risk of Ivabradine
 """
 
 import streamlit as st
-import plotly.graph_objects as go
-import requests
-import re
 import pandas as pd
-import time
+import plotly.graph_objects as go
 import json
 import logging
 from typing import Dict, List, Optional, Tuple
-from ivablib.herg_analyzer import DrugAnalyzer
+from ivablib import DrugAnalyzer
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -70,13 +67,26 @@ if analyze_button and drug_name:
                     col1, col2 = st.columns(2)
                     
                     with col1:
-                        st.subheader("Drug Information")
-                        if analysis.get('herg_ic50'):
-                            st.write(f"**hERG IC50:** {analysis['herg_ic50']:.2f} μM")
-                            st.write(f"**Source:** ChEMBL Database")
+                        st.header("Drug Information")
+                        
+                        # Display hERG IC50 with source
+                        herg_ic50 = analysis.get('herg_ic50')
+                        herg_source = analysis.get('herg_source', 'No data available')
+                        
+                        # Check if hERG IC50 is a number before formatting
+                        if isinstance(herg_ic50, (int, float)):
+                            st.metric("hERG IC50", f"{herg_ic50:.2f} μM")
                         else:
-                            st.write("**hERG IC50:** Not found")
-                            st.write("**Source:** No data available")
+                            st.metric("hERG IC50", str(herg_ic50))
+                        
+                        st.caption(f"Source: {herg_source}")
+                            
+                        # Add more drug information here if available
+                        if analysis.get('drug_info'):
+                            st.write("**Additional Information:**")
+                            for key, value in analysis['drug_info'].items():
+                                if key not in ['herg_ic50', 'herg_source']:
+                                    st.write(f"**{key.replace('_', ' ').title()}:** {value}")
                     
                     with col2:
                         st.subheader("Risk Assessment")
@@ -97,14 +107,34 @@ if analyze_button and drug_name:
                     else:
                         # Show summary table first
                         st.write("Summary of Papers:")
-                        display_df = literature[['title', 'journal', 'year']].copy()
-                        display_df.columns = ['Title', 'Journal', 'Year']
-                        st.dataframe(display_df, use_container_width=True)
+                        
+                        # Create a display dataframe with all needed columns
+                        display_df = literature[['title', 'journal', 'year', 'authors']].copy()
+                        display_df.columns = ['Title', 'Journal', 'Year', 'Authors']
+                        
+                        # Truncate long titles and authors for better display
+                        display_df['Title'] = display_df['Title'].str.slice(0, 100) + '...'
+                        display_df['Authors'] = display_df['Authors'].str.slice(0, 50) + '...'
+                        
+                        # Add index starting from 1
+                        display_df.index = range(1, len(display_df) + 1)
+                        
+                        # Display with full width and column config
+                        st.dataframe(
+                            display_df,
+                            use_container_width=True,
+                            column_config={
+                                "Title": st.column_config.TextColumn(width="large"),
+                                "Journal": st.column_config.TextColumn(width="medium"),
+                                "Year": st.column_config.NumberColumn(width="small"),
+                                "Authors": st.column_config.TextColumn(width="medium")
+                            }
+                        )
                         
                         # Show detailed expandable list
                         st.write("\nDetailed Paper Information:")
-                        for _, paper in literature.iterrows():
-                            with st.expander(paper['title']):
+                        for idx, paper in literature.iterrows():
+                            with st.expander(f"{idx+1}. {paper['title']}"):
                                 st.write(f"**Authors:** {paper['authors']}")
                                 st.write(f"**Journal:** {paper['journal']} ({paper['year']})")
                                 if paper['abstract']:
