@@ -114,39 +114,6 @@ class DrugAnalyzer:
             logger.error(f"Error checking CredibleMeds: {str(e)}")
             return False, ''
 
-    def _calculate_concentrations(self, 
-                                doses: List[float], 
-                                molecular_weight: float,
-                                herg_ic50: Optional[float] = None,
-                                volume_of_distribution: float = 100.0,  # L
-                                bioavailability: float = 0.4) -> List[DrugConcentration]:
-        """Calculate theoretical and plasma concentrations"""
-        concentrations = []
-        for dose in doses:
-            # Convert mg to μmol
-            dose_umol = (dose * 1000) / molecular_weight
-            
-            # Calculate theoretical maximum concentration (μM)
-            theoretical_max = dose_umol / volume_of_distribution
-            
-            # Calculate plasma concentration with bioavailability
-            plasma_concentration = theoretical_max * bioavailability
-            
-            # Calculate ratios if IC50 is available
-            ratio_theoretical = theoretical_max / herg_ic50 if herg_ic50 else None
-            ratio_plasma = plasma_concentration / herg_ic50 if herg_ic50 else None
-            
-            concentrations.append(DrugConcentration(
-                dose=dose,
-                theoretical_max=theoretical_max,
-                plasma_concentration=plasma_concentration,
-                ratio_theoretical=ratio_theoretical,
-                ratio_plasma=ratio_plasma
-            ))
-        
-        logger.info(f"Calculated concentrations: {concentrations}")
-        return concentrations
-
     def _search_literature(self, drug_name: str) -> pd.DataFrame:
         """Search PubChem literature for drug information"""
         try:
@@ -198,7 +165,7 @@ class DrugAnalyzer:
             logger.error(f"Error analyzing literature: {str(e)}")
             return {"error": str(e)}
 
-    def analyze_drug(self, drug_name: str, doses: Optional[List[float]] = None) -> Dict:
+    def analyze_drug(self, drug_name: str) -> Dict:
         """Analyze a drug for hERG interactions"""
         try:
             logger.info(f"Starting analysis for {drug_name}")
@@ -222,38 +189,12 @@ class DrugAnalyzer:
             herg_ic50 = self._search_chembl_herg(drug_name)
             logger.info(f"hERG IC50: {herg_ic50}")
             
-            # Calculate concentrations if doses provided
-            concentrations = []
-            if doses:
-                concentrations = self._calculate_concentrations(
-                    doses=doses,
-                    molecular_weight=molecular_weight,
-                    herg_ic50=herg_ic50
-                )
-            
             # Check CredibleMeds
             is_risk, risk_category = self._check_crediblemeds(drug_name)
             logger.info(f"CredibleMeds: {is_risk}, {risk_category}")
             
-            # Analyze literature
-            literature = self.analyze_literature(drug_name)
-            logger.info(f"Literature analysis complete")
-            
-            # Determine if theoretical binding is likely
-            theoretical_binding = False
-            if concentrations:
-                theoretical_binding = any(c.ratio_theoretical and c.ratio_theoretical > 0.1 for c in concentrations)
-            
-            # Format concentration results
-            concentration_results = []
-            for c in concentrations:
-                concentration_results.append({
-                    "dose": c.dose,
-                    "theoretical": c.theoretical_max,
-                    "plasma": c.plasma_concentration,
-                    "ratio_theoretical": c.ratio_theoretical,
-                    "ratio_plasma": c.ratio_plasma
-                })
+            # Determine if theoretical binding is likely based on CredibleMeds
+            theoretical_binding = is_risk
             
             result = {
                 "name": drug_name,
@@ -263,9 +204,7 @@ class DrugAnalyzer:
                 "source": "ChEMBL Database",
                 "crediblemeds_risk": is_risk,
                 "risk_category": risk_category,
-                "theoretical_binding": theoretical_binding,
-                "concentrations": concentration_results,
-                "literature": literature
+                "theoretical_binding": theoretical_binding
             }
             
             logger.info(f"Analysis result: {result}")

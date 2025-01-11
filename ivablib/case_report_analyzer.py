@@ -4,8 +4,6 @@ import re
 import logging
 import pandas as pd
 from typing import List, Dict, Any, Optional
-import os
-import PyPDF2
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -15,165 +13,120 @@ class CaseReportAnalyzer:
     """Analyzes medical case reports for relevant information."""
     
     def __init__(self):
-        """Initialize with regex patterns for extracting information."""
+        """Initialize the analyzer with regex patterns."""
+        # Compile regex patterns for better performance
         self.patterns = {
-            'age': re.compile(r'(?:age[d]?|year[s]?[- ]old)[: ]*(\d+)|\b(\d+)[ -](?:year[s]?[- ]old|yo)\b', re.IGNORECASE),
-            'sex': re.compile(r'\b(?:male|female|[MF])\b', re.IGNORECASE),
-            'qtc': re.compile(r'QTc[: ]*(\d+)(?:\s*m?sec)?|corrected[- ]QT[: ]*(\d+)', re.IGNORECASE),
-            'qt_uncorrected': re.compile(r'QT[: ]*(\d+)(?:\s*m?sec)?(?![Cc])', re.IGNORECASE),
-            'heart_rate': re.compile(r'(?:heart rate|HR|pulse)[: ]*(\d+)(?:\s*(?:bpm|beats per minute|/min))?', re.IGNORECASE),
-            'blood_pressure': re.compile(r'(?:blood pressure|BP)[: ]*(\d+/\d+)', re.IGNORECASE),
-            'had_tdp': re.compile(r'\b(?:torsade[s]? de pointes|tdp|pmvt)\b(?! risk| possible| unlikely| negative| no | not | without)', re.IGNORECASE),
-            'patient_type': re.compile(r'(?:inpatient|outpatient|emergency|hospitalized)', re.IGNORECASE),
-            'treatment_duration': re.compile(r'(?:treated for|duration of|over|for)\s+(\d+)\s+(?:day|week|month|year)s?', re.IGNORECASE),
-            'outcome': re.compile(r'(?:recovered|improved|resolved|discharged|survived|died|expired|fatal)', re.IGNORECASE),
+            'age': re.compile(r'(\d+)[\s-]*(year|yr|y)[s\s-]*old|(?:age[d\s:]*|aged\s*)(\d+)', re.IGNORECASE),
+            'sex': re.compile(r'\b(male|female|man|woman|boy|girl)\b', re.IGNORECASE),
+            'qtc': re.compile(r'QTc[\s:]*(\d+)', re.IGNORECASE),
+            'qt_uncorrected': re.compile(r'\bQT[\s:]*(\d+)', re.IGNORECASE),
+            'heart_rate': re.compile(r'(?:heart rate|HR|pulse)[\s:]*(\d+)(?:\s*beats?\s*per\s*min(?:ute)?|\s*bpm)?', re.IGNORECASE),
+            'blood_pressure': re.compile(r'(?:blood pressure|BP)[\s:]*([\d/]+)', re.IGNORECASE),
+            'had_tdp': re.compile(r'\b(?:torsade[s]* de pointes|TdP|torsades)\b', re.IGNORECASE),
+            'patient_type': re.compile(r'\b(pediatric|child|infant|newborn|adult|elderly)\b', re.IGNORECASE),
+            'outcome': re.compile(r'(?:treatment|therapy)[\s\w]+(?:successful|effective|improved|resolved|decreased|controlled|normalized)', re.IGNORECASE),
+            'treatment_duration': re.compile(r'(?:after|within|for)\s*(\d+)\s*(?:hour|hr|h|day|week|month|year)s?', re.IGNORECASE),
             'drug_combination': re.compile(r'(?:with|plus|and|combination)\s+(amiodarone|flecainide|beta.?blocker|metoprolol|propranolol|sotalol)', re.IGNORECASE)
         }
         
-    def _extract_heart_rate(self, text):
-        """Extract heart rate from text."""
-        hr_patterns = [
-            r'(?:heart rate|HR|pulse)[: ]*(\d+)(?:\s*(?:bpm|beats per minute|/min))?',
-            r'HR[: ]*(\d+)',
-            r'pulse[: ]*(\d+)',
-            r'(?:heart rate|HR)[- ](?:was|of)[: ]*(\d+)',
-            r'(?:heart rate|HR)[- ](?:increased|decreased)[- ]to[: ]*(\d+)'
-        ]
-        
-        for pattern in hr_patterns:
-            match = re.search(pattern, text, re.IGNORECASE)
-            if match:
-                try:
-                    hr = int(match.group(1))
-                    if 20 <= hr <= 300:  # Reasonable heart rate range
-                        return hr
-                except ValueError:
-                    continue
-        return None
-
-    def _extract_qtc(self, text):
-        """Extract QTc interval from text."""
-        qtc_patterns = [
-            r'QTc[: ]*(\d+)(?:\s*m?sec)?',
-            r'corrected[- ]QT[: ]*(\d+)',
-            r'QTc interval[: ]*(\d+)',
-            r'QTc prolongation to[: ]*(\d+)',
-            r'QTc was[: ]*(\d+)',
-            r'prolonged QTc of[: ]*(\d+)'
-        ]
-        
-        for pattern in qtc_patterns:
-            match = re.search(pattern, text, re.IGNORECASE)
-            if match:
-                try:
-                    qtc = int(match.group(1))
-                    if 300 <= qtc <= 700:  # Reasonable QTc range
-                        return qtc
-                except ValueError:
-                    continue
-        return None
-
-    def _extract_age(self, text):
-        """Extract age from text."""
-        age_patterns = [
-            r'(?:age[d]?|year[s]?[- ]old)[: ]*(\d+)',
-            r'\b(\d+)[ -](?:year[s]?[- ]old|yo)\b',
-            r'(\d+)[ -]year[- ]old',
-            r'age[d]?:?\s*(\d+)',
-            r'(\d+)(?:\s*(?:y|yr|year)s?\s*(?:old)?)'
-        ]
-        
-        for pattern in age_patterns:
-            match = re.search(pattern, text, re.IGNORECASE)
-            if match:
-                try:
-                    age = int(match.group(1))
-                    if 0 <= age <= 120:  # Reasonable age range
-                        return age
-                except ValueError:
-                    continue
-        return None
-
-    def _extract_sex(self, text):
-        """Extract sex from text."""
-        # Look for explicit mentions first
-        if re.search(r'\b(?:male|man)\b', text, re.IGNORECASE):
-            return 'Male'
-        if re.search(r'\b(?:female|woman)\b', text, re.IGNORECASE):
-            return 'Female'
+    def extract_value(self, text: str, pattern: re.Pattern) -> Optional[str]:
+        """Extract a value from text using a compiled regex pattern."""
+        if not text:
+            return None
             
-        # Then look for single letter indicators
-        if re.search(r'\bM\b', text):
-            return 'Male'
-        if re.search(r'\bF\b', text):
-            return 'Female'
-            
+        match = pattern.search(text)
+        if match:
+            # Get all groups that matched
+            groups = [g for g in match.groups() if g is not None]
+            if groups:
+                # Return the first non-None group
+                return groups[0].strip()
         return None
-
-    def _extract_tdp_status(self, text):
-        """Extract TdP status from text."""
-        text = text.lower()
         
-        # Check for explicit negatives first
-        negative_patterns = [
-            r'no[t]?\s+(?:evidence\s+of\s+)?(?:torsade|tdp)',
-            r'without\s+(?:evidence\s+of\s+)?(?:torsade|tdp)',
-            r'denied\s+(?:evidence\s+of\s+)?(?:torsade|tdp)',
-            r'negative\s+for\s+(?:torsade|tdp)'
-        ]
+    def extract_all_matches(self, text: str, pattern: re.Pattern) -> List[str]:
+        """Extract all matches from text using a compiled regex pattern."""
+        if not text:
+            return []
+            
+        matches = pattern.finditer(text)
+        results = []
+        for m in matches:
+            groups = [g for g in m.groups() if g is not None]
+            if groups:
+                results.append(groups[0].strip())
+        return results
         
-        for pattern in negative_patterns:
-            if re.search(pattern, text):
-                return 'Negative'
-        
-        # Then check for positives
-        positive_patterns = [
-            r'\b(?:torsade[s]?\s+de\s+pointes|tdp)\b',
-            r'polymorphic\s+[vV]entricular\s+[tT]achycardia',
-            r'\bpmvt\b',
-            r'developed\s+(?:torsade|tdp)',
-            r'experienced\s+(?:torsade|tdp)'
-        ]
-        
-        for pattern in positive_patterns:
-            if re.search(pattern, text):
-                return 'Positive'
-        
-        return 'Not reported'
-
-    def analyze_paper(self, paper):
+    def analyze_paper(self, paper: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Analyze a single paper for case report information."""
         try:
-            # Try to get full text if available
-            full_text = None
-            if paper.get('pmid'):
-                try:
-                    from .pubmed4125 import get_full_text
-                    full_text = get_full_text(paper['pmid'])
-                except Exception as e:
-                    logger.warning(f"Could not get full text for PMID {paper['pmid']}: {e}")
+            # Combine title and abstract for analysis
+            text = f"{paper.get('title', '')} {paper.get('abstract', '')}"
             
-            # Use full text if available, otherwise use title + abstract
-            text = full_text if full_text else f"{paper.get('title', '')} {paper.get('abstract', '')}"
+            # Skip if no meaningful text to analyze
+            if not text.strip():
+                return None
             
-            # Extract information
-            age = self._extract_age(text)
-            sex = self._extract_sex(text)
-            heart_rate = self._extract_heart_rate(text)
-            qtc = self._extract_qtc(text)
-            tdp_status = self._extract_tdp_status(text)
+            # Extract basic information
+            age = self.extract_value(text, self.patterns['age'])
+            sex = self.extract_value(text, self.patterns['sex'])
+            qtc = self.extract_value(text, self.patterns['qtc'])
+            qt = self.extract_value(text, self.patterns['qt_uncorrected'])
+            hr = self.extract_value(text, self.patterns['heart_rate'])
+            bp = self.extract_value(text, self.patterns['blood_pressure'])
             
-            # Log what we found
-            logger.info(f"Paper {paper.get('pmid')}: Age={age}, Sex={sex}, HR={heart_rate}, QTc={qtc}, TdP={tdp_status}")
+            # Extract additional information
+            patient_type = self.extract_value(text, self.patterns['patient_type'])
+            outcome = bool(self.patterns['outcome'].search(text))
+            treatment_duration = self.extract_value(text, self.patterns['treatment_duration'])
+            drug_combinations = self.extract_all_matches(text, self.patterns['drug_combination'])
             
-            return {
-                'pmid': paper.get('pmid'),
-                'age': age,
-                'sex': sex,
-                'heart_rate': heart_rate,
-                'qtc': qtc,
-                'tdp_status': tdp_status
-            }
+            # Check for TdP
+            had_tdp = bool(self.patterns['had_tdp'].search(text))
+            
+            # Clean up numeric values
+            try:
+                age = float(age) if age and age.isdigit() else None
+            except (ValueError, TypeError):
+                age = None
+                
+            try:
+                qtc = float(qtc) if qtc and qtc.isdigit() else None
+            except (ValueError, TypeError):
+                qtc = None
+                
+            try:
+                qt = float(qt) if qt and qt.isdigit() else None
+            except (ValueError, TypeError):
+                qt = None
+                
+            try:
+                hr = float(hr) if hr and hr.isdigit() else None
+            except (ValueError, TypeError):
+                hr = None
+            
+            # Only return if we found some relevant information
+            if any([age, sex, qtc, qt, hr, bp, had_tdp, patient_type, outcome, treatment_duration, drug_combinations]):
+                return {
+                    'title': paper.get('title', ''),
+                    'authors': paper.get('authors', ''),
+                    'year': paper.get('year'),
+                    'journal': paper.get('journal', ''),
+                    'doi': paper.get('doi', ''),
+                    'pmid': paper.get('pmid', ''),
+                    'age': age,
+                    'sex': sex.title() if sex else None,
+                    'qtc': qtc,
+                    'qt_uncorrected': qt,
+                    'heart_rate': hr,
+                    'blood_pressure': bp,
+                    'had_tdp': 'Yes' if had_tdp else 'No',
+                    'patient_type': patient_type.title() if patient_type else None,
+                    'treatment_successful': 'Yes' if outcome else 'No',
+                    'treatment_duration': treatment_duration,
+                    'drug_combinations': ', '.join(drug_combinations) if drug_combinations else None
+                }
+            return None
+            
         except Exception as e:
             logger.error(f"Error analyzing paper: {str(e)}")
             return None
@@ -188,7 +141,7 @@ class CaseReportAnalyzer:
                     results.append(result)
                     
             # Convert to DataFrame
-            df = pd.DataFrame(results) if results else pd.DataFrame(columns=['pmid', 'age', 'sex', 'heart_rate', 'qtc', 'tdp_status'])
+            df = pd.DataFrame(results) if results else pd.DataFrame(columns=['title', 'authors', 'year', 'journal', 'doi', 'pmid', 'age', 'sex', 'qtc', 'qt_uncorrected', 'heart_rate', 'blood_pressure', 'had_tdp', 'patient_type', 'treatment_successful', 'treatment_duration', 'drug_combinations', 'drug'])
             
             # Add drug name
             if not df.empty:
@@ -198,7 +151,7 @@ class CaseReportAnalyzer:
             
         except Exception as e:
             logger.error(f"Error analyzing papers: {str(e)}")
-            return pd.DataFrame(columns=['pmid', 'age', 'sex', 'heart_rate', 'qtc', 'tdp_status', 'drug'])
+            return pd.DataFrame(columns=['title', 'authors', 'year', 'journal', 'doi', 'pmid', 'age', 'sex', 'qtc', 'qt_uncorrected', 'heart_rate', 'blood_pressure', 'had_tdp', 'patient_type', 'treatment_successful', 'treatment_duration', 'drug_combinations', 'drug'])
 
 def analyze_papers(papers: List[Dict[str, Any]], drug_name: str) -> pd.DataFrame:
     """Analyze a list of papers and create a case report table."""
