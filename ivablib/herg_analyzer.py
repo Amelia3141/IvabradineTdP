@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from chembl_webresource_client.new_client import new_client
 import statistics
+import json
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -54,62 +55,54 @@ class DrugAnalyzer:
         """Search ChEMBL for hERG IC50 values"""
         try:
             molecule = new_client.molecule
-            activities = new_client.activity
+            results = molecule.filter(molecule_synonyms__molecule_synonym__iexact=compound_name).only(['molecule_chembl_id'])
             
-            # Search for the molecule
-            results = molecule.filter(molecule_synonyms__molecule_synonym__icontains=compound_name).only(['molecule_chembl_id'])
             if not results:
-                logger.warning(f"No ChEMBL results found for {compound_name}")
+                logger.warning(f"No results found for {compound_name}")
                 return None
                 
-            # Get activities for hERG
+            # Get activities
+            activities = new_client.activity
             herg_activities = []
-            for mol in results:
-                acts = activities.filter(
-                    molecule_chembl_id=mol['molecule_chembl_id'],
-                    target_chembl_id='CHEMBL240'  # hERG
+            
+            for result in results:
+                molecule_activities = activities.filter(
+                    target_chembl_id='CHEMBL240',  # hERG
+                    molecule_chembl_id=result['molecule_chembl_id'],
+                    standard_type__iregex='(IC50|Ki)'
                 ).only(['standard_value', 'standard_units'])
                 
-                for act in acts:
-                    if 'standard_value' in act and 'standard_units' in act:
-                        if act['standard_units'] == 'nM':
-                            herg_activities.append(float(act['standard_value']))
-                        elif act['standard_units'] == 'uM':
-                            herg_activities.append(float(act['standard_value']) * 1000)
+                for activity in molecule_activities:
+                    if activity.get('standard_value') and activity.get('standard_units') == 'nM':
+                        # Convert nM to μM
+                        herg_activities.append(float(activity['standard_value']) / 1000)
             
             if not herg_activities:
-                logger.warning(f"No hERG activity data found for {compound_name}")
+                logger.warning(f"No hERG activities found for {compound_name}")
                 return None
                 
             # Return median IC50
-            median_ic50 = statistics.median(herg_activities)
-            logger.info(f"Found hERG IC50 for {compound_name}: {median_ic50} nM")
-            return median_ic50
+            return statistics.median(herg_activities)
             
         except Exception as e:
             logger.error(f"Error searching ChEMBL: {str(e)}")
             return None
 
     def _check_crediblemeds(self, drug_name: str) -> Tuple[bool, str]:
-        """Check if drug is in CredibleMeds list of known TdP risk drugs.
-        Returns (is_risk, risk_category)"""
+        """Check if drug is in CredibleMeds database"""
         try:
-            data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
-            crediblemeds_file = os.path.join(data_dir, 'crediblemeds_data.txt')
-            logger.info(f"Checking CredibleMeds file: {crediblemeds_file}")
-            
-            # Create a dictionary of drug names to risk categories for faster lookup
-            drug_risks = {}
+            # Load CredibleMeds data
+            crediblemeds_file = os.path.join(os.path.dirname(__file__), 'data', 'crediblemeds.json')
             with open(crediblemeds_file, 'r') as f:
-                for line in f:
-                    if line.startswith('#') or '|' not in line:
-                        continue
-                    drug, risk = [x.strip() for x in line.split('|')]
-                    drug_risks[drug.lower()] = risk
+                crediblemeds_data = json.load(f)
             
-            risk_category = drug_risks.get(drug_name.lower(), '')
-            logger.info(f"CredibleMeds result for {drug_name}: {risk_category}")
-            return bool(risk_category), risk_category
+            # Search for drug
+            drug_lower = drug_name.lower()
+            for drug in crediblemeds_data:
+                if drug_lower == drug['name'].lower():
+                    return True, drug.get('category', 'Known Risk')
+            
+            return False, ''
             
         except Exception as e:
             logger.error(f"Error checking CredibleMeds: {str(e)}")
@@ -120,9 +113,13 @@ class DrugAnalyzer:
                                 herg_ic50: Optional[float] = None,
                                 dose: float = 5.0,  # mg
                                 volume_of_distribution: float = 100.0,  # L
-                                bioavailability: float = 0.4) -> DrugConcentration:
+                                bioavailability: float = 0.4) -> Optional[DrugConcentration]:
         """Calculate theoretical and plasma concentrations for a single dose"""
         try:
+            if not molecular_weight or molecular_weight <= 0:
+                logger.error("Invalid molecular weight")
+                return None
+            
             # Convert mg to μmol
             dose_umol = (dose * 1000) / molecular_weight
             
@@ -133,15 +130,18 @@ class DrugAnalyzer:
             plasma_concentration = theoretical_max * bioavailability
             
             # Calculate ratios if IC50 is available
-            ratio_theoretical = theoretical_max / herg_ic50 if herg_ic50 else None
-            ratio_plasma = plasma_concentration / herg_ic50 if herg_ic50 else None
+            ratio_theoretical = None
+            ratio_plasma = None
+            if herg_ic50 and herg_ic50 > 0:
+                ratio_theoretical = theoretical_max / herg_ic50
+                ratio_plasma = plasma_concentration / herg_ic50
             
             concentration = DrugConcentration(
-                dose=dose,
-                theoretical_max=theoretical_max,
-                plasma_concentration=plasma_concentration,
-                ratio_theoretical=ratio_theoretical,
-                ratio_plasma=ratio_plasma
+                dose=float(dose),
+                theoretical_max=float(theoretical_max),
+                plasma_concentration=float(plasma_concentration),
+                ratio_theoretical=float(ratio_theoretical) if ratio_theoretical is not None else None,
+                ratio_plasma=float(ratio_plasma) if ratio_plasma is not None else None
             )
             
             logger.info(f"Calculated concentrations: {concentration}")
@@ -236,7 +236,7 @@ class DrugAnalyzer:
                 concentration = self._calculate_concentrations(
                     molecular_weight=molecular_weight,
                     herg_ic50=herg_ic50,
-                    dose=dose
+                    dose=float(dose)
                 )
             
             # Determine if theoretical binding is likely
@@ -258,11 +258,11 @@ class DrugAnalyzer:
             # Add concentration data if available
             if concentration:
                 result.update({
-                    "dose": concentration.dose,
-                    "theoretical_max": concentration.theoretical_max,
-                    "plasma_concentration": concentration.plasma_concentration,
-                    "ratio_theoretical": concentration.ratio_theoretical,
-                    "ratio_plasma": concentration.ratio_plasma
+                    "dose": float(concentration.dose),
+                    "theoretical_max": float(concentration.theoretical_max),
+                    "plasma_concentration": float(concentration.plasma_concentration),
+                    "ratio_theoretical": float(concentration.ratio_theoretical) if concentration.ratio_theoretical is not None else None,
+                    "ratio_plasma": float(concentration.ratio_plasma) if concentration.ratio_plasma is not None else None
                 })
             
             logger.info(f"Analysis result: {result}")
