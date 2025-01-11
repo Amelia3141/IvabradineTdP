@@ -26,6 +26,12 @@ except ImportError:
 
 import difflib
 import csv
+import asyncio
+import aiohttp
+from functools import lru_cache
+import hashlib
+import pickle
+import os.path
 
 # Suppress SSL warnings
 urllib3.disable_warnings()
@@ -41,6 +47,35 @@ if HAVE_BIOPYTHON:
     Entrez.api_key = os.environ.get('NCBI_API_KEY')
     logger.info(f"Using email: {Entrez.email}")
     logger.info("NCBI credentials set up")
+
+# Cache directory for storing paper texts
+CACHE_DIR = os.path.join(os.getcwd(), '.paper_cache')
+os.makedirs(CACHE_DIR, exist_ok=True)
+
+@lru_cache(maxsize=1000)
+def get_cache_path(pmid: str) -> str:
+    """Get cache file path for a PMID"""
+    return os.path.join(CACHE_DIR, f"{pmid}.pkl")
+
+def cache_get(pmid: str) -> Optional[str]:
+    """Get paper text from cache"""
+    cache_path = get_cache_path(pmid)
+    if os.path.exists(cache_path):
+        try:
+            with open(cache_path, 'rb') as f:
+                return pickle.load(f)
+        except:
+            return None
+    return None
+
+def cache_set(pmid: str, text: str):
+    """Save paper text to cache"""
+    cache_path = get_cache_path(pmid)
+    try:
+        with open(cache_path, 'wb') as f:
+            pickle.dump(text, f)
+    except:
+        pass
 
 def get_from_scihub(url: str, output_dir: str, filename: str) -> Optional[str]:
     """Try to download a paper from Sci-Hub"""
@@ -413,63 +448,85 @@ def format_pubmed_results(records: List[Dict]) -> pd.DataFrame:
             
     return pd.DataFrame(results)
 
-def get_full_text(pmid: str, output_dir: str) -> Optional[str]:
-    """Get full text of a paper from PubMed Central, Crossref, or Sci-Hub"""
+async def get_full_text_async(pmid: str, session: aiohttp.ClientSession) -> Optional[str]:
+    """Get full text of a paper asynchronously"""
     try:
-        # First try PubMed Central
-        handle = Entrez.efetch(db="pmc", id=pmid, rettype="txt", retmode="text")
-        text = handle.read()
-        if text and len(text) > 100:  # Basic check to ensure we got meaningful text
-            logger.info(f"Got full text from PubMed Central for {pmid}")
-            return text
+        # Check cache first
+        cached = cache_get(pmid)
+        if cached:
+            return cached
+
+        # Try PMC first
+        async with session.get(f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pmc&id={pmid}&rettype=txt&retmode=text") as resp:
+            if resp.status == 200:
+                text = await resp.text()
+                if text and len(text) > 100:
+                    cache_set(pmid, text)
+                    return text
+
+        # Get DOI from PubMed
+        async with session.get(f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id={pmid}&rettype=xml&retmode=text") as resp:
+            if resp.status != 200:
+                return None
+                
+            xml = await resp.text()
+            doi_match = re.search(r'<ELocationID EIdType="doi">(.*?)</ELocationID>', xml)
+            if not doi_match:
+                return None
+                
+            doi = doi_match.group(1)
             
-        # If not in PMC, try getting DOI from PubMed
-        handle = Entrez.efetch(db="pubmed", id=pmid, rettype="xml", retmode="text")
-        records = Entrez.read(handle)
-        if records['PubmedArticle']:
-            article = records['PubmedArticle'][0]['MedlineCitation']['Article']
-            if 'ELocationID' in article:
-                for eloc in article['ELocationID']:
-                    if eloc.attributes['EIdType'] == 'doi':
-                        doi = str(eloc)
-                        
-                        # Try Crossref first
-                        try:
-                            crossref_url = f"https://api.crossref.org/works/{doi}"
-                            response = requests.get(crossref_url)
-                            if response.status_code == 200:
-                                data = response.json()
-                                if 'URL' in data['message']:
-                                    pdf_url = data['message']['URL']
-                                    response = requests.get(pdf_url)
-                                    if response.status_code == 200:
-                                        pdf_path = os.path.join(output_dir, f"{pmid}_crossref.pdf")
-                                        with open(pdf_path, 'wb') as f:
-                                            f.write(response.content)
-                                        text = extract_text_from_pdf(pdf_path)
-                                        if text:
-                                            logger.info(f"Got full text from Crossref for {pmid}")
-                                            return text
-                        except Exception as e:
-                            logger.warning(f"Error getting full text from Crossref for {pmid}: {str(e)}")
-                        
-                        # Finally try Sci-Hub
-                        try:
-                            pdf_path = get_from_scihub(doi, output_dir, f"{pmid}_scihub.pdf")
-                            if pdf_path:
-                                text = extract_text_from_pdf(pdf_path)
-                                if text:
-                                    logger.info(f"Got full text from Sci-Hub for {pmid}")
-                                    return text
-                        except Exception as e:
-                            logger.warning(f"Error getting full text from Sci-Hub for {pmid}: {str(e)}")
-        
-        logger.warning(f"Could not get full text for {pmid}")
+            # Try Sci-Hub directly
+            text = await get_from_scihub_async(doi, session)
+            if text:
+                cache_set(pmid, text)
+                return text
+                
         return None
         
     except Exception as e:
         logger.error(f"Error getting full text for {pmid}: {str(e)}")
         return None
+
+async def get_from_scihub_async(doi: str, session: aiohttp.ClientSession) -> Optional[str]:
+    """Get paper from Sci-Hub asynchronously"""
+    try:
+        scihub_url = f"https://sci-hub.se/{doi}"
+        async with session.get(scihub_url) as resp:
+            if resp.status != 200:
+                return None
+                
+            html = await resp.text()
+            pdf_match = re.search(r'<embed type="application/pdf" src="(.*?)"', html)
+            if not pdf_match:
+                return None
+                
+            pdf_url = pdf_match.group(1)
+            if not pdf_url.startswith('http'):
+                pdf_url = f"https:{pdf_url}"
+                
+            async with session.get(pdf_url) as pdf_resp:
+                if pdf_resp.status != 200:
+                    return None
+                    
+                pdf_data = await pdf_resp.read()
+                with open('temp.pdf', 'wb') as f:
+                    f.write(pdf_data)
+                    
+                text = extract_text_from_pdf('temp.pdf')
+                os.remove('temp.pdf')
+                return text
+                
+    except Exception as e:
+        logger.error(f"Error getting from Sci-Hub: {str(e)}")
+        return None
+
+async def get_texts_parallel(pmids: List[str]) -> Dict[str, str]:
+    """Get full texts for multiple PMIDs in parallel"""
+    async with aiohttp.ClientSession() as session:
+        tasks = [get_full_text_async(pmid, session) for pmid in pmids]
+        results = await asyncio.gather(*tasks)
+        return {pmid: text for pmid, text in zip(pmids, results) if text}
 
 def analyze_literature(drug_name: str) -> Dict:
     """Analyze literature for a drug"""
@@ -494,30 +551,27 @@ def analyze_literature(drug_name: str) -> Dict:
         cohort_studies = search_pubmed_cohort_studies(drug_name)
         clinical_trials = search_pubmed_clinical_trials(drug_name)
         
-        # Get full text papers and analyze them
+        # Only get full text for case reports to speed things up
         papers_to_analyze = []
-        for paper_type in [case_reports, cohort_studies, clinical_trials]:
-            if not paper_type.empty:
-                for _, paper in paper_type.iterrows():
-                    try:
-                        pmid = paper['PMID']
-                        if pmid == 'No PMID':
-                            continue
-                            
-                        # Try to get full text from various sources
-                        text = get_full_text(pmid, os.getcwd())
-                        if text:
-                            papers_to_analyze.append({
-                                'pmid': pmid,
-                                'title': paper['Title'],
-                                'authors': paper['Authors'].split(', '),
-                                'year': paper['Year'],
-                                'journal': paper['Journal'],
-                                'full_text': text
-                            })
-                    except Exception as e:
-                        logger.error(f"Error getting full text for {pmid}: {str(e)}")
-                        continue
+        if not case_reports.empty:
+            # Get PMIDs
+            pmids = [p for p in case_reports['PMID'].tolist() if p != 'No PMID']
+            
+            # Get texts in parallel
+            texts = asyncio.run(get_texts_parallel(pmids))
+            
+            # Create paper objects
+            for _, paper in case_reports.iterrows():
+                pmid = paper['PMID']
+                if pmid in texts:
+                    papers_to_analyze.append({
+                        'pmid': pmid,
+                        'title': paper['Title'],
+                        'authors': paper['Authors'].split(', '),
+                        'year': paper['Year'],
+                        'journal': paper['Journal'],
+                        'full_text': texts[pmid]
+                    })
         
         # Analyze papers using CaseReportAnalyzer
         from .case_report_analyzer import analyze_papers
