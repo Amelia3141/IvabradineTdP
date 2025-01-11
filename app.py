@@ -76,6 +76,28 @@ if analyze_button:
                         st.write(f"**Molecular Weight:** {analysis.get('molecular_weight', 'Not found')} g/mol")
                         st.write(f"**hERG IC50:** {analysis.get('herg_ic50', 'None')} μM")
                         st.write(f"**Source:** {analysis.get('source', 'Unknown')}")
+                        
+                        # Show concentration analysis
+                        concentrations = analysis.get('concentrations')
+                        if concentrations:
+                            st.subheader("Concentration Analysis")
+                            st.write(f"**Dose:** {concentrations['dose_mg']} mg")
+                            st.write(f"**Theoretical Max:** {concentrations['theoretical_uM']:.2f} μM")
+                            st.write(f"**Plasma Concentration:** {concentrations['plasma_uM']:.2f} μM")
+                            
+                            if concentrations['theoretical_ratio']:
+                                st.write(f"**Theoretical/IC50 Ratio:** {concentrations['theoretical_ratio']:.2f}")
+                                if concentrations['theoretical_ratio'] > 1:
+                                    st.warning("⚠️ Theoretical concentration exceeds hERG IC50")
+                                elif concentrations['theoretical_ratio'] > 0.1:
+                                    st.warning("⚠️ Theoretical concentration approaches hERG IC50")
+                            
+                            if concentrations['plasma_ratio']:
+                                st.write(f"**Plasma/IC50 Ratio:** {concentrations['plasma_ratio']:.2f}")
+                                if concentrations['plasma_ratio'] > 1:
+                                    st.error("⚠️ Plasma concentration exceeds hERG IC50")
+                                elif concentrations['plasma_ratio'] > 0.1:
+                                    st.warning("⚠️ Plasma concentration approaches hERG IC50")
                     
                     with col2:
                         st.subheader("Risk Assessment")
@@ -85,6 +107,8 @@ if analyze_button:
                             st.markdown("[View on CredibleMeds](https://crediblemeds.org)")
                         elif analysis.get('theoretical_binding'):
                             st.warning("⚠️ Potential hERG binding detected")
+                            if concentrations and concentrations['theoretical_ratio']:
+                                st.write(f"Theoretical concentration is {concentrations['theoretical_ratio']:.1f}x the IC50")
                         else:
                             st.success("✅ No significant hERG binding predicted")
                 
