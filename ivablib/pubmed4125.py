@@ -621,34 +621,23 @@ def process_papers(papers):
     try:
         analyzer = CaseReportAnalyzer()
         results = []
+        
         for paper in papers:
             pmid = str(paper['PMID'])
             text = paper.get('FullText', '')
             abstract = paper.get('Abstract', '')
             source = paper.get('TextSource', 'Unknown')
             
-            # Combine text sources for analysis
-            full_text = text
-            if not text and abstract:
-                full_text = abstract
-                
-            if full_text:
-                # Extract information using the analyzer
-                info = analyzer.analyze_paper({
-                    'PMID': pmid,
-                    'Title': paper.get('Title', ''),
-                    'Abstract': abstract,
-                    'FullText': full_text,
-                    'TextSource': source
-                })
-                
-                if info:
-                    results.append(info)
-                    logger.info(f"Successfully processed paper {pmid} from {source}")
-                else:
-                    logger.warning(f"No relevant information found in paper {pmid}")
+            logger.info(f"Processing paper {pmid} from {source}")
+            
+            # Extract information using the analyzer
+            info = analyzer.analyze_paper(paper)
+            
+            if info:
+                results.append(info)
+                logger.info(f"Successfully extracted information from paper {pmid}")
             else:
-                logger.warning(f"No text available to process for paper {pmid}")
+                logger.warning(f"No relevant information found in paper {pmid}")
                 
         logger.info(f"Successfully processed {len(results)} papers")
         return results
