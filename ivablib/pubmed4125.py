@@ -471,12 +471,34 @@ def search_pubmed_case_reports(drug_name: str) -> pd.DataFrame:
             results = []
             for paper in records['PubmedArticle']:
                 try:
+                    article = paper['MedlineCitation']['Article']
+                    
+                    # Extract DOI - check multiple possible locations
+                    doi = None
+                    if 'ELocationID' in article:
+                        for eloc in article['ELocationID']:
+                            if eloc.attributes.get('EIdType', '') == 'doi':
+                                doi = str(eloc)
+                                break
+                    if not doi and 'ArticleIdList' in paper['PubmedData']:
+                        for article_id in paper['PubmedData']['ArticleIdList']:
+                            if article_id.attributes.get('IdType', '') == 'doi':
+                                doi = str(article_id)
+                                break
+                    
                     paper_dict = {
                         'PMID': paper['MedlineCitation']['PMID'],
-                        'Title': paper['MedlineCitation']['Article']['ArticleTitle'],
-                        'Abstract': paper['MedlineCitation']['Article'].get('Abstract', {}).get('AbstractText', [''])[0],
-                        'Year': paper['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate'].get('Year', '')
+                        'Title': article['ArticleTitle'],
+                        'Abstract': article.get('Abstract', {}).get('AbstractText', [''])[0],
+                        'Year': article['Journal']['JournalIssue']['PubDate'].get('Year', ''),
+                        'DOI': doi
                     }
+                    
+                    if doi:
+                        logger.info(f"Found DOI for paper {paper_dict['PMID']}: {doi}")
+                    else:
+                        logger.warning(f"No DOI found for paper {paper_dict['PMID']}")
+                        
                     results.append(paper_dict)
                 except Exception as e:
                     logger.error(f"Error processing paper: {e}")
