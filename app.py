@@ -133,9 +133,9 @@ if analyze_button:
                     
                     if 'error' in literature:
                         st.error(f"Error analyzing literature: {literature['error']}")
-                    elif literature and 'case_reports' in literature:
+                    elif 'case_reports' in literature:
                         papers = literature['case_reports']
-                        if papers:
+                        if isinstance(papers, list) and len(papers) > 0:
                             st.write(f"Found {len(papers)} relevant papers")
                             
                             # Create a download button for the full dataset

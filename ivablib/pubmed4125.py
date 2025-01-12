@@ -535,28 +535,95 @@ def analyze_literature(drug_name):
             logger.info(f"No papers found for {drug_name}")
             return {
                 'case_reports': [],
-                'total_cases': 0,
                 'message': f"No case reports found for {drug_name}"
             }
             
         # Get full texts
         papers = get_full_texts(papers)
+        if not papers:
+            logger.info(f"No full texts found for {drug_name}")
+            return {
+                'case_reports': [],
+                'message': f"No full texts available for {drug_name}"
+            }
         
         # Process papers
-        processed_papers = process_papers(papers)
+        result = process_papers(papers)
+        if 'error' in result:
+            return result
         
-        return {
-            'case_reports': processed_papers,
-            'total_cases': len(processed_papers)
-        }
+        if not result.get('case_reports'):
+            return {
+                'case_reports': [],
+                'message': f"No relevant case reports found for {drug_name}"
+            }
+            
+        return result
         
     except Exception as e:
         logger.error(f"Error in analyze_literature: {str(e)}")
         return {
-            'error': f"Error analyzing literature: {str(e)}",
-            'case_reports': [],
-            'total_cases': 0
+            'error': f"Error analyzing literature: {str(e)}"
         }
+
+def get_full_texts(papers):
+    """Get full texts for papers"""
+    papers_with_text = []
+    total_papers = len(papers)
+    texts_found = 0
+    
+    for paper in papers:
+        pmid = str(paper.get('PMID', ''))
+        doi = paper.get('DOI', '')
+        
+        logger.info(f"Getting text for paper {pmid}")
+        
+        # Get text from various sources
+        text, source = get_full_text(pmid, doi)
+        
+        if text:
+            texts_found += 1
+            paper_with_text = {
+                'PMID': pmid,
+                'Title': paper.get('Title', ''),
+                'Abstract': paper.get('Abstract', ''),
+                'FullText': text,
+                'TextSource': source,
+                'DOI': doi
+            }
+            papers_with_text.append(paper_with_text)
+            logger.info(f"Added text for paper {pmid} from {source}")
+        else:
+            logger.warning(f"No text found for paper {pmid}")
+    
+    logger.info(f"Found text for {texts_found} out of {total_papers} papers")
+    return papers_with_text
+
+def process_papers(papers):
+    """Process papers to extract relevant information"""
+    try:
+        analyzer = CaseReportAnalyzer()
+        results = []
+        
+        for paper in papers:
+            # Extract information using the analyzer
+            info = analyzer.analyze_paper(paper)
+            if info:
+                results.append(info)
+                logger.info(f"Successfully processed paper {paper.get('PMID', 'Unknown')}")
+            else:
+                logger.warning(f"No relevant information found in paper {paper.get('PMID', 'Unknown')}")
+                
+        if results:
+            logger.info(f"Successfully processed {len(results)} papers")
+            return {'case_reports': results}
+        else:
+            logger.warning("No case reports found in any papers")
+            return {'message': "No case reports found in the literature."}
+        
+    except Exception as e:
+        logger.error(f"Error processing papers: {str(e)}")
+        return {'error': str(e)}
 
 def get_paper_details(pmids):
     """Get paper details from PubMed"""
@@ -589,70 +656,6 @@ def get_paper_details(pmids):
     except Exception as e:
         logger.error(f"Error getting paper details: {e}")
         return pd.DataFrame()
-
-def get_full_texts(papers):
-    """Get full texts for papers"""
-    papers_with_text = []
-    total_papers = len(papers)
-    texts_found = 0
-    
-    for paper in papers:
-        pmid = paper.get('PMID')
-        doi = paper.get('DOI')
-        
-        if not pmid:
-            logger.warning(f"Skipping paper without PMID: {paper.get('Title', 'Unknown Title')}")
-            continue
-            
-        text, source = get_full_text(pmid, doi)
-        if text:
-            texts_found += 1
-            paper['FullText'] = text
-            paper['TextSource'] = source
-            papers_with_text.append(paper)
-        else:
-            # If we couldn't get full text but have abstract in the paper data
-            if paper.get('Abstract'):
-                logger.info(f"Using provided abstract for {pmid} as fallback")
-                paper['FullText'] = paper['Abstract']
-                paper['TextSource'] = 'PubMed Abstract'
-                papers_with_text.append(paper)
-                texts_found += 1
-            else:
-                logger.warning(f"No text available for {pmid}")
-    
-    logger.info(f"Got {texts_found} full texts out of {total_papers} papers")
-    return papers_with_text
-
-def process_papers(papers):
-    """Process papers to extract relevant information"""
-    try:
-        analyzer = CaseReportAnalyzer()
-        results = []
-        
-        for paper in papers:
-            pmid = str(paper['PMID'])
-            text = paper.get('FullText', '')
-            abstract = paper.get('Abstract', '')
-            source = paper.get('TextSource', 'Unknown')
-            
-            logger.info(f"Processing paper {pmid} from {source}")
-            
-            # Extract information using the analyzer
-            info = analyzer.analyze_paper(paper)
-            
-            if info:
-                results.append(info)
-                logger.info(f"Successfully extracted information from paper {pmid}")
-            else:
-                logger.warning(f"No relevant information found in paper {pmid}")
-                
-        logger.info(f"Successfully processed {len(results)} papers")
-        return results
-        
-    except Exception as e:
-        logger.error(f"Error processing papers: {str(e)}")
-        return []
 
 def main():
     if len(sys.argv) != 2:
