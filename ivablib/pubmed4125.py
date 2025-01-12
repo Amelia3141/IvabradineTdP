@@ -218,28 +218,38 @@ def search_pubmed_case_reports(drug_name: str) -> pd.DataFrame:
         try:
             # Search PubMed
             handle = Entrez.esearch(db="pubmed", term=query, retmax=100)
+            logger.info("Got esearch handle")
             record = Entrez.read(handle)
+            logger.info(f"Search returned {len(record['IdList'])} results")
             handle.close()
             
             if not record["IdList"]:
+                logger.info("No results found")
                 return pd.DataFrame()
                 
             # Fetch details
+            logger.info(f"Fetching details for {len(record['IdList'])} papers")
             handle = Entrez.efetch(db="pubmed", id=record["IdList"], 
                                  rettype="xml", retmode="text")
             records = Entrez.read(handle)
+            logger.info(f"Got {len(records['PubmedArticle'])} paper details")
             handle.close()
 
             results = []
             for paper in records['PubmedArticle']:
-                paper_dict = {
-                    'PMID': paper['MedlineCitation']['PMID'],
-                    'Title': paper['MedlineCitation']['Article']['ArticleTitle'],
-                    'Abstract': paper['MedlineCitation']['Article'].get('Abstract', {}).get('AbstractText', [''])[0],
-                    'Year': paper['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate'].get('Year', '')
-                }
-                results.append(paper_dict)
+                try:
+                    paper_dict = {
+                        'PMID': paper['MedlineCitation']['PMID'],
+                        'Title': paper['MedlineCitation']['Article']['ArticleTitle'],
+                        'Abstract': paper['MedlineCitation']['Article'].get('Abstract', {}).get('AbstractText', [''])[0],
+                        'Year': paper['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate'].get('Year', '')
+                    }
+                    results.append(paper_dict)
+                except Exception as e:
+                    logger.error(f"Error processing paper: {e}")
+                    continue
             
+            logger.info(f"Processed {len(results)} papers successfully")
             return pd.DataFrame(results)
             
         except Exception as e:
