@@ -145,24 +145,22 @@ if analyze_button:
                             # Create a dataframe from case reports
                             case_reports_df = pd.DataFrame(literature['case_reports'])
                             
-                            # Format numeric columns
-                            numeric_cols = ['Age', 'Oral Dose (mg)', 'QT (ms)', 'QTc (ms)', 'Heart Rate (bpm)']
-                            for col in numeric_cols:
-                                if col in case_reports_df.columns:
-                                    case_reports_df[col] = pd.to_numeric(case_reports_df[col], errors='coerce')
-                                    case_reports_df[col] = case_reports_df[col].round(1)
-                            
-                            # Add styling
+                            # Add styling for the table
                             st.markdown("""
                             <style>
                             .stDataFrame {
                                 width: 100%;
-                                font-size: 14px;
                             }
                             .stDataFrame td {
-                                white-space: pre-wrap;
-                                max-width: 300px;
-                                overflow-wrap: break-word;
+                                white-space: nowrap;
+                                max-width: 500px;
+                                overflow: hidden;
+                                text-overflow: ellipsis;
+                            }
+                            .stDataFrame td:nth-child(3),
+                            .stDataFrame td:nth-child(4) {
+                                white-space: normal;
+                                min-width: 300px;
                             }
                             </style>
                             """, unsafe_allow_html=True)
@@ -171,7 +169,12 @@ if analyze_button:
                             st.dataframe(
                                 case_reports_df,
                                 use_container_width=True,
-                                height=400
+                                column_config={
+                                    "title": "Title",
+                                    "year": "Year",
+                                    "abstract": "Abstract",
+                                    "full_text": "Full Text"
+                                }
                             )
                             
                             # Add download button for CSV

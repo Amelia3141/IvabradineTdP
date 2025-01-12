@@ -532,12 +532,62 @@ def analyze_literature(drug_name: str) -> Dict:
             # Create paper objects
             for _, paper in case_reports.iterrows():
                 pmid = paper['PMID']
+                text = texts.get(pmid, 'None')
+                
+                # Extract fields using regex patterns
                 case_report = {
                     'title': paper['Title'] if not pd.isna(paper['Title']) else '',
                     'year': int(paper['Year']) if not pd.isna(paper['Year']) else '',
                     'abstract': paper['Abstract'] if not pd.isna(paper['Abstract']) else '',
-                    'full_text': texts.get(pmid, 'None')
+                    'full_text': text,
+                    'age': '',  # Will be extracted by regex
+                    'sex': '',  # Will be extracted by regex
+                    'oral_dose': '',  # Will be extracted by regex
+                    'theoretical_max': '',  # Will be extracted by regex
+                    'bioavailability': '',  # Will be extracted by regex
+                    'herg_ic50': '',  # Will be extracted by regex
+                    'plasma_concentration': '',  # Will be extracted by regex
+                    'qt': '',  # Will be extracted by regex
+                    'qtc': '',  # Will be extracted by regex
+                    'qtr': '',  # Will be calculated later
+                    'qtf': '',  # Will be calculated later
+                    'heart_rate': '',  # Will be extracted by regex
+                    'tdp': 'No',  # Will be updated by regex
+                    'blood_pressure': '',  # Will be extracted by regex
+                    'medical_history': '',  # Will be extracted by regex
+                    'medication_history': '',  # Will be extracted by regex
+                    'treatment_course': ''  # Will be extracted by regex
                 }
+                
+                # Extract information using regex patterns
+                if text:
+                    combined_text = text + ' ' + case_report['abstract']
+                    patterns = {
+                        'age': re.compile(r'(?:(?:aged?|age[d\s:]*|a|was)\s*)?(\d+)[\s-]*(?:year|yr|y|yo|years?)[s\s-]*(?:old|of\s+age)?|(?:age[d\s:]*|aged\s*)(\d+)', re.IGNORECASE),
+                        'sex': re.compile(r'\b(?:male|female|man|woman|boy|girl|[MF]\s*/\s*(?:\d+|[MF])|gender[\s:]+(?:male|female)|(?:he|she|his|her)\s+was)\b', re.IGNORECASE),
+                        'oral_dose': re.compile(r'(?:oral\s+dose|dose[d\s]*orally|given|administered|took|ingested|consumed|prescribed)\s*(?:with|at|of|a|total)?\s*(\d+\.?\d*)\s*(?:mg|milligrams?|g|grams?|mcg|micrograms?)', re.IGNORECASE),
+                        'theoretical_max': re.compile(r'(?:maximum|max|peak|highest|cmax|c-?max)\s*(?:concentration|conc|level|exposure)\s*(?:of|was|is|reached|measured|observed|calculated)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*(?:μM|uM|micromolar|nmol/[lL]|μmol/[lL]|ng/m[lL])', re.IGNORECASE),
+                        'bioavailability': re.compile(r'(?:bioavailability|F|absorption|systemic\s+availability)\s*(?:of|was|is|approximately|about|~)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*%?', re.IGNORECASE),
+                        'herg_ic50': re.compile(r'(?:hERG\s+IC50|IC50\s+(?:value\s+)?(?:for|of)\s+hERG|half-?maximal\s+(?:inhibitory)?\s+concentration|IC50)\s*(?:of|was|is|=|:)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*(?:μM|uM|micromolar|nmol/[lL]|μmol/[lL])', re.IGNORECASE),
+                        'plasma_concentration': re.compile(r'(?:plasma|blood|serum)\s*(?:concentration|level|exposure|Cmax|C-max)\s*(?:of|was|is|measured|found|detected|reached)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*(?:μM|uM|micromolar|ng/m[lL]|μg/m[lL]|mg/[lL]|g/[lL])', re.IGNORECASE),
+                        'qt': re.compile(r'\b(?:QT|uncorrected\s+QT|QT\s*interval|interval\s*QT|baseline\s*QT)[\s:]*(?:interval|duration|measurement|value)?\s*(?:of|was|is|=|:|measured|found|documented|recorded)?\s*(\d+\.?\d*)\s*(?:ms(?:ec)?|milliseconds?|s(?:ec)?|seconds?)?', re.IGNORECASE),
+                        'qtc': re.compile(r'(?:QTc[FBR]?|corrected\s+QT|QT\s*corrected|QT[c]?\s*interval\s*(?:corrected)?|corrected\s*QT\s*interval)[\s:]*(?:interval|duration|measurement|prolongation|value)?\s*(?:of|was|is|=|:|measured|found|documented|recorded)?\s*(\d+\.?\d*)\s*(?:ms(?:ec)?|milliseconds?|s(?:ec)?|seconds?)?', re.IGNORECASE),
+                        'heart_rate': re.compile(r'(?:heart\s+rate|HR|pulse|ventricular\s+rate|heart\s+rhythm|cardiac\s+rate)[\s:]*(?:of|was|is|=|:)?\s*(\d+)(?:\s*(?:beats?\s*per\s*min(?:ute)?|bpm|min-1|/min))?', re.IGNORECASE),
+                        'blood_pressure': re.compile(r'(?:blood\s+pressure|BP|arterial\s+pressure)[\s:]*(?:of|was|is|=|:)?\s*([\d/]+)(?:\s*mm\s*Hg)?', re.IGNORECASE),
+                        'tdp': re.compile(r'\b(?:torsade[s]?\s*(?:de)?\s*pointes?|TdP|torsades|polymorphic\s+[vV]entricular\s+[tT]achycardia|PVT\s+(?:with|showing)\s+[tT]dP)\b', re.IGNORECASE),
+                        'medical_history': re.compile(r'(?:medical|clinical|past|previous|documented|known|significant)\s*(?:history|condition|diagnosis|comorbidities)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE),
+                        'medication_history': re.compile(r'(?:medication|drug|prescription|current\s+medications?|concomitant\s+medications?)\s*(?:history|list|profile|regime)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE),
+                        'treatment_course': re.compile(r'(?:treatment|therapy|management|intervention|administered|given)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE)
+                    }
+                    
+                    for field, pattern in patterns.items():
+                        match = pattern.search(combined_text)
+                        if match:
+                            if field == 'tdp':
+                                case_report[field] = 'Yes'
+                            else:
+                                groups = [g for g in match.groups() if g is not None]
+                                case_report[field] = groups[0] if groups else match.group(0)
                 
                 results['case_reports'].append(case_report)
                 if case_report['year']:
