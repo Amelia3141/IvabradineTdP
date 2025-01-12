@@ -531,13 +531,16 @@ def analyze_literature(drug_name):
         
         # Search for papers
         papers = search_pubmed_case_reports(drug_name)
-        if not papers:
+        if papers.empty:  
             logger.info(f"No papers found for {drug_name}")
             return {
                 'case_reports': [],
                 'message': f"No case reports found for {drug_name}"
             }
             
+        # Convert DataFrame to list of dicts for processing
+        papers = papers.to_dict('records')
+        
         # Get full texts
         papers = get_full_texts(papers)
         if not papers:
