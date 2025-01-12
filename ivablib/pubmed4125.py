@@ -17,6 +17,7 @@ import difflib
 import csv
 import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor
+from .case_report_analyzer import CaseReportAnalyzer
 
 # Suppress SSL warnings
 requests.packages.urllib3.disable_warnings()
