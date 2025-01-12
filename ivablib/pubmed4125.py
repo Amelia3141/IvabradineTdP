@@ -144,9 +144,14 @@ def get_crossref_text(doi):
     """Get full text using DOI from Crossref."""
     try:
         # First get the redirect URL
-        headers = {'Accept': 'text/html', 'User-Agent': 'TdPAnalyzer/1.0'}
+        headers = {
+            'Accept': 'text/html',
+            'User-Agent': 'TdPAnalyzer/1.0 (mailto:your@email.com)'
+        }
         response = requests.get(f"https://doi.org/{doi}", headers=headers, allow_redirects=True)
         final_url = response.url
+        
+        logger.info(f"Redirected to: {final_url}")
         
         # Now get the content from the final URL
         response = requests.get(final_url, headers=headers)
@@ -154,14 +159,33 @@ def get_crossref_text(doi):
         
         # Try different possible content containers
         article_text = (
-            soup.find('div', {'class': 'fulltext-view'}) or
+            # Elsevier specific selectors
             soup.find('div', {'class': 'article-body'}) or
             soup.find('div', {'id': 'body'}) or
-            soup.find('article')
+            soup.find('div', {'class': 'article-text'}) or
+            soup.find('div', {'class': 'article-content'}) or
+            soup.find('div', {'class': 'main-content'}) or
+            # ScienceDirect specific
+            soup.find('div', {'id': 'centerInner'}) or
+            soup.find('div', {'class': 'article'}) or
+            # Generic article containers
+            soup.find('div', {'class': 'fulltext-view'}) or
+            soup.find('article') or
+            # Abstract as fallback
+            soup.find('div', {'class': 'abstract'}) or
+            soup.find('abstract')
         )
         
         if article_text:
-            return article_text.get_text(separator=' ', strip=True)
+            # Clean the text
+            text = article_text.get_text(separator=' ', strip=True)
+            # Remove excessive whitespace
+            text = ' '.join(text.split())
+            logger.info(f"Successfully extracted {len(text)} characters of text from {final_url}")
+            return text
+        else:
+            logger.warning(f"No article text found at {final_url}")
+            
     except Exception as e:
         logger.error(f"Error getting Crossref text: {e}")
     return None
@@ -383,9 +407,26 @@ def format_pubmed_results(records: List[Dict]) -> pd.DataFrame:
         try:
             paper_dict = {
                 'PMID': record['MedlineCitation']['PMID'],
-                'Title': record['MedlineCitation']['Article']['ArticleTitle'],
+                'Case Report Title': record['MedlineCitation']['Article']['ArticleTitle'],
                 'Abstract': record['MedlineCitation']['Article'].get('Abstract', {}).get('AbstractText', [''])[0],
-                'Year': record['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate'].get('Year', '')
+                'Year': record['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate'].get('Year', ''),
+                'Age': '',  # Will be extracted by regex
+                'Sex': '',  # Will be extracted by regex
+                'Oral Dose (mg)': '',  # Will be extracted by regex
+                'theoretical max concentration (μM)': '',  # Will be extracted by regex
+                '40% bioavailability': '',  # Will be extracted by regex
+                'Theoretical HERG IC50 / Concentration μM': '',  # Will be extracted by regex
+                '40% Plasma concentration': '',  # Will be extracted by regex
+                'Uncorrected QT (ms)': '',  # Will be extracted by regex
+                'QTc': '',  # Will be extracted by regex
+                'QTR': '',  # Will be calculated later
+                'QTF': '',  # Will be calculated later
+                'Heart Rate (bpm)': '',  # Will be extracted by regex
+                'Torsades de Pointes?': 'No',  # Will be updated by regex
+                'Blood Pressure (mmHg)': '',  # Will be extracted by regex
+                'Medical History': '',  # Will be extracted by regex
+                'Medication History': '',  # Will be extracted by regex
+                'Course of Treatment': ''  # Will be extracted by regex
             }
             results.append(paper_dict)
         except Exception as e:
@@ -492,17 +533,15 @@ def analyze_literature(drug_name: str) -> Dict:
             for _, paper in case_reports.iterrows():
                 pmid = paper['PMID']
                 case_report = {
-                    'pmid': pmid,
-                    'title': paper['Title'],
-                    'year': paper['Year'],
-                    'abstract': paper['Abstract']
+                    'title': paper['Title'] if not pd.isna(paper['Title']) else '',
+                    'year': int(paper['Year']) if not pd.isna(paper['Year']) else '',
+                    'abstract': paper['Abstract'] if not pd.isna(paper['Abstract']) else '',
+                    'full_text': texts.get(pmid, 'None')
                 }
-                # Add full text if available
-                if pmid in texts:
-                    case_report['full_text'] = texts[pmid]
                 
                 results['case_reports'].append(case_report)
-                results['years'].append(paper['Year'])
+                if case_report['year']:
+                    results['years'].append(case_report['year'])
                     
             results['total_cases'] = len(results['case_reports'])
             
