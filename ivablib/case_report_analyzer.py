@@ -11,6 +11,28 @@ import PyPDF2
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+def clean_text(text: str) -> str:
+    """Clean and normalize text."""
+    if not text:
+        return ""
+    
+    # Remove excessive whitespace
+    text = ' '.join(text.split())
+    
+    # Fix common OCR/PDF extraction issues
+    text = text.replace('|', 'I')  # Common OCR error
+    text = text.replace('—', '-')  # Normalize dashes
+    text = text.replace('–', '-')
+    text = text.replace(''', "'")
+    text = text.replace('"', '"')
+    text = text.replace('"', '"')
+    
+    # Fix spacing around numbers and units
+    text = re.sub(r'(\d)([a-zA-Z])', r'\1 \2', text)  # Add space between number and unit
+    text = re.sub(r'(\d)\s+([.,])\s*(\d)', r'\1\2\3', text)  # Fix decimal numbers
+    
+    return text
+
 class CaseReportAnalyzer:
     """Analyzes medical case reports for relevant information."""
     
@@ -203,7 +225,7 @@ class CaseReportAnalyzer:
                     continue
                 
                 # Clean the text
-                text = self._clean_text(text)
+                text = clean_text(text)
                 
                 # Extract all values with context
                 result = {
@@ -344,52 +366,78 @@ class CaseReportAnalyzer:
         if not match:
             return ""
             
-        # Get context around the match
+        # Get the matched text and its context
+        matched_text = match.group(0)
         context = self.get_smart_context(text, match.start(), match.end())
-        return context
         
+        # Return the first group if available, otherwise the whole match
+        groups = [g for g in match.groups() if g is not None]
+        value = groups[0] if groups else matched_text
+        
+        return value
+
     def _extract_numeric(self, text: str) -> Optional[float]:
         """Extract numeric value from text."""
         if not text:
             return None
             
-        # Look for numbers in the text
-        numbers = re.findall(r'(\d+\.?\d*)', text)
-        if not numbers:
-            return None
-            
-        # Return the first number found
         try:
-            return float(numbers[0])
-        except ValueError:
-            return None
+            # Find first number in text
+            match = re.search(r'(\d+\.?\d*)', text)
+            if match:
+                return float(match.group(1))
+        except Exception as e:
+            logger.error(f"Error extracting numeric value: {e}")
             
+        return None
+
     def _extract_unit(self, text: str) -> str:
         """Extract unit from dosing text."""
         if not text:
             return ""
             
-        units = re.findall(r'(?:mg|milligrams?|g|grams?|mcg|micrograms?|µg)', text, re.IGNORECASE)
-        return units[0] if units else ""
-        
+        try:
+            # Look for common units after numbers
+            match = re.search(r'\d+\.?\d*\s*([a-zA-Z]+)', text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            logger.error(f"Error extracting unit: {e}")
+            
+        return ""
+
     def _extract_frequency(self, text: str) -> str:
         """Extract frequency from dosing text."""
         if not text:
             return ""
             
-        freq = re.findall(r'(?:per|a|each|every|q|q\.)\s*(?:day|daily|d|qd|od|q\.?d\.?|24\s*h(?:ours?)?|diem)|(?:once|twice|thrice|[1-4]x|q\.?d|bid|tid|qid)', text, re.IGNORECASE)
-        return freq[0] if freq else ""
-        
+        try:
+            # Look for common frequency patterns
+            freq_patterns = [
+                r'(once|twice|thrice|[1-4]x|q\.?d|bid|tid|qid)',
+                r'(per|a|each|every|q|q\.)\s*(?:day|daily|d|qd|od|q\.?d\.?|24\s*h(?:ours?)?|diem)'
+            ]
+            
+            for pattern in freq_patterns:
+                match = re.search(pattern, text, re.IGNORECASE)
+                if match:
+                    return match.group(0)
+        except Exception as e:
+            logger.error(f"Error extracting frequency: {e}")
+            
+        return ""
+
     def _clean_sex(self, text: str) -> str:
         """Clean and standardize sex value."""
         if not text:
             return ""
             
         text = text.lower()
-        if any(term in text for term in ['male', 'man', 'boy', 'm/']):
-            return "male"
-        elif any(term in text for term in ['female', 'woman', 'girl', 'f/']):
-            return "female"
+        if any(term in text for term in ['male', 'man', 'm/', 'boy']):
+            return "Male"
+        elif any(term in text for term in ['female', 'woman', 'f/', 'girl']):
+            return "Female"
+            
         return ""
 
     def extract_value(self, text: str, pattern: re.Pattern) -> Optional[str]:
@@ -425,33 +473,6 @@ class CaseReportAnalyzer:
             logger.error(f"Error in regex matching: {e}")
             
         return None
-
-    def _clean_text(self, text: str) -> str:
-        """Clean and normalize text."""
-        if not text:
-            return ""
-        
-        # Remove excessive whitespace
-        text = ' '.join(text.split())
-        
-        # Fix common OCR/PDF extraction issues
-        text = text.replace('|', 'I')  # Common OCR error
-        text = text.replace('—', '-')  # Normalize dashes
-        text = text.replace('–', '-')
-        text = text.replace(''', "'")
-        text = text.replace('"', '"')
-        text = text.replace('"', '"')
-        
-        # Fix spacing around numbers and units
-        text = re.sub(r'(\d)([a-zA-Z])', r'\1 \2', text)  # Add space between number and unit
-        text = re.sub(r'(\d)\s+([.,])\s*(\d)', r'\1\2\3', text)  # Fix decimal numbers
-        
-        return text
-        
-def analyze_papers(papers: List[Dict[str, Any]], drug_name: str) -> pd.DataFrame:
-    """Analyze a list of papers and create a case report table."""
-    analyzer = CaseReportAnalyzer()
-    return analyzer.analyze_papers(papers, drug_name)
 
 def convert_pdf_to_text(pdf_path: str) -> Optional[str]:
     """Convert a PDF file to text and save it"""
