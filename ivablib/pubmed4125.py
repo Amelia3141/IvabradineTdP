@@ -36,61 +36,114 @@ def get_full_text(pmid, doi=None):
     """Get full text from PMC, Crossref, or Sci-Hub in that order."""
     text = None
     source = None
-    logger.info(f"Attempting to get full text for PMID {pmid}, DOI {doi}")
-
+    
     # Try PMC first
     try:
+        logger.info(f"Attempting PMC retrieval for PMID {pmid}")
         pmc_id = get_pmcid_from_pmid(pmid)
-        logger.info(f"PMC ID for {pmid}: {pmc_id}")
         if pmc_id:
             text = get_pmc_text(pmc_id)
             if text:
                 source = 'PMC'
-                logger.info(f"Successfully got text from PMC for {pmid}")
+                logger.info("Successfully retrieved from PMC")
                 return text, source
             else:
-                logger.info(f"No text found in PMC for {pmid}")
+                logger.info("No text found in PMC")
     except Exception as e:
-        logger.error(f"Error getting PMC text for {pmid}: {e}")
+        logger.error(f"Error retrieving from PMC: {e}")
 
-    # Try Crossref next if we have a DOI
+    # Try Crossref if we have a DOI
     if doi:
         try:
-            logger.info(f"Trying Crossref for {pmid} with DOI {doi}")
-            crossref_text = get_crossref_text(doi)
-            if crossref_text:
-                text = crossref_text
+            logger.info(f"Attempting Crossref retrieval for DOI {doi}")
+            text = get_crossref_text(doi)
+            if text:
                 source = 'Crossref'
-                logger.info(f"Successfully got text from Crossref for {pmid}")
+                logger.info("Successfully retrieved from Crossref")
                 return text, source
             else:
-                logger.info(f"No text found in Crossref for {pmid}")
+                logger.info("No text found in Crossref or hit paywall")
         except Exception as e:
-            logger.error(f"Error getting Crossref text for {doi}: {e}")
+            logger.error(f"Error retrieving from Crossref: {e}")
 
     # Finally try Sci-Hub with retries
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            logger.info(f"Trying Sci-Hub for {pmid} (attempt {attempt + 1}/{max_retries})")
-            scihub_text = get_scihub_text(pmid, doi)
-            if scihub_text:
-                text = scihub_text
+            logger.info(f"Attempting Sci-Hub retrieval (attempt {attempt + 1}/{max_retries})")
+            text = get_scihub_text(pmid, doi)
+            if text:
                 source = 'Sci-Hub'
-                logger.info(f"Successfully got text from Sci-Hub for {pmid}")
+                logger.info("Successfully retrieved from Sci-Hub")
                 return text, source
             else:
-                logger.info(f"No text found in Sci-Hub for {pmid} on attempt {attempt + 1}")
-            # Add a delay between retries
+                logger.info(f"No text found in Sci-Hub on attempt {attempt + 1}")
+            
             if attempt < max_retries - 1:
-                time.sleep(2)
+                delay = 2 * (attempt + 1)  # Exponential backoff
+                logger.info(f"Waiting {delay} seconds before next attempt...")
+                time.sleep(delay)
         except Exception as e:
-            logger.error(f"Error getting Sci-Hub text for {pmid} on attempt {attempt + 1}: {e}")
+            logger.error(f"Error retrieving from Sci-Hub on attempt {attempt + 1}: {e}")
             if attempt < max_retries - 1:
-                time.sleep(2)
+                delay = 2 * (attempt + 1)
+                logger.info(f"Waiting {delay} seconds before next attempt...")
+                time.sleep(delay)
 
-    logger.warning(f"Could not get full text for {pmid} from any source (PMC, Crossref, or Sci-Hub)")
+    logger.warning(f"Failed to retrieve text from any source for PMID {pmid}")
     return text, source
+
+def get_full_texts(papers):
+    """Get full texts for papers"""
+    papers_with_text = []
+    total_papers = len(papers)
+    texts_found = 0
+    retrieval_stats = {
+        'PMC': 0,
+        'Crossref': 0,
+        'Sci-Hub': 0,
+        'Failed': 0
+    }
+    
+    for paper in papers:
+        pmid = str(paper.get('PMID', ''))
+        doi = paper.get('DOI', '')
+        
+        logger.info(f"\nAttempting to retrieve text for paper {pmid}")
+        logger.info(f"Title: {paper.get('Title', 'No title')}")
+        if doi:
+            logger.info(f"DOI: {doi}")
+        
+        # Get text from various sources
+        text, source = get_full_text(pmid, doi)
+        
+        if text:
+            texts_found += 1
+            retrieval_stats[source] += 1
+            paper_with_text = paper.copy()  # Keep all original paper data
+            paper_with_text.update({
+                'FullText': text,
+                'TextSource': source
+            })
+            papers_with_text.append(paper_with_text)
+            logger.info(f"Successfully retrieved text from {source}")
+        else:
+            retrieval_stats['Failed'] += 1
+            logger.warning(f"Failed to retrieve text for paper {pmid}")
+            logger.warning("Attempted sources: PMC, Crossref, and Sci-Hub")
+            
+    # Log detailed statistics
+    logger.info("\nText Retrieval Statistics:")
+    logger.info(f"Total papers processed: {total_papers}")
+    logger.info(f"Successful retrievals: {texts_found}")
+    logger.info(f"Success rate: {(texts_found/total_papers*100):.1f}%")
+    logger.info("\nSource breakdown:")
+    logger.info(f"- PMC: {retrieval_stats['PMC']} papers")
+    logger.info(f"- Crossref: {retrieval_stats['Crossref']} papers")
+    logger.info(f"- Sci-Hub: {retrieval_stats['Sci-Hub']} papers")
+    logger.info(f"- Failed: {retrieval_stats['Failed']} papers")
+    
+    return papers_with_text
 
 def get_pmcid_from_pmid(pmid):
     """Convert PMID to PMCID using NCBI's ID converter."""
@@ -522,35 +575,6 @@ def format_pubmed_results(records: List[Dict]) -> pd.DataFrame:
             continue
             
     return pd.DataFrame(results)
-
-def get_full_texts(papers):
-    """Get full texts for papers"""
-    papers_with_text = []
-    total_papers = len(papers)
-    texts_found = 0
-    
-    for paper in papers:
-        pmid = str(paper.get('PMID', ''))
-        doi = paper.get('DOI', '')
-        
-        logger.info(f"Getting text for paper {pmid}")
-        
-        # Get text from various sources
-        text, source = get_full_text(pmid, doi)
-        
-        if text:
-            texts_found += 1
-            paper_with_text = paper.copy()  # Keep all original paper data
-            paper_with_text.update({
-                'FullText': text,
-                'TextSource': source
-            })
-            papers_with_text.append(paper_with_text)
-        else:
-            logger.warning(f"No text found for paper {pmid}")
-            
-    logger.info(f"Found text for {texts_found} out of {total_papers} papers")
-    return papers_with_text
 
 def get_texts_parallel(pmids):
     """Get full texts for multiple PMIDs in parallel using ThreadPoolExecutor"""
