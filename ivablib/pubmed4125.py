@@ -101,17 +101,41 @@ def get_pmc_text(pmcid):
     """Get full text from PMC."""
     try:
         url = f"https://www.ncbi.nlm.nih.gov/pmc/articles/{pmcid}/"
-        response = requests.get(url)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 TdPAnalyzer/1.0',
+            'Accept': 'text/html,application/xhtml+xml'
+        }
+        response = requests.get(url, headers=headers)
         soup = BeautifulSoup(response.text, 'html.parser')
-        # Try different possible content containers
-        article_text = (
-            soup.find('div', {'class': 'article-body'}) or
-            soup.find('div', {'class': 'jig-ncbiinpagenav'}) or
-            soup.find('article') or
-            soup.find('div', {'id': 'body'})
-        )
+        
+        # Try multiple possible content containers in order
+        article_text = None
+        selectors = [
+            ('div', {'class': 'jig-ncbiinpagenav'}),
+            ('div', {'id': 'mc'}),  # Main content div in PMC
+            ('div', {'class': 'article-body'}),
+            ('div', {'id': 'body'}),
+            ('article', {}),
+            ('div', {'class': 'content'}),
+            ('div', {'class': 'article'}),
+        ]
+        
+        for tag, attrs in selectors:
+            content = soup.find(tag, attrs)
+            if content:
+                # Remove references, supplementary material, etc.
+                for div in content.find_all(['div', 'section'], {'class': ['ref-list', 'supplementary-material', 'copyright']}):
+                    div.decompose()
+                article_text = content
+                break
+        
         if article_text:
-            return article_text.get_text(separator=' ', strip=True)
+            # Clean the text
+            text = article_text.get_text(separator=' ', strip=True)
+            # Remove excessive whitespace
+            text = ' '.join(text.split())
+            return text
+            
     except Exception as e:
         logger.error(f"Error getting PMC text: {e}")
     return None
@@ -145,20 +169,50 @@ def get_crossref_text(doi):
 def get_scihub_text(pmid, doi=None):
     """Get full text from Sci-Hub."""
     try:
-        identifier = doi if doi else pmid
-        url = f"https://sci-hub.se/{identifier}"
-        response = requests.get(url)
-        soup = BeautifulSoup(response.text, 'html.parser')
-        pdf_url = soup.find('iframe', {'id': 'pdf'})
-        if pdf_url:
-            pdf_url = urljoin('https://sci-hub.se/', pdf_url['src'])
-            pdf_response = requests.get(pdf_url)
-            pdf_file = io.BytesIO(pdf_response.content)
-            pdf_reader = PyPDF2.PdfReader(pdf_file)
-            text = ""
-            for page in pdf_reader.pages:
-                text += page.extract_text()
-            return text
+        # Try multiple Sci-Hub domains
+        domains = [
+            'https://sci-hub.se',
+            'https://sci-hub.st',
+            'https://sci-hub.ee',
+            'https://sci-hub.wf',
+            'https://sci-hub.ren'
+        ]
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 TdPAnalyzer/1.0',
+            'Accept': 'text/html,application/xhtml+xml'
+        }
+        
+        for domain in domains:
+            try:
+                # Try DOI first if available
+                if doi:
+                    url = f"{domain}/{doi}"
+                else:
+                    url = f"{domain}/pubmed/{pmid}"
+                
+                response = requests.get(url, headers=headers, timeout=10)
+                soup = BeautifulSoup(response.text, 'html.parser')
+                
+                # Look for embedded PDF
+                pdf_iframe = soup.find('iframe', {'id': 'pdf'})
+                if pdf_iframe and 'src' in pdf_iframe.attrs:
+                    pdf_url = pdf_iframe['src']
+                    if not pdf_url.startswith('http'):
+                        pdf_url = f"https:{pdf_url}"
+                    
+                    # Download PDF
+                    pdf_response = requests.get(pdf_url, headers=headers, timeout=10)
+                    if pdf_response.headers.get('content-type', '').lower() == 'application/pdf':
+                        pdf_file = io.BytesIO(pdf_response.content)
+                        pdf_reader = PyPDF2.PdfReader(pdf_file)
+                        text = ""
+                        for page in pdf_reader.pages:
+                            text += page.extract_text()
+                        return text
+            except Exception as e:
+                continue
+                
     except Exception as e:
         logger.error(f"Error getting Sci-Hub text: {e}")
     return None
@@ -376,13 +430,22 @@ def get_texts_parallel(pmids):
                 dois[pmid] = doi
                 logger.info(f"Found DOI for {pmid}: {doi}")
             
+            # Add a small delay between requests
+            time.sleep(1)
+            
         except Exception as e:
             logger.error(f"Error getting DOI for {pmid}: {e}")
     
+    def get_text_with_delay(pmid):
+        """Wrapper to add delay between requests"""
+        text, source = get_full_text(pmid, dois.get(pmid))
+        time.sleep(2)  # Add delay between full text requests
+        return text, source
+    
     # Use ThreadPoolExecutor to run requests in parallel
-    with ThreadPoolExecutor(max_workers=5) as executor:
+    with ThreadPoolExecutor(max_workers=3) as executor:  # Reduced max_workers to avoid overwhelming servers
         future_to_pmid = {
-            executor.submit(get_full_text, pmid, dois.get(pmid)): pmid 
+            executor.submit(get_text_with_delay, pmid): pmid 
             for pmid in pmids
         }
         
