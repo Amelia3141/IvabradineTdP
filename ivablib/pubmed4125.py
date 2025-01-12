@@ -206,74 +206,92 @@ def get_crossref_text(doi):
         # First get the redirect URL
         headers = {
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept-Language': 'en-US,en;q=0.9',
             'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1'
+            'Upgrade-Insecure-Requests': '1',
+            'Cache-Control': 'max-age=0',
+            'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': '"macOS"',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1'
         }
         
-        response = requests.get(f"https://doi.org/{doi}", headers=headers, allow_redirects=True, verify=False, timeout=30)
+        session = requests.Session()
+        session.headers.update(headers)
+        
+        # Try to get the article page
+        response = session.get(f"https://doi.org/{doi}", allow_redirects=True, verify=False, timeout=30)
         final_url = response.url
         
         logger.info(f"Redirected to: {final_url}")
         
-        # Now get the content from the final URL
-        response = requests.get(final_url, headers=headers, verify=False, timeout=30)
-        soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # Check for common paywall indicators
-        paywall_indicators = [
-            'div[class*="paywall"]',
-            'div[id*="paywall"]',
-            'div[class*="access-denied"]',
-            'div[class*="access-restricted"]',
-            'div[class*="subscription-required"]'
-        ]
-        
-        for indicator in paywall_indicators:
-            if soup.select(indicator):
-                logger.info(f"Paywall detected at {final_url}")
-                return None
-        
-        # Try different possible content containers
-        article_text = None
-        selectors = [
-            # Elsevier
-            ('div', {'class': ['article-body', 'article-text', 'article-content', 'full-text']}),
-            # Springer
-            ('div', {'class': ['c-article-body', 'c-article-section']}),
-            # Wiley
-            ('div', {'class': ['article-body', 'article__body', 'fulltext']}),
-            # Nature
-            ('div', {'class': ['c-article-body', 'article-body', 'article__body']}),
-            # Generic
-            ('div', {'id': ['body', 'main-content', 'content-main']}),
-            ('article', {}),
-            ('div', {'class': ['content', 'main']}),
-        ]
-        
-        for tag, attrs in selectors:
-            content = soup.find(tag, attrs)
-            if content:
-                # Remove unwanted elements
-                for unwanted in content.find_all(['div', 'section'], {'class': ['ref-list', 'supplementary-material', 'copyright', 'author-notes']}):
-                    unwanted.decompose()
-                article_text = content
-                break
-        
-        if article_text:
-            # Clean the text
-            text = article_text.get_text(separator=' ', strip=True)
-            # Remove excessive whitespace
-            text = ' '.join(text.split())
-            if len(text) > 500:  # Only return if we got substantial text
-                logger.info(f"Successfully extracted {len(text)} characters of text from {final_url}")
-                return text
-            else:
-                logger.info(f"Text too short ({len(text)} chars) from {final_url}, likely paywall or access issue")
-                return None
-        else:
+        # Check if we're redirected to a known publisher domain
+        publisher_domains = ['sciencedirect.com', 'springer.com', 'wiley.com', 'nature.com', 'bmj.com', 'tandfonline.com']
+        if any(domain in final_url for domain in publisher_domains):
+            # Now get the content from the final URL
+            response = session.get(final_url, verify=False, timeout=30)
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Check for common paywall indicators
+            paywall_indicators = [
+                'div[class*="paywall"]',
+                'div[id*="paywall"]',
+                'div[class*="access-denied"]',
+                'div[class*="access-restricted"]',
+                'div[class*="subscription-required"]',
+                'div[class*="purchase-options"]',
+                'div[class*="login-required"]',
+                'div[class*="sign-in"]'
+            ]
+            
+            for indicator in paywall_indicators:
+                if soup.select(indicator):
+                    logger.info(f"Paywall detected at {final_url}")
+                    return None
+            
+            # Try different possible content containers
+            article_text = None
+            selectors = [
+                # Elsevier
+                ('div', {'class': ['article-body', 'article-text', 'article-content', 'full-text', 'article__body']}),
+                # Springer
+                ('div', {'class': ['c-article-body', 'c-article-section', 'main-content']}),
+                # Wiley
+                ('div', {'class': ['article-body', 'article__body', 'fulltext', 'main-content']}),
+                # Nature
+                ('div', {'class': ['c-article-body', 'article-body', 'article__body', 'content-container']}),
+                # BMJ
+                ('div', {'class': ['article-body', 'content-block', 'article-content']}),
+                # Taylor & Francis
+                ('div', {'class': ['article-body', 'article-text', 'NLM__article-body']}),
+                # Generic
+                ('div', {'id': ['body', 'main-content', 'content-main', 'article-content']}),
+                ('article', {}),
+                ('div', {'class': ['content', 'main', 'article']}),
+            ]
+            
+            for tag, attrs in selectors:
+                contents = soup.find_all(tag, attrs)
+                for content in contents:
+                    if content:
+                        # Remove unwanted elements
+                        for unwanted in content.find_all(['div', 'section'], {'class': [
+                            'ref-list', 'supplementary-material', 'copyright', 'author-notes',
+                            'references', 'footnotes', 'article-footer', 'metrics', 'figure'
+                        ]}):
+                            unwanted.decompose()
+                        text = content.get_text(separator=' ', strip=True)
+                        if len(text) > 500:  # Only return if we got substantial text
+                            logger.info(f"Successfully extracted {len(text)} characters of text from {final_url}")
+                            return text
+            
             logger.warning(f"No article text found at {final_url}")
+        else:
+            logger.info(f"URL {final_url} not recognized as a supported publisher")
             
     except Exception as e:
         logger.error(f"Error getting Crossref text: {e}")
@@ -290,26 +308,44 @@ def get_scihub_text(pmid, doi=None):
             'https://sci-hub.ee',
             'https://sci-hub.wf',
             'https://sci-hub.ren',
-            'https://sci-hub.cat'
+            'https://sci-hub.cat',
+            'https://sci-hub.do'
         ]
         
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             'Accept-Language': 'en-US,en;q=0.9',
             'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1'
+            'Upgrade-Insecure-Requests': '1',
+            'Cache-Control': 'max-age=0',
+            'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': '"macOS"',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1'
         }
+        
+        session = requests.Session()
+        session.headers.update(headers)
         
         for domain in domains:
             try:
+                logger.info(f"Trying Sci-Hub domain: {domain}")
+                
                 # Try DOI first if available, then PMID
                 if doi:
                     url = f"{domain}/{doi}"
                 else:
                     url = f"{domain}/pubmed/{pmid}"
                 
-                response = requests.get(url, headers=headers, timeout=30, verify=False)
+                response = session.get(url, timeout=30, verify=False)
+                if 'location not found' in response.text.lower():
+                    logger.info(f"Paper not found on {domain}")
+                    continue
+                    
                 soup = BeautifulSoup(response.text, 'html.parser')
                 
                 # Look for embedded PDF
@@ -319,23 +355,31 @@ def get_scihub_text(pmid, doi=None):
                     if not pdf_url.startswith('http'):
                         pdf_url = urljoin(domain, pdf_url) if pdf_url.startswith('/') else f"https:{pdf_url}"
                     
-                    # Download PDF with retry
-                    for _ in range(3):
+                    logger.info(f"Found PDF iframe at {pdf_url}")
+                    
+                    # Download PDF with retry and exponential backoff
+                    for attempt in range(3):
                         try:
-                            pdf_response = requests.get(pdf_url, headers=headers, timeout=30, verify=False)
+                            delay = 2 ** attempt
+                            time.sleep(delay)
+                            
+                            pdf_response = session.get(pdf_url, timeout=30, verify=False)
                             if pdf_response.headers.get('content-type', '').lower() == 'application/pdf':
                                 pdf_file = io.BytesIO(pdf_response.content)
                                 pdf_reader = PyPDF2.PdfReader(pdf_file)
                                 text = ""
                                 for page in pdf_reader.pages:
                                     text += page.extract_text()
-                                if len(text.strip()) > 500:  # Only return if we got substantial text
+                                text = text.strip()
+                                if len(text) > 500:  # Only return if we got substantial text
+                                    logger.info(f"Successfully extracted {len(text)} characters from PDF")
                                     return text
-                                break
+                                else:
+                                    logger.warning(f"PDF text too short ({len(text)} chars), might be corrupted")
                         except Exception as e:
-                            logger.error(f"Error downloading PDF from {pdf_url}: {e}")
-                            time.sleep(2)
-                            continue
+                            logger.error(f"Error downloading PDF from {pdf_url} (attempt {attempt + 1}): {e}")
+                            if attempt < 2:  # Don't sleep after last attempt
+                                continue
                 
                 # Also try to find direct download links
                 download_links = soup.find_all('a', href=True)
@@ -344,15 +388,21 @@ def get_scihub_text(pmid, doi=None):
                     if href.lower().endswith('.pdf'):
                         try:
                             pdf_url = urljoin(domain, href)
-                            pdf_response = requests.get(pdf_url, headers=headers, timeout=30, verify=False)
+                            logger.info(f"Found direct PDF link: {pdf_url}")
+                            
+                            pdf_response = session.get(pdf_url, timeout=30, verify=False)
                             if pdf_response.headers.get('content-type', '').lower() == 'application/pdf':
                                 pdf_file = io.BytesIO(pdf_response.content)
                                 pdf_reader = PyPDF2.PdfReader(pdf_file)
                                 text = ""
                                 for page in pdf_reader.pages:
                                     text += page.extract_text()
-                                if len(text.strip()) > 500:
+                                text = text.strip()
+                                if len(text) > 500:
+                                    logger.info(f"Successfully extracted {len(text)} characters from PDF")
                                     return text
+                                else:
+                                    logger.warning(f"PDF text too short ({len(text)} chars), might be corrupted")
                         except Exception as e:
                             logger.error(f"Error downloading PDF from link {pdf_url}: {e}")
                             continue
@@ -360,12 +410,13 @@ def get_scihub_text(pmid, doi=None):
             except Exception as e:
                 logger.error(f"Error accessing {domain}: {e}")
                 continue
-            
-            time.sleep(2)  # Add delay between domain attempts
-                
+        
+        logger.warning(f"Could not retrieve text from any Sci-Hub domain for PMID {pmid}")
+        return None
+        
     except Exception as e:
         logger.error(f"Error in get_scihub_text: {e}")
-    return None
+        return None
 
 def get_drug_names(drug_name: str) -> List[str]:
     """Get all related drug names from the drugnames.csv file"""
