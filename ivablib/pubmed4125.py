@@ -598,88 +598,98 @@ def get_paper_details(pmids):
         logger.error(f"Error getting paper details: {e}")
         return pd.DataFrame()
 
-def process_papers(papers):
-    """Process papers to extract relevant information"""
-    try:
-        results = []
-        for _, paper in papers.iterrows():
-            pmid = paper['PMID']
-            text = paper.get('Full Text', '')
-            
-            report = {
-                'Title': paper.get('Title', ''),
-                'Age': '',
-                'Sex': '',
-                'Oral Dose (mg)': '',
-                'Theoretical Max Concentration (μM)': '',
-                '40% Bioavailability': '',
-                'Theoretical HERG IC50 / Concentration μM': '',
-                '40% Plasma Concentration': '',
-                'Uncorrected QT (ms)': '',
-                'QTc': '',
-                'QTR': '',
-                'QTF': '',
-                'Heart Rate (bpm)': '',
-                'Torsades de Pointes?': 'No',
-                'Blood Pressure (mmHg)': '',
-                'Medical History': '',
-                'Medication History': '',
-                'Course of Treatment': '',
-                'Year': paper.get('Year', ''),
-                'Abstract': paper.get('Abstract', ''),
-                'Full Text': text
-            }
-            
-            # Extract fields using regex patterns
-            if text:
-                combined_text = text + ' ' + report['Abstract']
-                patterns = {
-                    'Age': re.compile(r'(?:(?:aged?|age[d\s:]*|a|was)\s*)?(\d+)[\s-]*(?:year|yr|y|yo|years?)[s\s-]*(?:old|of\s+age)?|(?:age[d\s:]*|aged\s*)(\d+)', re.IGNORECASE),
-                    'Sex': re.compile(r'\b(?:male|female|man|woman|boy|girl|[MF]\s*/\s*(?:\d+|[MF])|gender[\s:]+(?:male|female)|(?:he|she|his|her)\s+was)\b', re.IGNORECASE),
-                    'Oral Dose (mg)': re.compile(r'(?:oral\s+dose|dose[d\s]*orally|given|administered|took|ingested|consumed|prescribed)\s*(?:with|at|of|a|total)?\s*(\d+\.?\d*)\s*(?:mg|milligrams?|g|grams?|mcg|micrograms?)', re.IGNORECASE),
-                    'Theoretical Max Concentration (μM)': re.compile(r'(?:maximum|max|peak|highest|cmax|c-?max)\s*(?:concentration|conc|level|exposure)\s*(?:of|was|is|reached|measured|observed|calculated)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*(?:μM|uM|micromolar|nmol/[lL]|μmol/[lL]|ng/m[lL]|μg/m[lL]|mg/[lL]|g/[lL])', re.IGNORECASE),
-                    '40% Bioavailability': re.compile(r'(?:bioavailability|F|absorption|systemic\s+availability)\s*(?:of|was|is|approximately|about|~)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*%?', re.IGNORECASE),
-                    'Theoretical HERG IC50 / Concentration μM': re.compile(r'(?:hERG\s+IC50|IC50\s+(?:value\s+)?(?:for|of)\s+hERG|half-?maximal\s+(?:inhibitory)?\s+concentration|IC50)\s*(?:of|was|is|=|:)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*(?:μM|uM|micromolar|nmol/[lL]|μmol/[lL])', re.IGNORECASE),
-                    '40% Plasma Concentration': re.compile(r'(?:plasma|blood|serum)\s*(?:concentration|level|exposure|Cmax|C-max)\s*(?:of|was|is|measured|found|detected|reached)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*(?:μM|uM|micromolar|ng/m[lL]|μg/m[lL]|mg/[lL]|g/[lL])', re.IGNORECASE),
-                    'Uncorrected QT (ms)': re.compile(r'\b(?:QT|uncorrected\s+QT|QT\s*interval|interval\s*QT|baseline\s*QT)[\s:]*(?:interval|duration|measurement|value)?\s*(?:of|was|is|=|:|measured|found|documented|recorded)?\s*(\d+\.?\d*)\s*(?:ms(?:ec)?|milliseconds?|s(?:ec)?|seconds?)?', re.IGNORECASE),
-                    'QTc': re.compile(r'(?:QTc[FBR]?|corrected\s+QT|QT\s*corrected|QT[c]?\s*interval\s*(?:corrected)?|corrected\s*QT\s*interval)[\s:]*(?:interval|duration|measurement|prolongation|value)?\s*(?:of|was|is|=|:|measured|found|documented|recorded)?\s*(\d+\.?\d*)\s*(?:ms(?:ec)?|milliseconds?|s(?:ec)?|seconds?)?', re.IGNORECASE),
-                    'Heart Rate (bpm)': re.compile(r'(?:heart\s+rate|HR|pulse|ventricular\s+rate|heart\s+rhythm|cardiac\s+rate)[\s:]*(?:of|was|is|=|:)?\s*(\d+)(?:\s*(?:beats?\s*per\s*min(?:ute)?|bpm|min-1|/min))?', re.IGNORECASE),
-                    'Blood Pressure (mmHg)': re.compile(r'(?:blood\s+pressure|BP|arterial\s+pressure)[\s:]*(?:of|was|is|=|:)?\s*([\d/]+)(?:\s*mm\s*Hg)?', re.IGNORECASE),
-                    'Torsades de Pointes?': re.compile(r'\b(?:torsade[s]?\s*(?:de)?\s*pointes?|TdP|torsades|polymorphic\s+[vV]entricular\s+[tT]achycardia|PVT\s+(?:with|showing)\s+[tT]dP)\b', re.IGNORECASE),
-                    'Medical History': re.compile(r'(?:medical|clinical|past|previous|documented|known|significant)\s*(?:history|condition|diagnosis|comorbidities)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE),
-                    'Medication History': re.compile(r'(?:medication|drug|prescription|current\s+medications?|concomitant\s+medications?)\s*(?:history|list|profile|regime)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE),
-                    'Course of Treatment': re.compile(r'(?:treatment|therapy|management|intervention|administered|given)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE)
-                }
-                
-                for field, pattern in patterns.items():
-                    match = pattern.search(combined_text)
-                    if match:
-                        if field == 'Torsades de Pointes?':
-                            report[field] = 'Yes'
-                        else:
-                            groups = [g for g in match.groups() if g is not None]
-                            report[field] = groups[0] if groups else match.group(0)
-                
-                results.append(report)
-                
-        return results
-        
-    except Exception as e:
-        logger.error(f"Error processing papers: {e}")
-        return []
-
 def get_full_texts(papers):
     """Get full texts for papers"""
     try:
-        pmids = [paper['PMID'] for paper in papers]
+        # Convert DataFrame to list of dictionaries if it's a DataFrame
+        if isinstance(papers, pd.DataFrame):
+            papers = papers.to_dict('records')
+            
+        pmids = [str(paper['PMID']) for paper in papers]
         texts = get_texts_parallel(pmids)
+        
         for paper in papers:
-            paper['Full Text'] = texts.get(paper['PMID'], '')
+            paper['Full Text'] = texts.get(str(paper['PMID']), '')
+            
+            # If we don't have full text, use the abstract as fallback
+            if not paper['Full Text'] and paper.get('Abstract'):
+                paper['Full Text'] = paper['Abstract']
+                logger.info(f"Using abstract as fallback for PMID {paper['PMID']}")
+                
         return papers
         
     except Exception as e:
         logger.error(f"Error getting full texts: {e}")
         return papers
+
+def process_papers(papers):
+    """Process papers to extract relevant information"""
+    try:
+        # Convert DataFrame to list of dictionaries if it's a DataFrame
+        if isinstance(papers, pd.DataFrame):
+            papers = papers.to_dict('records')
+            
+        results = []
+        for paper in papers:
+            pmid = str(paper['PMID'])
+            text = paper.get('Full Text', '')
+            abstract = paper.get('Abstract', '')
+            
+            # Combine full text and abstract for better information extraction
+            combined_text = f"{text} {abstract}".strip()
+            
+            report = {
+                'PMID': pmid,
+                'Title': paper.get('Title', ''),
+                'Age': '',
+                'Sex': '',
+                'Oral Dose (mg)': '',
+                'QTc': '',
+                'Heart Rate (bpm)': '',
+                'Blood Pressure (mmHg)': '',
+                'Torsades de Pointes?': 'No',
+                'Medical History': '',
+                'Medication History': '',
+                'Course of Treatment': '',
+                'Year': paper.get('Year', ''),
+                'Abstract': paper.get('Abstract', ''),
+            }
+            
+            # Extract fields using regex patterns
+            if combined_text:
+                patterns = {
+                    'Age': r'(?:(?:aged?|age[d\s:]*|a|was)\s*)?(\d+)[\s-]*(?:year|yr|y|yo|years?)[s\s-]*(?:old|of\s+age)?|(?:age[d\s:]*|aged\s*)(\d+)',
+                    'Sex': r'\b(?:male|female|man|woman|boy|girl|[MF]\s*/\s*(?:\d+|[MF])|gender[\s:]+(?:male|female)|(?:he|she|his|her)\s+was)\b',
+                    'Oral Dose (mg)': r'(?:oral\s+dose|dose[d\s]*orally|given|administered|took|ingested|consumed|prescribed)\s*(?:with|at|of|a|total)?\s*(\d+\.?\d*)\s*(?:mg|milligrams?|g|grams?|mcg|micrograms?)',
+                    'QTc': r'(?:QTc[FBR]?|corrected\s+QT|QT\s*corrected|QT[c]?\s*interval\s*(?:corrected)?|corrected\s*QT\s*interval)[\s:]*(?:interval|duration|measurement|prolongation|value)?\s*(?:of|was|is|=|:|measured|found|documented|recorded)?\s*(\d+\.?\d*)\s*(?:ms(?:ec)?|milliseconds?|s(?:ec)?|seconds?)?',
+                    'Heart Rate (bpm)': r'(?:heart\s+rate|HR|pulse|ventricular\s+rate|heart\s+rhythm|cardiac\s+rate)[\s:]*(?:of|was|is|=|:)?\s*(\d+)(?:\s*(?:beats?\s*per\s*min(?:ute)?|bpm|min-1|/min))?',
+                    'Blood Pressure (mmHg)': r'(?:blood\s+pressure|BP|arterial\s+pressure)[\s:]*(?:of|was|is|=|:)?\s*([\d/]+)(?:\s*mm\s*Hg)?',
+                    'Medical History': r'(?:medical|clinical|past|previous|documented|known|significant)\s*(?:history|condition|diagnosis|comorbidities)[:\.]\s*([^\.]+?)(?:\.|\n|$)',
+                    'Medication History': r'(?:medication|drug|prescription|current\s+medications?|concomitant\s+medications?)\s*(?:history|list|profile|regime)[:\.]\s*([^\.]+?)(?:\.|\n|$)',
+                    'Course of Treatment': r'(?:treatment|therapy|management|intervention|administered|given)[:\.]\s*([^\.]+?)(?:\.|\n|$)'
+                }
+                
+                for field, pattern in patterns.items():
+                    matches = re.finditer(pattern, combined_text, re.IGNORECASE)
+                    for match in matches:
+                        if match.groups():
+                            # Use the first non-None group
+                            value = next((g for g in match.groups() if g is not None), '')
+                            if value:
+                                report[field] = value
+                                break
+                
+                # Check for TdP specifically
+                if re.search(r'\b(?:torsade[s]?\s*(?:de)?\s*pointes?|TdP|torsades|polymorphic\s+[vV]entricular\s+[tT]achycardia|PVT\s+(?:with|showing)\s+[tT]dP)\b', combined_text, re.IGNORECASE):
+                    report['Torsades de Pointes?'] = 'Yes'
+            
+            results.append(report)
+        
+        return results
+        
+    except Exception as e:
+        logger.error(f"Error processing papers: {e}")
+        return []
 
 def main():
     if len(sys.argv) != 2:
