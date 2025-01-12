@@ -655,13 +655,15 @@ def analyze_literature(drug_name: str):
         logger.info(f"Starting literature analysis for {drug_name}")
         
         # Search for papers
-        papers = search_pubmed_case_reports(drug_name)
-        if papers.empty:
+        papers_df = search_pubmed_case_reports(drug_name)
+        if papers_df.empty:
             logger.info(f"No papers found for {drug_name}")
             return {
                 'error': f"No papers found for {drug_name}"
             }
             
+        # Convert DataFrame to list of dictionaries
+        papers = papers_df.to_dict('records')
         logger.info(f"Found {len(papers)} papers for {drug_name}")
         
         # Get full texts
