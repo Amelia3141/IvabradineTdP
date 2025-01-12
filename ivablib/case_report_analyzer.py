@@ -72,6 +72,17 @@ class CaseReportAnalyzer:
             
             # Enhanced treatment patterns
             'treatment_course': re.compile(r'(?:treatment|therapy|management|intervention|administered|given)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE),
+            
+            # Additional patterns for QT analysis
+            'drug_qt': re.compile(r'(?P<drug>\w+)\s*(?:(?:prolong|increas|affect|chang|caus).*?QT[c]?|QT[c]?\s*(?:prolong|increas|affect|chang).*?(?:by|with|after|following|due\s+to)\s*\w+)', re.IGNORECASE),
+            
+            'brady_qt': re.compile(r'(?:bradycardia|low\s+heart\s+rate|slow\s+heart\s+rate).*?QT[c]?|QT[c]?.*?(?:bradycardia|low\s+heart\s+rate|slow\s+heart\s+rate)', re.IGNORECASE),
+            
+            'figure_qt': re.compile(r'(?:figure|fig\.|fig)\s*\d+.*?QT[c]?|QT[c]?.*?(?:figure|fig\.|fig)\s*\d+', re.IGNORECASE),
+            
+            'table_qt': re.compile(r'(?:table|tbl\.|tab)\s*\d+.*?QT[c]?|QT[c]?.*?(?:table|tbl\.|tab)\s*\d+', re.IGNORECASE),
+            
+            'supp_qt': re.compile(r'(?:supplementary|supp\.|supplement).*?QT[c]?|QT[c]?.*?(?:supplementary|supp\.|supplement)', re.IGNORECASE)
         }
 
     def get_smart_context(self, text: str, match_start: int, match_end: int, min_chars: int = 50) -> str:
@@ -330,19 +341,33 @@ class CaseReportAnalyzer:
             # Define patterns for information extraction
             patterns = {
                 'Age': re.compile(r'(?:(?:aged?|age[d\s:]*|a|was)\s*)?(\d+)[\s-]*(?:year|yr|y|yo|years?)[s\s-]*(?:old|of\s+age)?|(?:age[d\s:]*|aged\s*)(\d+)', re.IGNORECASE),
+                
                 'Sex': re.compile(r'\b(?:male|female|man|woman|boy|girl|[MF]\s*/\s*(?:\d+|[MF])|gender[\s:]+(?:male|female)|(?:he|she|his|her)\s+was)\b', re.IGNORECASE),
+                
                 'Oral Dose (mg)': re.compile(r'(?:oral|po|by\s+mouth|orally|per\s+os)\s*(?:dose|dosage|doses|administration|administered|given|taken|prescribed|started|initiated|received|treated\s+with)?\s*(?:with|at|of|a|total|daily|once|twice|thrice|[1-4]x|q\.?d|bid|tid|qid)?\s*(?:dose\s+of\s+)?(\d+\.?\d*)\s*(?:mg|milligrams?|g|grams?|mcg|micrograms?|µg)', re.IGNORECASE),
+                
                 'Theoretical Max Concentration (μM)': re.compile(r'(?:theoretical|max|maximum|peak)\s*(?:concentration|level|plasma|blood)\s*(?:of|was|is|=|:)?\s*(\d+\.?\d*)\s*(?:μM|uM|micromolar)', re.IGNORECASE),
+                
                 '40% Bioavailability': re.compile(r'(?:bioavailability|F|BA)\s*(?:of|was|is|=|:)?\s*(\d+\.?\d*)\s*%', re.IGNORECASE),
+                
                 'Theoretical HERG IC50 / Concentration μM': re.compile(r'(?:herg|ikr)\s*(?:ic50|ic\s*50)\s*(?:of|was|is|=|:)?\s*(\d+\.?\d*)\s*(?:μM|uM|micromolar)', re.IGNORECASE),
+                
                 '40% Plasma Concentration': re.compile(r'(?:plasma|blood|serum)\s*(?:concentration|level)\s*(?:of|was|is|=|:)?\s*(\d+\.?\d*)\s*(?:μM|uM|micromolar)', re.IGNORECASE),
+                
                 'Uncorrected QT (ms)': re.compile(r'\b(?:QT|uncorrected\s+QT|QT\s*interval|interval\s*QT|baseline\s*QT)[\s:]*(?:interval|duration|measurement|value)?\s*(?:of|was|is|=|:|measured|found|documented|recorded|increased\s+to)?\s*(\d+\.?\d*)\s*(?:ms(?:ec)?|milliseconds?|s(?:ec)?|seconds?)?', re.IGNORECASE),
+                
                 'QTc': re.compile(r'(?:QTc[FBR]?|corrected\s+QT|QT\s*corrected|QT[c]?\s*interval\s*(?:corrected)?|corrected\s*QT\s*interval)[\s:]*(?:interval|duration|measurement|prolongation|value)?\s*(?:of|was|is|=|:|measured|found|documented|recorded|increased\s+to)?\s*(\d+\.?\d*)\s*(?:ms(?:ec)?|milliseconds?|s(?:ec)?|seconds?)?', re.IGNORECASE),
+                
                 'Heart Rate (bpm)': re.compile(r'(?:heart\s+rate|HR|pulse|ventricular\s+rate|heart\s+rhythm|cardiac\s+rate)[\s:]*(?:of|was|is|=|:|decreased\s+to|increased\s+to)?\s*(\d+)(?:\s*(?:beats?\s*per\s*min(?:ute)?|bpm|min-1|/min))?', re.IGNORECASE),
+                
                 'Blood Pressure (mmHg)': re.compile(r'(?:blood\s+pressure|BP|arterial\s+pressure)[\s:]*(?:of|was|is|=|:|measured)?\s*([\d/]+)(?:\s*mm\s*Hg)?', re.IGNORECASE),
+                
                 'Torsades de Pointes?': re.compile(r'\b(?:torsade[s]?\s*(?:de)?\s*pointes?|TdP|torsades|polymorphic\s+[vV]entricular\s+[tT]achycardia|PVT\s+(?:with|showing)\s+[tT]dP)\b', re.IGNORECASE),
+                
                 'Medical History': re.compile(r'(?:medical|clinical|past|previous|documented|known|significant)\s*(?:history|condition|diagnosis|comorbidities)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE),
+                
                 'Medication History': re.compile(r'(?:medication|drug|prescription|current\s+medications?|concomitant\s+medications?)\s*(?:history|list|profile|regime)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE),
+                
                 'Course of Treatment': re.compile(r'(?:treatment|therapy|management|intervention|administered|given)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE),
             }
 
