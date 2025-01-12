@@ -413,10 +413,10 @@ def format_pubmed_results(records: List[Dict]) -> pd.DataFrame:
                 'Age': '',  # Will be extracted by regex
                 'Sex': '',  # Will be extracted by regex
                 'Oral Dose (mg)': '',  # Will be extracted by regex
-                'theoretical max concentration (μM)': '',  # Will be extracted by regex
-                '40% bioavailability': '',  # Will be extracted by regex
+                'Theoretical Max Concentration (μM)': '',  # Will be extracted by regex
+                '40% Bioavailability': '',  # Will be extracted by regex
                 'Theoretical HERG IC50 / Concentration μM': '',  # Will be extracted by regex
-                '40% Plasma concentration': '',  # Will be extracted by regex
+                '40% Plasma Concentration': '',  # Will be extracted by regex
                 'Uncorrected QT (ms)': '',  # Will be extracted by regex
                 'QTc': '',  # Will be extracted by regex
                 'QTR': '',  # Will be calculated later
@@ -508,98 +508,86 @@ def get_texts_parallel(pmids):
     return texts
 
 def analyze_literature(drug_name: str) -> Dict:
-    """Analyze literature for a drug"""
+    """Analyze literature for a given drug."""
     try:
-        logger.info(f"Searching literature for {drug_name}")
-        
-        # Search for case reports
-        case_reports = search_pubmed_case_reports(drug_name)
-        
-        results = {
-            'case_reports': [],
-            'total_cases': 0,
-            'years': [],
-            'sources': {}
-        }
-        
-        if not case_reports.empty:
+        papers = search_pubmed_case_reports(drug_name)
+        if not papers.empty:
             # Get PMIDs
-            pmids = [p for p in case_reports['PMID'].tolist() if p != 'No PMID']
+            pmids = [p for p in papers['PMID'].tolist() if p != 'No PMID']
             
             # Get texts in parallel using ThreadPoolExecutor
             texts = get_texts_parallel(pmids)
             
             # Create paper objects
-            for _, paper in case_reports.iterrows():
+            case_reports = []
+            for _, paper in papers.iterrows():
                 pmid = paper['PMID']
                 text = texts.get(pmid, 'None')
                 
-                # Extract fields using regex patterns
-                case_report = {
-                    'title': paper['Title'] if not pd.isna(paper['Title']) else '',
-                    'year': int(paper['Year']) if not pd.isna(paper['Year']) else '',
-                    'abstract': paper['Abstract'] if not pd.isna(paper['Abstract']) else '',
-                    'full_text': text,
-                    'age': '',  # Will be extracted by regex
-                    'sex': '',  # Will be extracted by regex
-                    'oral_dose': '',  # Will be extracted by regex
-                    'theoretical_max': '',  # Will be extracted by regex
-                    'bioavailability': '',  # Will be extracted by regex
-                    'herg_ic50': '',  # Will be extracted by regex
-                    'plasma_concentration': '',  # Will be extracted by regex
-                    'qt': '',  # Will be extracted by regex
-                    'qtc': '',  # Will be extracted by regex
-                    'qtr': '',  # Will be calculated later
-                    'qtf': '',  # Will be calculated later
-                    'heart_rate': '',  # Will be extracted by regex
-                    'tdp': 'No',  # Will be updated by regex
-                    'blood_pressure': '',  # Will be extracted by regex
-                    'medical_history': '',  # Will be extracted by regex
-                    'medication_history': '',  # Will be extracted by regex
-                    'treatment_course': ''  # Will be extracted by regex
+                report = {
+                    'Title': paper.get('Title', ''),
+                    'Age': '',
+                    'Sex': '',
+                    'Oral Dose (mg)': '',
+                    'Theoretical Max Concentration (μM)': '',
+                    '40% Bioavailability': '',
+                    'Theoretical HERG IC50 / Concentration μM': '',
+                    '40% Plasma Concentration': '',
+                    'Uncorrected QT (ms)': '',
+                    'QTc': '',
+                    'QTR': '',
+                    'QTF': '',
+                    'Heart Rate (bpm)': '',
+                    'Torsades de Pointes?': 'No',
+                    'Blood Pressure (mmHg)': '',
+                    'Medical History': '',
+                    'Medication History': '',
+                    'Course of Treatment': '',
+                    'Year': paper.get('Year', ''),
+                    'Abstract': paper.get('Abstract', ''),
+                    'Full Text': text
                 }
                 
-                # Extract information using regex patterns
+                # Extract fields using regex patterns
                 if text:
-                    combined_text = text + ' ' + case_report['abstract']
+                    combined_text = text + ' ' + report['Abstract']
                     patterns = {
-                        'age': re.compile(r'(?:(?:aged?|age[d\s:]*|a|was)\s*)?(\d+)[\s-]*(?:year|yr|y|yo|years?)[s\s-]*(?:old|of\s+age)?|(?:age[d\s:]*|aged\s*)(\d+)', re.IGNORECASE),
-                        'sex': re.compile(r'\b(?:male|female|man|woman|boy|girl|[MF]\s*/\s*(?:\d+|[MF])|gender[\s:]+(?:male|female)|(?:he|she|his|her)\s+was)\b', re.IGNORECASE),
-                        'oral_dose': re.compile(r'(?:oral\s+dose|dose[d\s]*orally|given|administered|took|ingested|consumed|prescribed)\s*(?:with|at|of|a|total)?\s*(\d+\.?\d*)\s*(?:mg|milligrams?|g|grams?|mcg|micrograms?)', re.IGNORECASE),
-                        'theoretical_max': re.compile(r'(?:maximum|max|peak|highest|cmax|c-?max)\s*(?:concentration|conc|level|exposure)\s*(?:of|was|is|reached|measured|observed|calculated)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*(?:μM|uM|micromolar|nmol/[lL]|μmol/[lL]|ng/m[lL])', re.IGNORECASE),
-                        'bioavailability': re.compile(r'(?:bioavailability|F|absorption|systemic\s+availability)\s*(?:of|was|is|approximately|about|~)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*%?', re.IGNORECASE),
-                        'herg_ic50': re.compile(r'(?:hERG\s+IC50|IC50\s+(?:value\s+)?(?:for|of)\s+hERG|half-?maximal\s+(?:inhibitory)?\s+concentration|IC50)\s*(?:of|was|is|=|:)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*(?:μM|uM|micromolar|nmol/[lL]|μmol/[lL])', re.IGNORECASE),
-                        'plasma_concentration': re.compile(r'(?:plasma|blood|serum)\s*(?:concentration|level|exposure|Cmax|C-max)\s*(?:of|was|is|measured|found|detected|reached)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*(?:μM|uM|micromolar|ng/m[lL]|μg/m[lL]|mg/[lL]|g/[lL])', re.IGNORECASE),
-                        'qt': re.compile(r'\b(?:QT|uncorrected\s+QT|QT\s*interval|interval\s*QT|baseline\s*QT)[\s:]*(?:interval|duration|measurement|value)?\s*(?:of|was|is|=|:|measured|found|documented|recorded)?\s*(\d+\.?\d*)\s*(?:ms(?:ec)?|milliseconds?|s(?:ec)?|seconds?)?', re.IGNORECASE),
-                        'qtc': re.compile(r'(?:QTc[FBR]?|corrected\s+QT|QT\s*corrected|QT[c]?\s*interval\s*(?:corrected)?|corrected\s*QT\s*interval)[\s:]*(?:interval|duration|measurement|prolongation|value)?\s*(?:of|was|is|=|:|measured|found|documented|recorded)?\s*(\d+\.?\d*)\s*(?:ms(?:ec)?|milliseconds?|s(?:ec)?|seconds?)?', re.IGNORECASE),
-                        'heart_rate': re.compile(r'(?:heart\s+rate|HR|pulse|ventricular\s+rate|heart\s+rhythm|cardiac\s+rate)[\s:]*(?:of|was|is|=|:)?\s*(\d+)(?:\s*(?:beats?\s*per\s*min(?:ute)?|bpm|min-1|/min))?', re.IGNORECASE),
-                        'blood_pressure': re.compile(r'(?:blood\s+pressure|BP|arterial\s+pressure)[\s:]*(?:of|was|is|=|:)?\s*([\d/]+)(?:\s*mm\s*Hg)?', re.IGNORECASE),
-                        'tdp': re.compile(r'\b(?:torsade[s]?\s*(?:de)?\s*pointes?|TdP|torsades|polymorphic\s+[vV]entricular\s+[tT]achycardia|PVT\s+(?:with|showing)\s+[tT]dP)\b', re.IGNORECASE),
-                        'medical_history': re.compile(r'(?:medical|clinical|past|previous|documented|known|significant)\s*(?:history|condition|diagnosis|comorbidities)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE),
-                        'medication_history': re.compile(r'(?:medication|drug|prescription|current\s+medications?|concomitant\s+medications?)\s*(?:history|list|profile|regime)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE),
-                        'treatment_course': re.compile(r'(?:treatment|therapy|management|intervention|administered|given)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE)
+                        'Age': re.compile(r'(?:(?:aged?|age[d\s:]*|a|was)\s*)?(\d+)[\s-]*(?:year|yr|y|yo|years?)[s\s-]*(?:old|of\s+age)?|(?:age[d\s:]*|aged\s*)(\d+)', re.IGNORECASE),
+                        'Sex': re.compile(r'\b(?:male|female|man|woman|boy|girl|[MF]\s*/\s*(?:\d+|[MF])|gender[\s:]+(?:male|female)|(?:he|she|his|her)\s+was)\b', re.IGNORECASE),
+                        'Oral Dose (mg)': re.compile(r'(?:oral\s+dose|dose[d\s]*orally|given|administered|took|ingested|consumed|prescribed)\s*(?:with|at|of|a|total)?\s*(\d+\.?\d*)\s*(?:mg|milligrams?|g|grams?|mcg|micrograms?)', re.IGNORECASE),
+                        'Theoretical Max Concentration (μM)': re.compile(r'(?:maximum|max|peak|highest|cmax|c-?max)\s*(?:concentration|conc|level|exposure)\s*(?:of|was|is|reached|measured|observed|calculated)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*(?:μM|uM|micromolar|nmol/[lL]|μmol/[lL]|ng/m[lL])', re.IGNORECASE),
+                        '40% Bioavailability': re.compile(r'(?:bioavailability|F|absorption|systemic\s+availability)\s*(?:of|was|is|approximately|about|~)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*%?', re.IGNORECASE),
+                        'Theoretical HERG IC50 / Concentration μM': re.compile(r'(?:hERG\s+IC50|IC50\s+(?:value\s+)?(?:for|of)\s+hERG|half-?maximal\s+(?:inhibitory)?\s+concentration|IC50)\s*(?:of|was|is|=|:)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*(?:μM|uM|micromolar|nmol/[lL]|μmol/[lL])', re.IGNORECASE),
+                        '40% Plasma Concentration': re.compile(r'(?:plasma|blood|serum)\s*(?:concentration|level|exposure|Cmax|C-max)\s*(?:of|was|is|measured|found|detected|reached)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*(?:μM|uM|micromolar|ng/m[lL]|μg/m[lL]|mg/[lL]|g/[lL])', re.IGNORECASE),
+                        'Uncorrected QT (ms)': re.compile(r'\b(?:QT|uncorrected\s+QT|QT\s*interval|interval\s*QT|baseline\s*QT)[\s:]*(?:interval|duration|measurement|value)?\s*(?:of|was|is|=|:|measured|found|documented|recorded)?\s*(\d+\.?\d*)\s*(?:ms(?:ec)?|milliseconds?|s(?:ec)?|seconds?)?', re.IGNORECASE),
+                        'QTc': re.compile(r'(?:QTc[FBR]?|corrected\s+QT|QT\s*corrected|QT[c]?\s*interval\s*(?:corrected)?|corrected\s*QT\s*interval)[\s:]*(?:interval|duration|measurement|prolongation|value)?\s*(?:of|was|is|=|:|measured|found|documented|recorded)?\s*(\d+\.?\d*)\s*(?:ms(?:ec)?|milliseconds?|s(?:ec)?|seconds?)?', re.IGNORECASE),
+                        'Heart Rate (bpm)': re.compile(r'(?:heart\s+rate|HR|pulse|ventricular\s+rate|heart\s+rhythm|cardiac\s+rate)[\s:]*(?:of|was|is|=|:)?\s*(\d+)(?:\s*(?:beats?\s*per\s*min(?:ute)?|bpm|min-1|/min))?', re.IGNORECASE),
+                        'Blood Pressure (mmHg)': re.compile(r'(?:blood\s+pressure|BP|arterial\s+pressure)[\s:]*(?:of|was|is|=|:)?\s*([\d/]+)(?:\s*mm\s*Hg)?', re.IGNORECASE),
+                        'Torsades de Pointes?': re.compile(r'\b(?:torsade[s]?\s*(?:de)?\s*pointes?|TdP|torsades|polymorphic\s+[vV]entricular\s+[tT]achycardia|PVT\s+(?:with|showing)\s+[tT]dP)\b', re.IGNORECASE),
+                        'Medical History': re.compile(r'(?:medical|clinical|past|previous|documented|known|significant)\s*(?:history|condition|diagnosis|comorbidities)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE),
+                        'Medication History': re.compile(r'(?:medication|drug|prescription|current\s+medications?|concomitant\s+medications?)\s*(?:history|list|profile|regime)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE),
+                        'Course of Treatment': re.compile(r'(?:treatment|therapy|management|intervention|administered|given)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE)
                     }
                     
                     for field, pattern in patterns.items():
                         match = pattern.search(combined_text)
                         if match:
-                            if field == 'tdp':
-                                case_report[field] = 'Yes'
+                            if field == 'Torsades de Pointes?':
+                                report[field] = 'Yes'
                             else:
                                 groups = [g for g in match.groups() if g is not None]
-                                case_report[field] = groups[0] if groups else match.group(0)
+                                report[field] = groups[0] if groups else match.group(0)
                 
-                results['case_reports'].append(case_report)
-                if case_report['year']:
-                    results['years'].append(case_report['year'])
-                    
-            results['total_cases'] = len(results['case_reports'])
-            
-        return results
-        
+                case_reports.append(report)
+                
+            return {
+                "case_reports": case_reports,
+                "total_cases": len(case_reports)
+            }
+
     except Exception as e:
         logger.error(f"Error analyzing literature: {e}")
-        return {'error': str(e)}
+        return {"error": str(e)}
 
 def main():
     if len(sys.argv) != 2:
