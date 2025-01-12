@@ -133,57 +133,29 @@ if analyze_button:
                     if 'error' in literature:
                         st.error(f"Error analyzing literature: {literature['error']}")
                     else:
-                        # Show analysis results first
-                        analysis_results = literature.get('analysis', [])
-                        if analysis_results:
-                            st.subheader("Case Report Analysis")
-                            df = pd.DataFrame(analysis_results)
-                            st.dataframe(df, use_container_width=True)
-                            
-                            # Show statistics
-                            st.subheader("Summary Statistics")
-                            col1, col2, col3 = st.columns(3)
-                            
-                            with col1:
-                                tdp_cases = len([x for x in analysis_results if x.get('had_tdp') == 'Yes'])
-                                st.metric("TdP Cases", tdp_cases)
-                                
-                            with col2:
-                                avg_qtc = pd.DataFrame(analysis_results)['qtc'].mean()
-                                if not pd.isna(avg_qtc):
-                                    st.metric("Average QTc", f"{avg_qtc:.0f} ms")
-                                    
-                            with col3:
-                                success_rate = len([x for x in analysis_results if x.get('treatment_successful') == 'Yes']) / len(analysis_results) * 100
-                                st.metric("Treatment Success Rate", f"{success_rate:.0f}%")
-                        
-                        # Show papers by type
                         st.subheader("Literature Search Results")
-                        col1, col2, col3 = st.columns(3)
                         
-                        with col1:
-                            st.subheader("Case Reports")
-                            if literature.get('case_reports'):
-                                df = pd.DataFrame(literature['case_reports'])
-                                st.dataframe(df, use_container_width=True)
-                            else:
-                                st.write("No case reports found")
-                        
-                        with col2:
-                            st.subheader("Cohort Studies")
-                            if literature.get('cohort_studies'):
-                                df = pd.DataFrame(literature['cohort_studies'])
-                                st.dataframe(df, use_container_width=True)
-                            else:
-                                st.write("No cohort studies found")
-                        
-                        with col3:
-                            st.subheader("Clinical Trials")
-                            if literature.get('clinical_trials'):
-                                df = pd.DataFrame(literature['clinical_trials'])
-                                st.dataframe(df, use_container_width=True)
-                            else:
-                                st.write("No clinical trials found")
+                        # Display case reports
+                        st.subheader("Case Reports")
+                        if literature.get('case_reports'):
+                            st.metric("Total Case Reports", literature['total_cases'])
+                            
+                            # Create a dataframe from case reports
+                            case_reports_df = pd.DataFrame(literature['case_reports'])
+                            if not case_reports_df.empty:
+                                # Display basic info in a table
+                                display_df = case_reports_df[['title', 'year', 'pmid']].copy()
+                                display_df.columns = ['Title', 'Year', 'PMID']
+                                st.dataframe(display_df, use_container_width=True)
+                                
+                                # Show years distribution if we have data
+                                if literature.get('years'):
+                                    years = pd.Series(literature['years']).value_counts().sort_index()
+                                    if not years.empty:
+                                        st.subheader("Publications by Year")
+                                        st.bar_chart(years)
+                        else:
+                            st.write("No case reports found")
                     
     except Exception as e:
         st.error(f"Error analyzing drug: {str(e)}")
