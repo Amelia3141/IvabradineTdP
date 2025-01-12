@@ -131,69 +131,72 @@ if analyze_button:
                     literature = analysis.get('literature', {})
                     logger.info(f"Literature data: {literature}")
                     
-                    if 'error' in literature:
-                        st.error(f"Error analyzing literature: {literature['error']}")
-                    else:
-                        st.subheader("Case Reports")
-                        if literature.get('case_reports'):
-                            st.metric("Total Case Reports", len(literature['case_reports']))
+                    if literature:
+                        papers = literature.get('papers', [])
+                        if papers:
+                            st.write(f"Found {len(papers)} relevant papers")
                             
-                            # Group the data into sections
-                            sections = {
-                                "Patient Demographics": [
-                                    "title", "age", "sex"
-                                ],
-                                "Drug Information": [
-                                    "oral_dose", 
-                                    "theoretical_max", 
-                                    "bioavailability",
-                                    "herg_ic50",
-                                    "plasma_concentration"
-                                ],
-                                "ECG Parameters": [
-                                    "qt",
-                                    "qtc",
-                                    "qtr",
-                                    "qtf",
-                                    "heart_rate",
-                                    "tdp",
-                                    "blood_pressure"
-                                ],
-                                "Clinical Information": [
-                                    "medical_history",
-                                    "medication_history",
-                                    "treatment_course"
-                                ]
-                            }
-                            
-                            # Create a DataFrame from case reports
-                            case_reports_df = pd.DataFrame(literature['case_reports'])
-                            
-                            # Display each section in an expander
-                            for section_name, columns in sections.items():
-                                with st.expander(f"{section_name}", expanded=True):
-                                    # Only show columns that exist in the DataFrame
-                                    valid_columns = [col for col in columns if col in case_reports_df.columns]
-                                    if valid_columns:
-                                        st.dataframe(
-                                            case_reports_df[valid_columns],
-                                            use_container_width=True,
-                                            hide_index=True
-                                        )
-                                    else:
-                                        st.info(f"No {section_name.lower()} data available")
-                            
-                            # Add download button for full CSV
-                            csv = case_reports_df.to_csv(index=False)
+                            # Create a download button for the full dataset
+                            df = pd.DataFrame(papers)
+                            csv = df.to_csv(index=False)
                             st.download_button(
-                                "Download Full Case Report Data (CSV)",
+                                "Download full dataset as CSV",
                                 csv,
                                 "case_reports.csv",
                                 "text/csv",
                                 key='download-csv'
                             )
+                            
+                            # Display each paper in its own box
+                            for paper in papers:
+                                with st.container():
+                                    st.markdown("---")
+                                    col1, col2 = st.columns([3, 1])
+                                    
+                                    with col1:
+                                        st.markdown(f"### {paper.get('title', 'Untitled Paper')}")
+                                        st.markdown(f"**PMID:** {paper.get('pmid', 'N/A')}")
+                                    
+                                    with col2:
+                                        if paper.get('url'):
+                                            st.markdown(f"[View Paper]({paper['url']})")
+                                    
+                                    # Patient Information
+                                    st.markdown("#### Patient Information")
+                                    patient_col1, patient_col2 = st.columns(2)
+                                    with patient_col1:
+                                        st.write(f"**Age:** {paper.get('age', 'N/A')}")
+                                        st.write(f"**Sex:** {paper.get('sex', 'N/A')}")
+                                    with patient_col2:
+                                        st.write(f"**QT/QTc:** {paper.get('qt', 'N/A')}")
+                                        st.write(f"**Heart Rate:** {paper.get('heart_rate', 'N/A')}")
+                                    
+                                    # Medication Information
+                                    st.markdown("#### Medication Details")
+                                    med_col1, med_col2 = st.columns(2)
+                                    with med_col1:
+                                        st.write(f"**Dose:** {paper.get('oral_dose', 'N/A')}")
+                                        st.write(f"**Concentration:** {paper.get('plasma_concentration', 'N/A')}")
+                                    with med_col2:
+                                        st.write(f"**Route:** {paper.get('route', 'N/A')}")
+                                        st.write(f"**Duration:** {paper.get('duration', 'N/A')}")
+                                    
+                                    # Additional Information
+                                    if paper.get('medical_history'):
+                                        with st.expander("Medical History"):
+                                            st.write(paper['medical_history'])
+                                    
+                                    if paper.get('medication_history'):
+                                        with st.expander("Medication History"):
+                                            st.write(paper['medication_history'])
+                                    
+                                    if paper.get('course_of_treatment'):
+                                        with st.expander("Course of Treatment"):
+                                            st.write(paper['course_of_treatment'])
                         else:
-                            st.info("No case reports found")
+                            st.info("No case reports found in the literature.")
+                    else:
+                        st.info("No literature data available.")
                     
     except Exception as e:
         st.error(f"Error analyzing drug: {str(e)}")
