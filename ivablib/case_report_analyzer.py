@@ -24,7 +24,20 @@ class CaseReportAnalyzer:
             'sex': re.compile(r'\b(?:male|female|man|woman|boy|girl|[MF]\s*/\s*(?:\d+|[MF])|gender[\s:]+(?:male|female)|(?:he|she|his|her)\s+was)\b', re.IGNORECASE),
             
             # Enhanced dosing patterns
-            'oral_dose': re.compile(r'(?:oral\s+dose|dose[d\s]*orally|given|administered|took|ingested|consumed|prescribed)\s*(?:with|at|of|a|total)?\s*(\d+\.?\d*)\s*(?:mg|milligrams?|g|grams?|mcg|micrograms?)', re.IGNORECASE),
+            'oral_dose': re.compile(r"""
+                (?:
+                    (?:oral|po|by\s+mouth|orally|per\s+os)\s+
+                    (?:dose|dosage|doses|administration|administered|given|taken|prescribed|started|initiated|received|treated\s+with)|
+                    (?:dose[d\s]*|given|administered|took|ingested|consumed|prescribed|started|initiated|received|treated\s+with)\s+
+                    (?:orally|po|by\s+mouth|per\s+os)
+                )
+                \s*
+                (?:with|at|of|a|total|daily|once|twice|thrice|[1-4]x|q\.?d|bid|tid|qid)?\s*
+                (?:dose\s+of\s+)?
+                (\d+\.?\d*)\s*
+                (?:mg|milligrams?|g|grams?|mcg|micrograms?|µg)
+                (?:\s*(?:per|a|each|every|q|q\.)\s*(?:day|daily|d|qd|od|q\.?d\.?|24\s*h(?:ours?)?|diem))?
+            """, re.VERBOSE | re.IGNORECASE),
             
             # Enhanced concentration patterns
             'theoretical_max': re.compile(r'(?:maximum|max|peak|highest|cmax|c-?max)\s*(?:concentration|conc|level|exposure)\s*(?:of|was|is|reached|measured|observed|calculated)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*(?:μM|uM|micromolar|nmol/[lL]|μmol/[lL]|ng/m[lL])', re.IGNORECASE),
@@ -389,13 +402,6 @@ class CaseReportAnalyzer:
         
         return df
         
-    def extract_numeric(self, value: str) -> Optional[float]:
-        """Extract numeric value from string."""
-        if not value or not isinstance(value, str):
-            return None
-        match = re.search(r'(\d+\.?\d*)', value)
-        return float(match.group(1)) if match else None
-
     def analyze_paper(self, paper: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Analyze a single paper for case report information."""
         try:
@@ -408,122 +414,158 @@ class CaseReportAnalyzer:
             if not text.strip():
                 return None
             
-            # Perform comprehensive QT analysis
+            # Clean and normalize text
+            text = clean_text(text)
+            
+            # Extract basic information with context
+            age_info = self._extract_with_context(text, self.patterns['age'])
+            sex_info = self._extract_with_context(text, self.patterns['sex'])
+            dose_info = self._extract_with_context(text, self.patterns['oral_dose'])
+            
+            # Extract ECG measurements with context
+            hr_info = self._extract_with_context(text, self.patterns['heart_rate'])
+            bp_info = self._extract_with_context(text, self.patterns['blood_pressure'])
+            
+            # Extract QT/QTc values with comprehensive analysis
             qt_analysis = self.analyze_qt_comprehensive(text)
             
-            # Extract QT/QTc values from comprehensive analysis
-            qtc_value = None
-            qt_value = None
-            qtc_context = None
-            qt_context = None
-            qt_source = None
+            # Extract other clinical information
+            medical_history = self._extract_with_context(text, self.patterns['medical_history'])
+            medication_history = self._extract_with_context(text, self.patterns['medication_history'])
+            treatment_course = self._extract_with_context(text, self.patterns['treatment_course'])
+            lab_values = self._extract_with_context(text, self.patterns['lab_values'])
             
-            # Function to extract numeric value from text
-            def extract_numeric(text):
-                match = re.search(r'(\d+\.?\d*)', text)
-                return float(match.group(1)) if match else None
-            
-            # Check all sources for QT/QTc values in priority order
-            sources = [
-                ('Main Text', qt_analysis['numeric_values']),
-                ('Figure', qt_analysis['figure_qt']),
-                ('Table', qt_analysis['table_qt']),
-                ('Supplementary', qt_analysis['supp_qt'])
-            ]
-            
-            for source_name, values in sources:
-                # For numeric values from main text
-                if source_name == 'Main Text':
-                    for pattern_name, pattern_values in values.items():
-                        if pattern_values:
-                            max_value_dict = max(pattern_values, key=lambda x: x['value'])
-                            if 'qtc' in pattern_name and (qtc_value is None or max_value_dict['value'] > qtc_value):
-                                qtc_value = max_value_dict['value']
-                                qtc_context = max_value_dict['context']
-                                qt_source = 'Main Text'
-                            elif 'qt' in pattern_name and (qt_value is None or max_value_dict['value'] > qt_value):
-                                qt_value = max_value_dict['value']
-                                qt_context = max_value_dict['context']
-                                qt_source = 'Main Text'
-                else:
-                    # For figure/table/supplementary values
-                    for item in values:
-                        value = extract_numeric(item['text'])
-                        if value:
-                            # Assume milliseconds if no unit specified
-                            if 'sec' in item['text'].lower():
-                                value *= 1000
-                            
-                            # Update QT/QTc based on context
-                            if 'qtc' in item['text'].lower():
-                                if qtc_value is None or value > qtc_value:
-                                    qtc_value = value
-                                    qtc_context = item['context']
-                                    qt_source = source_name
-                            else:
-                                if qt_value is None or value > qt_value:
-                                    qt_value = value
-                                    qt_context = item['context']
-                                    qt_source = source_name
-            
-            # Extract other information with context
-            age_info = self.extract_value_with_context(text, self.patterns['age'])
-            sex_info = self.extract_value_with_context(text, self.patterns['sex'])
-            dose_info = self.extract_value_with_context(text, self.patterns['oral_dose'])
-            max_conc_info = self.extract_value_with_context(text, self.patterns['theoretical_max'])
-            bioavail_info = self.extract_value_with_context(text, self.patterns['bioavailability'])
-            herg_info = self.extract_value_with_context(text, self.patterns['herg_ic50'])
-            plasma_info = self.extract_value_with_context(text, self.patterns['plasma_concentration'])
-            hr_info = self.extract_value_with_context(text, self.patterns['heart_rate'])
-            bp_info = self.extract_value_with_context(text, self.patterns['blood_pressure'])
-            
+            # Create result dictionary with all available information
             result = {
                 'title': paper.get('Title', ''),
                 'year': paper.get('Year', ''),
-                'abstract': paper.get('Abstract', ''),
-                'full_text': paper.get('FullText', 'None'),
-                'age': age_info[0] if age_info else None,
+                'pmid': paper.get('PMID', 'N/A'),
+                'doi': paper.get('DOI', 'N/A'),
+                'source': paper.get('Source', 'Unknown'),
+                
+                # Patient demographics
+                'age': self._extract_numeric(age_info[0]) if age_info else None,
                 'age_context': age_info[1] if age_info else None,
-                'sex': sex_info[0] if sex_info else None,
+                'sex': self._clean_sex(sex_info[0]) if sex_info else None,
                 'sex_context': sex_info[1] if sex_info else None,
-                'oral_dose': dose_info[0] if dose_info else None,
+                
+                # Medication details
+                'oral_dose': self._extract_numeric(dose_info[0]) if dose_info else None,
                 'dose_context': dose_info[1] if dose_info else None,
-                'theoretical_max': max_conc_info[0] if max_conc_info else None,
-                'max_conc_context': max_conc_info[1] if max_conc_info else None,
-                'bioavailability': bioavail_info[0] if bioavail_info else None,
-                'bioavailability_context': bioavail_info[1] if bioavail_info else None,
-                'herg_ic50': herg_info[0] if herg_info else None,
-                'herg_context': herg_info[1] if herg_info else None,
-                'plasma_concentration': plasma_info[0] if plasma_info else None,
-                'plasma_context': plasma_info[1] if plasma_info else None,
-                'qt': qt_value,
-                'qt_context': qt_context,
-                'qt_source': qt_source,
-                'qtc': qtc_value,
-                'qtc_context': qtc_context,
-                'qtc_source': qt_source,
-                'heart_rate': hr_info[0] if hr_info else None,
+                'dose_unit': self._extract_unit(dose_info[0]) if dose_info else None,
+                'dose_frequency': self._extract_frequency(dose_info[0]) if dose_info else None,
+                
+                # ECG measurements
+                'heart_rate': self._extract_numeric(hr_info[0]) if hr_info else None,
                 'heart_rate_context': hr_info[1] if hr_info else None,
-                'tdp': 'Yes' if qt_analysis['tdp_mentions'] else 'No',
-                'tdp_context': qt_analysis['tdp_mentions'][0]['context'] if qt_analysis['tdp_mentions'] else None,
                 'blood_pressure': bp_info[0] if bp_info else None,
                 'blood_pressure_context': bp_info[1] if bp_info else None,
-                'medical_history': self.extract_value(text, self.patterns['medical_history']),
-                'medication_history': self.extract_value(text, self.patterns['medication_history']),
-                'treatment_course': self.extract_value(text, self.patterns['treatment_course'])
+                
+                # QT/QTc analysis
+                'qt': qt_analysis.get('qt_value'),
+                'qt_context': qt_analysis.get('qt_context'),
+                'qtc': qt_analysis.get('qtc_value'),
+                'qtc_context': qt_analysis.get('qtc_context'),
+                'qt_source': qt_analysis.get('qt_source'),
+                
+                # Clinical information
+                'medical_history': medical_history[0] if medical_history else None,
+                'medical_history_context': medical_history[1] if medical_history else None,
+                'medication_history': medication_history[0] if medication_history else None,
+                'medication_history_context': medication_history[1] if medication_history else None,
+                'treatment_course': treatment_course[0] if treatment_course else None,
+                'treatment_course_context': treatment_course[1] if treatment_course else None,
+                'lab_values': lab_values[0] if lab_values else None,
+                'lab_values_context': lab_values[1] if lab_values else None,
+                
+                # TdP analysis
+                'tdp': 'Yes' if qt_analysis.get('tdp_mentions') else 'No',
+                'tdp_context': qt_analysis.get('tdp_context'),
+                
+                # Detailed analysis
+                'detailed_qt_analysis': qt_analysis
             }
             
-            # Add detailed QT analysis
-            result['detailed_qt_analysis'] = qt_analysis
-            
             # Only return if we found some meaningful information
-            if any(v for v in result.values() if v not in (None, '', 'No')):
+            if any(v for v in result.values() if v not in (None, '', 'No', 'N/A', 'Unknown')):
                 return result
             return None
             
         except Exception as e:
             logger.error(f"Error analyzing paper: {str(e)}")
             return None
+
+    def _extract_with_context(self, text: str, pattern: re.Pattern) -> Optional[Tuple[str, str]]:
+        """Extract value and context using pattern."""
+        if not text:
+            return None
+            
+        match = pattern.search(text)
+        if not match:
+            return None
+            
+        value = next((g for g in match.groups() if g is not None), None)
+        if not value:
+            return None
+            
+        context = self.get_smart_context(text, match.start(), match.end())
+        return value, context
+
+    def _extract_numeric(self, text: str) -> Optional[float]:
+        """Extract numeric value from text."""
+        if not text:
+            return None
+            
+        match = re.search(r'(\d+\.?\d*)', text)
+        return float(match.group(1)) if match else None
+
+    def _extract_unit(self, text: str) -> Optional[str]:
+        """Extract unit from dosing text."""
+        if not text:
+            return None
+            
+        unit_pattern = re.compile(r'(mg|milligrams?|g|grams?|mcg|micrograms?|µg)', re.IGNORECASE)
+        match = unit_pattern.search(text)
+        return match.group(1) if match else None
+
+    def _extract_frequency(self, text: str) -> Optional[str]:
+        """Extract frequency from dosing text."""
+        if not text:
+            return None
+            
+        freq_pattern = re.compile(r'(daily|once|twice|thrice|[1-4]x|q\.?d|bid|tid|qid|per\s+day|q24h)', re.IGNORECASE)
+        match = freq_pattern.search(text)
+        return match.group(1) if match else None
+
+    def _clean_sex(self, text: str) -> Optional[str]:
+        """Clean and standardize sex value."""
+        if not text:
+            return None
+            
+        text = text.lower()
+        if any(m in text for m in ['male', 'man', 'm/', 'boy']):
+            return 'male'
+        elif any(f in text for f in ['female', 'woman', 'f/', 'girl']):
+            return 'female'
+        return None
+
+    def extract_value(self, text: str, pattern: re.Pattern) -> Optional[str]:
+        """Extract value from text using a compiled regex pattern."""
+        if not text:
+            return None
+            
+        match = pattern.search(text)
+        if match:
+            # Return the first non-None group
+            return next((g for g in match.groups() if g is not None), None)
+        return None
+
+    def extract_numeric(self, value: str) -> Optional[float]:
+        """Extract numeric value from string."""
+        if not value or not isinstance(value, str):
+            return None
+        match = re.search(r'(\d+\.?\d*)', value)
+        return float(match.group(1)) if match else None
 
     def _extract_first_match(self, pattern, text):
         """Helper method to extract first regex match from text."""
