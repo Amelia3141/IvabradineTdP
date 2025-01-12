@@ -3,7 +3,7 @@
 import re
 import logging
 import pandas as pd
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 import os
 import PyPDF2
 
@@ -18,38 +18,269 @@ class CaseReportAnalyzer:
         """Initialize the analyzer with regex patterns."""
         # Compile regex patterns for better performance
         self.patterns = {
-            'age': re.compile(r'(\d+)[\s-]*(year|yr|y)[s\s-]*old|(?:age[d\s:]*|aged\s*)(\d+)', re.IGNORECASE),
-            'sex': re.compile(r'\b(male|female|man|woman|boy|girl)\b', re.IGNORECASE),
-            'qtc': re.compile(r'QTc[\s:]*(\d+)', re.IGNORECASE),
-            'qt_uncorrected': re.compile(r'\bQT[\s:]*(\d+)', re.IGNORECASE),
-            'heart_rate': re.compile(r'(?:heart rate|HR|pulse)[\s:]*(\d+)(?:\s*beats?\s*per\s*min(?:ute)?|\s*bpm)?', re.IGNORECASE),
-            'blood_pressure': re.compile(r'(?:blood pressure|BP)[\s:]*([\d/]+)', re.IGNORECASE),
-            'had_tdp': re.compile(r'\b(?:torsade[s]* de pointes|TdP|torsades)\b', re.IGNORECASE),
-            'patient_type': re.compile(r'\b(pediatric|child|infant|newborn|adult|elderly)\b', re.IGNORECASE),
-            'outcome': re.compile(r'(?:treatment|therapy)[\s\w]+(?:successful|effective|improved|resolved|decreased|controlled|normalized)', re.IGNORECASE),
-            'treatment_duration': re.compile(r'(?:after|within|for)\s*(\d+)\s*(?:hour|hr|h|day|week|month|year)s?', re.IGNORECASE),
-            'drug_combination': re.compile(r'(?:with|plus|and|combination)\s+(amiodarone|flecainide|beta.?blocker|metoprolol|propranolol|sotalol)', re.IGNORECASE)
+            # Enhanced demographic patterns
+            'age': re.compile(r'(?:(?:aged?|age[d\s:]*|a|was)\s*)?(\d+)[\s-]*(?:year|yr|y|yo|years?)[s\s-]*(?:old|of\s+age)?|(?:age[d\s:]*|aged\s*)(\d+)', re.IGNORECASE),
+            
+            'sex': re.compile(r'\b(?:male|female|man|woman|boy|girl|[MF]\s*/\s*(?:\d+|[MF])|gender[\s:]+(?:male|female)|(?:he|she|his|her)\s+was)\b', re.IGNORECASE),
+            
+            # Enhanced dosing patterns
+            'oral_dose': re.compile(r'(?:oral\s+dose|dose[d\s]*orally|given|administered|took|ingested|consumed|prescribed)\s*(?:with|at|of|a|total)?\s*(\d+\.?\d*)\s*(?:mg|milligrams?|g|grams?|mcg|micrograms?)', re.IGNORECASE),
+            
+            # Enhanced concentration patterns
+            'theoretical_max': re.compile(r'(?:maximum|max|peak|highest|cmax|c-?max)\s*(?:concentration|conc|level|exposure)\s*(?:of|was|is|reached|measured|observed|calculated)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*(?:μM|uM|micromolar|nmol/[lL]|μmol/[lL]|ng/m[lL])', re.IGNORECASE),
+            
+            'bioavailability': re.compile(r'(?:bioavailability|F|absorption|systemic\s+availability)\s*(?:of|was|is|approximately|about|~)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*%?', re.IGNORECASE),
+            
+            'herg_ic50': re.compile(r'(?:hERG\s+IC50|IC50\s+(?:value\s+)?(?:for|of)\s+hERG|half-?maximal\s+(?:inhibitory)?\s+concentration|IC50)\s*(?:of|was|is|=|:)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*(?:μM|uM|micromolar|nmol/[lL]|μmol/[lL])', re.IGNORECASE),
+            
+            'plasma_concentration': re.compile(r'(?:plasma|blood|serum)\s*(?:concentration|level|exposure|Cmax|C-max)\s*(?:of|was|is|measured|found|detected|reached)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*(?:μM|uM|micromolar|ng/m[lL]|μg/m[lL]|mg/[lL]|g/[lL])', re.IGNORECASE),
+            
+            # Enhanced ECG patterns
+            'qtc': re.compile(r"""
+                (?:
+                    QTc[FBR]?|
+                    corrected\s+QT|
+                    QT\s*corrected|
+                    QT[c]?\s*interval\s*(?:corrected)?|
+                    corrected\s*QT\s*interval
+                )
+                [\s:]*
+                (?:interval|duration|measurement|prolongation|value)?
+                \s*
+                (?:of|was|is|=|:|measured|found|documented|recorded)?
+                \s*
+                (\d+\.?\d*)
+                \s*
+                (?:ms(?:ec)?|milliseconds?|s(?:ec)?|seconds?)?
+            """, re.VERBOSE | re.IGNORECASE),
+
+            'qt': re.compile(r"""
+                \b(?:
+                    QT|
+                    uncorrected\s+QT|
+                    QT\s*interval|
+                    interval\s*QT|
+                    baseline\s*QT
+                )
+                [\s:]*
+                (?:interval|duration|measurement|value)?
+                \s*
+                (?:of|was|is|=|:|measured|found|documented|recorded)?
+                \s*
+                (\d+\.?\d*)
+                \s*
+                (?:ms(?:ec)?|milliseconds?|s(?:ec)?|seconds?)?
+            """, re.VERBOSE | re.IGNORECASE),
+            
+            'heart_rate': re.compile(r'(?:heart\s+rate|HR|pulse|ventricular\s+rate|heart\s+rhythm|cardiac\s+rate)[\s:]*(?:of|was|is|=|:)?\s*(\d+)(?:\s*(?:beats?\s*per\s*min(?:ute)?|bpm|min-1|/min))?', re.IGNORECASE),
+            
+            'blood_pressure': re.compile(r'(?:blood\s+pressure|BP|arterial\s+pressure)[\s:]*(?:of|was|is|=|:)?\s*([\d/]+)(?:\s*mm\s*Hg)?', re.IGNORECASE),
+            
+            # Enhanced arrhythmia patterns
+            'tdp': re.compile(r'\b(?:torsade[s]?\s*(?:de)?\s*pointes?|TdP|torsades|polymorphic\s+[vV]entricular\s+[tT]achycardia|PVT\s+(?:with|showing)\s+[tT]dP)\b', re.IGNORECASE),
+            
+            # Enhanced history patterns
+            'medical_history': re.compile(r'(?:medical|clinical|past|previous|documented|known|significant)\s*(?:history|condition|diagnosis|comorbidities)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE),
+            
+            'medication_history': re.compile(r'(?:medication|drug|prescription|current\s+medications?|concomitant\s+medications?)\s*(?:history|list|profile|regime)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE),
+            
+            # Enhanced treatment patterns
+            'treatment_course': re.compile(r'(?:treatment|therapy|management|intervention|administered|given)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE),
+            
+            # Additional patterns for table/figure data
+            'table_data': re.compile(r'Table\s*\d+[.:]\s*([^.]+)', re.IGNORECASE),
+            
+            'figure_data': re.compile(r'Fig(?:ure|\.)\s*\d+[.:]\s*([^.]+)', re.IGNORECASE),
+            
+            # Laboratory values
+            'lab_values': re.compile(r'(?:laboratory|lab|biochemistry|chemistry)\s*(?:results|values|findings|data)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE),
+            
+            # Figure/Table QT mentions
+            'figure_qt': re.compile(r"""
+                (?:Fig(?:ure|\.)?|Table)\s*\d+[A-Z]?\)?[:\s]+
+                (?:[^.]*?)
+                (?:
+                    QT[c]?[\s:]*(\d+\.?\d*)(?:\s*(?:ms|msec|s|sec|seconds?))?|
+                    (?:shows?|demonstrates?|illustrates?|reveals?)\s+
+                    (?:[^.]*?)
+                    QT[c]?[\s:]*(\d+\.?\d*)
+                )
+            """, re.VERBOSE | re.IGNORECASE),
+
+            # Table cell QT values
+            'table_qt': re.compile(r"""
+                (?:QT[c]?|Interval)[\s:]*
+                (?:\((?:ms|msec|s|sec|seconds?)\))?\s*
+                [\|\{\[\t]*
+                (\d+\.?\d*)
+            """, re.VERBOSE | re.IGNORECASE),
+            
+            # Supplementary material QT values
+            'supp_qt': re.compile(r"""
+                (?:Supplementary|Suppl\.?|Online)\s+
+                (?:Fig(?:ure|\.)?|Table|Data|Material)\s*\d*[:\s]+
+                (?:[^.]*?)
+                QT[c]?[\s:]*(\d+\.?\d*)
+            """, re.VERBOSE | re.IGNORECASE),
+            
+            # Drug-QT relationships
+            'drug_qt': re.compile(r"""
+                (?P<drug>\w+)\s+
+                (?:
+                    (?:is|are|was|were|being|been)\s+
+                    (?:
+                        known\s+to|
+                        reported\s+to|
+                        associated\s+with|
+                        linked\s+to
+                    )\s+
+                    (?:cause|produce|induce|prolong|affect)
+                )?\s*
+                (?:QT|QTc)\s*
+                (?:
+                    prolongation|
+                    interval|
+                    changes?
+                )
+            """, re.VERBOSE | re.IGNORECASE),
+            
+            # Bradycardia-QT relationship
+            'brady_qt': re.compile(r"""
+                (?:
+                    bradycardia|
+                    slow\s+heart\s+rate|
+                    decreased\s+heart\s+rate|
+                    heart\s+rate\s*(?:of)?\s*\d+
+                )
+                [^.]*?
+                (?:QT|QTc|prolongation|interval)
+            """, re.VERBOSE | re.IGNORECASE)
         }
+
+    def get_smart_context(self, text: str, match_start: int, match_end: int, min_chars: int = 50) -> str:
+        """
+        Get context with a minimum of min_chars but expanded to complete sentences.
         
-    def extract_value(self, text: str, pattern: re.Pattern) -> Optional[str]:
-        """Extract a value from text using a compiled regex pattern."""
+        Args:
+            text: The full text to extract context from
+            match_start: Start position of the match
+            match_end: End position of the match
+            min_chars: Minimum number of characters for context window
+            
+        Returns:
+            String containing the smart context window
+        """
+        # Get initial context window
+        start_pos = max(0, match_start - min_chars)
+        end_pos = min(len(text), match_end + min_chars)
+        
+        # Expand to nearest sentence boundaries
+        # Look backwards for sentence start
+        while start_pos > 0:
+            prev_char = text[start_pos - 1]
+            if prev_char in '.!?' and text[start_pos].isupper():
+                break
+            start_pos -= 1
+        
+        # Look forwards for sentence end
+        while end_pos < len(text):
+            if text[end_pos - 1] in '.!?' and (end_pos == len(text) or text[end_pos].isupper()):
+                break
+            end_pos += 1
+        
+        return text[start_pos:end_pos].strip()
+
+    def extract_value_with_context(self, text: str, pattern: re.Pattern) -> Optional[Tuple[str, str]]:
+        """Extract a value and its context from text using a compiled regex pattern."""
         if not text:
             return None
             
         match = pattern.search(text)
         if match:
-            # Return the first non-None group
-            return next((g for g in match.groups() if g is not None), None)
+            value = next((g for g in match.groups() if g is not None), None)
+            if value:
+                context = self.get_smart_context(text, match.start(), match.end())
+                return value, context
         return None
+
+    def analyze_qt_comprehensive(self, text: str) -> Dict[str, Any]:
+        """Perform comprehensive QT analysis on text with smart context windows."""
+        results = {
+            'numeric_values': {},
+            'tdp_mentions': [],
+            'drug_qt_interactions': [],
+            'brady_qt_relations': [],
+            'figure_qt': [],
+            'table_qt': [],
+            'supp_qt': []
+        }
         
-    def extract_all_matches(self, text: str, pattern: re.Pattern) -> List[str]:
-        """Extract all matches from text using a compiled regex pattern."""
-        if not text:
-            return []
-            
-        matches = pattern.finditer(text)
-        return [next((g for g in m.groups() if g is not None), '') for m in matches]
+        # Find numeric values with units
+        for pattern_name in ['qtc', 'qt']:
+            matches = self.patterns[pattern_name].finditer(text)
+            for match in matches:
+                if pattern_name not in results['numeric_values']:
+                    results['numeric_values'][pattern_name] = []
+                value = float(match.group(1))
+                # Convert seconds to milliseconds if needed
+                if any(unit in match.group(0).lower() for unit in ['sec', 's', 'seconds']):
+                    value *= 1000
+                results['numeric_values'][pattern_name].append({
+                    'value': value,
+                    'context': self.get_smart_context(text, match.start(), match.end())
+                })
         
+        # Find Torsades mentions
+        tdp_matches = self.patterns['tdp'].finditer(text)
+        for match in tdp_matches:
+            results['tdp_mentions'].append({
+                'text': match.group(0).strip(),
+                'context': self.get_smart_context(text, match.start(), match.end())
+            })
+        
+        # Find drug-QT relationships
+        drug_matches = self.patterns['drug_qt'].finditer(text)
+        for match in drug_matches:
+            results['drug_qt_interactions'].append({
+                'drug': match.group('drug'),
+                'text': match.group(0).strip(),
+                'context': self.get_smart_context(text, match.start(), match.end())
+            })
+        
+        # Find bradycardia-QT relationships
+        brady_matches = self.patterns['brady_qt'].finditer(text)
+        for match in brady_matches:
+            results['brady_qt_relations'].append({
+                'text': match.group(0).strip(),
+                'context': self.get_smart_context(text, match.start(), match.end())
+            })
+        
+        # Find figure/table QT mentions
+        figure_matches = self.patterns['figure_qt'].finditer(text)
+        for match in figure_matches:
+            results['figure_qt'].append({
+                'text': match.group(0).strip(),
+                'context': self.get_smart_context(text, match.start(), match.end())
+            })
+        
+        # Find table cell QT values
+        table_matches = self.patterns['table_qt'].finditer(text)
+        for match in table_matches:
+            results['table_qt'].append({
+                'text': match.group(0).strip(),
+                'context': self.get_smart_context(text, match.start(), match.end())
+            })
+        
+        # Find supplementary material QT values
+        supp_matches = self.patterns['supp_qt'].finditer(text)
+        for match in supp_matches:
+            results['supp_qt'].append({
+                'text': match.group(0).strip(),
+                'context': self.get_smart_context(text, match.start(), match.end())
+            })
+        
+        return results
+
     def analyze_paper(self, paper: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Analyze a single paper for case report information."""
         try:
@@ -62,49 +293,120 @@ class CaseReportAnalyzer:
             if not text.strip():
                 return None
             
-            # Extract basic information
-            age = self.extract_value(text, self.patterns['age'])
-            sex = self.extract_value(text, self.patterns['sex'])
-            qtc = self.extract_value(text, self.patterns['qtc'])
-            qt = self.extract_value(text, self.patterns['qt_uncorrected'])
-            hr = self.extract_value(text, self.patterns['heart_rate'])
-            bp = self.extract_value(text, self.patterns['blood_pressure'])
+            # Perform comprehensive QT analysis
+            qt_analysis = self.analyze_qt_comprehensive(text)
             
-            # Extract additional information
-            patient_type = self.extract_value(text, self.patterns['patient_type'])
-            outcome = bool(self.patterns['outcome'].search(text))
-            treatment_duration = self.extract_value(text, self.patterns['treatment_duration'])
-            drug_combinations = self.extract_all_matches(text, self.patterns['drug_combination'])
+            # Extract QT/QTc values from comprehensive analysis
+            qtc_value = None
+            qt_value = None
+            qtc_context = None
+            qt_context = None
+            qt_source = None
             
-            # Check for TdP
-            had_tdp = bool(self.patterns['had_tdp'].search(text))
+            # Function to extract numeric value from text
+            def extract_numeric(text):
+                match = re.search(r'(\d+\.?\d*)', text)
+                return float(match.group(1)) if match else None
             
-            # Only return if we found some relevant information
-            if any([age, sex, qtc, qt, hr, bp, had_tdp, patient_type, outcome, treatment_duration, drug_combinations]):
-                return {
-                    'title': paper.get('title', ''),
-                    'authors': paper.get('authors', []),
-                    'year': paper.get('year'),
-                    'journal': paper.get('journal', ''),
-                    'pmid': paper.get('pmid', ''),
-                    'age': float(age) if age and age.isdigit() else None,
-                    'sex': sex.title() if sex else None,
-                    'qtc': float(qtc) if qtc and qtc.isdigit() else None,
-                    'qt_uncorrected': float(qt) if qt and qt.isdigit() else None,
-                    'heart_rate': float(hr) if hr and hr.isdigit() else None,
-                    'blood_pressure': bp,
-                    'had_tdp': 'Yes' if had_tdp else 'No',
-                    'patient_type': patient_type.title() if patient_type else None,
-                    'treatment_successful': 'Yes' if outcome else 'No',
-                    'treatment_duration': treatment_duration,
-                    'drug_combinations': ', '.join(drug_combinations) if drug_combinations else None
-                }
+            # Check all sources for QT/QTc values in priority order
+            sources = [
+                ('Main Text', qt_analysis['numeric_values']),
+                ('Figure', qt_analysis['figure_qt']),
+                ('Table', qt_analysis['table_qt']),
+                ('Supplementary', qt_analysis['supp_qt'])
+            ]
+            
+            for source_name, values in sources:
+                # For numeric values from main text
+                if source_name == 'Main Text':
+                    for pattern_name, pattern_values in values.items():
+                        if pattern_values:
+                            max_value_dict = max(pattern_values, key=lambda x: x['value'])
+                            if 'qtc' in pattern_name and (qtc_value is None or max_value_dict['value'] > qtc_value):
+                                qtc_value = max_value_dict['value']
+                                qtc_context = max_value_dict['context']
+                                qt_source = 'Main Text'
+                            elif 'qt' in pattern_name and (qt_value is None or max_value_dict['value'] > qt_value):
+                                qt_value = max_value_dict['value']
+                                qt_context = max_value_dict['context']
+                                qt_source = 'Main Text'
+                else:
+                    # For figure/table/supplementary values
+                    for item in values:
+                        value = extract_numeric(item['text'])
+                        if value:
+                            # Assume milliseconds if no unit specified
+                            if 'sec' in item['text'].lower():
+                                value *= 1000
+                            
+                            # Update QT/QTc based on context
+                            if 'qtc' in item['text'].lower():
+                                if qtc_value is None or value > qtc_value:
+                                    qtc_value = value
+                                    qtc_context = item['context']
+                                    qt_source = source_name
+                            else:
+                                if qt_value is None or value > qt_value:
+                                    qt_value = value
+                                    qt_context = item['context']
+                                    qt_source = source_name
+            
+            # Extract other information with context
+            age_info = self.extract_value_with_context(text, self.patterns['age'])
+            sex_info = self.extract_value_with_context(text, self.patterns['sex'])
+            dose_info = self.extract_value_with_context(text, self.patterns['oral_dose'])
+            max_conc_info = self.extract_value_with_context(text, self.patterns['theoretical_max'])
+            bioavail_info = self.extract_value_with_context(text, self.patterns['bioavailability'])
+            herg_info = self.extract_value_with_context(text, self.patterns['herg_ic50'])
+            plasma_info = self.extract_value_with_context(text, self.patterns['plasma_concentration'])
+            hr_info = self.extract_value_with_context(text, self.patterns['heart_rate'])
+            bp_info = self.extract_value_with_context(text, self.patterns['blood_pressure'])
+            
+            result = {
+                'Case Report Title': paper.get('title', ''),
+                'Age': age_info[0] if age_info else None,
+                'Age Context': age_info[1] if age_info else None,
+                'Sex': sex_info[0] if sex_info else None,
+                'Sex Context': sex_info[1] if sex_info else None,
+                'Oral Dose (mg)': dose_info[0] if dose_info else None,
+                'Dose Context': dose_info[1] if dose_info else None,
+                'theoretical max concentration (μM)': max_conc_info[0] if max_conc_info else None,
+                'Max Conc Context': max_conc_info[1] if max_conc_info else None,
+                '40% bioavailability': bioavail_info[0] if bioavail_info else None,
+                'Bioavailability Context': bioavail_info[1] if bioavail_info else None,
+                'Theoretical hERG IC50 / Concentration μM': herg_info[0] if herg_info else None,
+                'hERG Context': herg_info[1] if herg_info else None,
+                '40% Plasma concentration': plasma_info[0] if plasma_info else None,
+                'Plasma Context': plasma_info[1] if plasma_info else None,
+                'Uncorrected QT (ms)': qt_value,
+                'QT Context': qt_context,
+                'QT Source': qt_source,
+                'QTc': qtc_value,
+                'QTc Context': qtc_context,
+                'QTc Source': qt_source,
+                'Heart Rate (bpm)': hr_info[0] if hr_info else None,
+                'HR Context': hr_info[1] if hr_info else None,
+                'Torsades de Pointes?': 'Yes' if qt_analysis['tdp_mentions'] else 'No',
+                'TdP Context': qt_analysis['tdp_mentions'][0]['context'] if qt_analysis['tdp_mentions'] else None,
+                'Blood Pressure (mmHg)': bp_info[0] if bp_info else None,
+                'BP Context': bp_info[1] if bp_info else None,
+                'Medical History': self.extract_value(text, self.patterns['medical_history']),
+                'Medication History': self.extract_value(text, self.patterns['medication_history']),
+                'Course of Treatment': self.extract_value(text, self.patterns['treatment_course'])
+            }
+            
+            # Add detailed QT analysis
+            result['detailed_qt_analysis'] = qt_analysis
+            
+            # Only return if we found some meaningful information
+            if any(v for v in result.values() if v not in (None, '', 'No')):
+                return result
             return None
             
         except Exception as e:
             logger.error(f"Error analyzing paper: {str(e)}")
             return None
-            
+
     def analyze_papers(self, papers: List[Dict[str, Any]], drug_name: str) -> pd.DataFrame:
         """Analyze a list of papers and return results as a DataFrame."""
         try:
@@ -116,20 +418,6 @@ class CaseReportAnalyzer:
                     
             # Convert to DataFrame
             df = pd.DataFrame(results) if results else pd.DataFrame()
-            
-            # Add drug name
-            if not df.empty:
-                df['drug'] = drug_name
-                
-                # Reorder columns for better display
-                column_order = [
-                    'title', 'year', 'authors', 'journal', 'pmid',
-                    'drug', 'had_tdp', 'qtc', 'qt_uncorrected',
-                    'heart_rate', 'blood_pressure', 'age', 'sex',
-                    'patient_type', 'treatment_successful',
-                    'treatment_duration', 'drug_combinations'
-                ]
-                df = df[column_order]
             
             return df
             
