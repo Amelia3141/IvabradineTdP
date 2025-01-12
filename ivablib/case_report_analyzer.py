@@ -281,6 +281,72 @@ class CaseReportAnalyzer:
         
         return results
 
+    def analyze_papers(self, papers: List[Dict[str, Any]], drug_name: str) -> pd.DataFrame:
+        """Analyze a list of papers and return results as a DataFrame."""
+        try:
+            results = []
+            for paper in papers:
+                result = {}
+                
+                # Basic paper info
+                result['title'] = paper.get('title', '')
+                result['year'] = paper.get('year', None)
+                result['pmid'] = paper.get('pmid', '')
+                result['doi'] = paper.get('doi', '')
+                result['journal'] = paper.get('journal', '')
+                
+                # Get full text if available
+                text = paper.get('full_text', '') or paper.get('abstract', '')
+                if not text:
+                    continue
+                    
+                # Extract demographics
+                age_info = self.extract_value_with_context(text, self.patterns['age'])
+                sex_info = self.extract_value_with_context(text, self.patterns['sex'])
+                result['age'] = int(age_info[0]) if age_info else None
+                result['sex'] = sex_info[0] if sex_info else None
+                
+                # Extract vitals
+                qt_data = self.analyze_qt_comprehensive(text)
+                result['qtc'] = max([item['value'] for item in qt_data['numeric_values'].get('qtc', [])]) if qt_data['numeric_values'].get('qtc') else None
+                result['qt_uncorrected'] = max([item['value'] for item in qt_data['numeric_values'].get('qt', [])]) if qt_data['numeric_values'].get('qt') else None
+                
+                hr_info = self.extract_value_with_context(text, self.patterns['heart_rate'])
+                bp_info = self.extract_value_with_context(text, self.patterns['blood_pressure'])
+                result['heart_rate'] = int(hr_info[0]) if hr_info else None
+                result['blood_pressure'] = bp_info[0] if bp_info else None
+                
+                # Extract history
+                med_history = self.extract_value_with_context(text, self.patterns['medical_history'])
+                med_list = self.extract_value_with_context(text, self.patterns['medication_history'])
+                result['medical_history'] = med_history[0] if med_history else None
+                result['medication_history'] = med_list[0] if med_list else None
+                
+                # Extract treatment and outcome
+                treatment = self.extract_value_with_context(text, self.patterns['treatment_course'])
+                result['treatment_course'] = treatment[0] if treatment else None
+                
+                # Determine outcome
+                has_tdp = bool(qt_data['tdp_mentions'])
+                result['outcome'] = 'TdP' if has_tdp else 'No TdP reported'
+                
+                # Only add if we found meaningful information
+                if any(v for v in result.values() if v not in (None, '', 'No')):
+                    results.append(result)
+                    
+            # Convert to DataFrame with all required columns
+            df = pd.DataFrame(results) if results else pd.DataFrame(columns=[
+                'title', 'year', 'pmid', 'doi', 'journal',
+                'age', 'sex', 'qtc', 'qt_uncorrected', 'heart_rate', 'blood_pressure',
+                'medical_history', 'medication_history', 'treatment_course', 'outcome'
+            ])
+            
+            return df
+            
+        except Exception as e:
+            logger.error(f"Error analyzing papers: {str(e)}")
+            return pd.DataFrame()  # Return empty DataFrame on error
+
     def analyze_paper(self, paper: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Analyze a single paper for case report information."""
         try:
@@ -406,24 +472,6 @@ class CaseReportAnalyzer:
         except Exception as e:
             logger.error(f"Error analyzing paper: {str(e)}")
             return None
-
-    def analyze_papers(self, papers: List[Dict[str, Any]], drug_name: str) -> pd.DataFrame:
-        """Analyze a list of papers and return results as a DataFrame."""
-        try:
-            results = []
-            for paper in papers:
-                result = self.analyze_paper(paper)
-                if result:
-                    results.append(result)
-                    
-            # Convert to DataFrame
-            df = pd.DataFrame(results) if results else pd.DataFrame()
-            
-            return df
-            
-        except Exception as e:
-            logger.error(f"Error analyzing papers: {str(e)}")
-            return pd.DataFrame()  # Return empty DataFrame on error
 
 def analyze_papers(papers: List[Dict[str, Any]], drug_name: str) -> pd.DataFrame:
     """Analyze a list of papers and create a case report table."""
