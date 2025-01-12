@@ -311,24 +311,10 @@ class CaseReportAnalyzer:
         # Create DataFrame
         df = pd.DataFrame(results)
         
-        # Ensure all columns exist
-        for col in df.columns:
-            if col not in df:
-                df[col] = ''
-                
         # Fill NaN values
         df = df.fillna('')
         
         return df
-
-    def _extract_first_match(self, pattern, text):
-        """Helper method to extract first regex match from text."""
-        match = pattern.search(text)
-        if match:
-            # Get the first non-None group
-            groups = [g for g in match.groups() if g is not None]
-            return groups[0] if groups else match.group(0)
-        return ''
 
     def analyze_paper(self, paper: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Analyze a single paper for case report information."""
@@ -413,8 +399,9 @@ class CaseReportAnalyzer:
             
             result = {
                 'Case Report Title': paper.get('title', ''),
-                'Authors': paper.get('authors', ''),
-                'Year': paper.get('year', None),
+                'year': paper.get('year', ''),
+                'abstract': paper.get('abstract', ''),
+                'full_text': paper.get('full_text', 'None'),
                 'Age': age_info[0] if age_info else None,
                 'Age Context': age_info[1] if age_info else None,
                 'Sex': sex_info[0] if sex_info else None,
@@ -457,6 +444,15 @@ class CaseReportAnalyzer:
         except Exception as e:
             logger.error(f"Error analyzing paper: {str(e)}")
             return None
+
+    def _extract_first_match(self, pattern, text):
+        """Helper method to extract first regex match from text."""
+        match = pattern.search(text)
+        if match:
+            # Get the first non-None group
+            groups = [g for g in match.groups() if g is not None]
+            return groups[0] if groups else match.group(0)
+        return ''
 
 def analyze_papers(papers: List[Dict[str, Any]], drug_name: str) -> pd.DataFrame:
     """Analyze a list of papers and create a case report table."""
