@@ -281,11 +281,36 @@ class CaseReportAnalyzer:
 
     def analyze_papers(self, papers: List[Dict[str, Any]], drug_name: str) -> pd.DataFrame:
         """Analyze a list of papers and create a case report table."""
+        # Define columns for the output DataFrame
+        columns = [
+            'Case Report Title',
+            'Age', 
+            'Sex',
+            'Oral Dose (mg)',
+            'theoretical max concentration (μM)',
+            '40% bioavailability',
+            'Theoretical HERG IC50 / Concentration μM',
+            '40% Plasma concentration',
+            'Uncorrected QT (ms)',
+            'QTc',
+            'QTR',
+            'QTF',
+            'Heart Rate (bpm)',
+            'Torsades de Pointes?',
+            'Blood Pressure (mmHg)',
+            'Medical History',
+            'Medication History',
+            'Course of Treatment'
+        ]
+        
         results = []
         for paper in papers:
-            # Extract all the required fields using regex patterns
+            # Extract text from paper
             text = paper.get('full_text', '') + ' ' + paper.get('abstract', '')
-            
+            if not text.strip():
+                continue
+                
+            # Extract all values with context
             result = {
                 'title': paper.get('title', ''),
                 'age': self._extract_first_match(self.patterns['age'], text),
@@ -297,37 +322,78 @@ class CaseReportAnalyzer:
                 'plasma_concentration': self._extract_first_match(self.patterns['plasma_concentration'], text),
                 'qt': self._extract_first_match(self.patterns['qt'], text),
                 'qtc': self._extract_first_match(self.patterns['qtc'], text),
-                'qtr': '',  # Will be calculated later
-                'qtf': '',  # Will be calculated later
                 'heart_rate': self._extract_first_match(self.patterns['heart_rate'], text),
                 'tdp': 'Yes' if self.patterns['tdp'].search(text) else 'No',
                 'blood_pressure': self._extract_first_match(self.patterns['blood_pressure'], text),
                 'medical_history': self._extract_first_match(self.patterns['medical_history'], text),
                 'medication_history': self._extract_first_match(self.patterns['medication_history'], text),
-                'treatment_course': self._extract_first_match(self.patterns['treatment_course'], text),
-                'year': paper.get('year', ''),
-                'abstract': paper.get('abstract', ''),
-                'full_text': paper.get('full_text', '')
+                'treatment_course': self._extract_first_match(self.patterns['treatment_course'], text)
             }
             
             # Calculate QTR and QTF if possible
-            qt = self.extract_numeric(result['qt'])
-            hr = self.extract_numeric(result['heart_rate'])
-            if qt and hr:
+            qt_val = self.extract_numeric(result['qt'])
+            hr_val = self.extract_numeric(result['heart_rate'])
+            if qt_val and hr_val:
                 try:
                     # Calculate QTR using Rautaharju formula
-                    qtr = qt / (120 / hr) ** 0.5
+                    qtr = qt_val / (120 / hr_val) ** 0.5
                     result['qtr'] = f"{qtr:.1f}"
                     
                     # Calculate QTF using Fridericia formula
-                    qtf = qt / (60 / hr) ** (1/3)
+                    qtf = qt_val / (60 / hr_val) ** (1/3)
                     result['qtf'] = f"{qtf:.1f}"
                 except Exception as e:
                     logger.error(f"Error calculating QTR/QTF: {e}")
+                    result['qtr'] = ''
+                    result['qtf'] = ''
+            else:
+                result['qtr'] = ''
+                result['qtf'] = ''
             
-            results.append(result)
+            # Format result to match desired columns
+            formatted_result = {
+                'Case Report Title': result['title'],
+                'Age': result['age'],
+                'Sex': result['sex'],
+                'Oral Dose (mg)': result['oral_dose'],
+                'theoretical max concentration (μM)': result['theoretical_max'],
+                '40% bioavailability': result['bioavailability'],
+                'Theoretical HERG IC50 / Concentration μM': result['herg_ic50'],
+                '40% Plasma concentration': result['plasma_concentration'],
+                'Uncorrected QT (ms)': result['qt'],
+                'QTc': result['qtc'],
+                'QTR': result['qtr'],
+                'QTF': result['qtf'],
+                'Heart Rate (bpm)': result['heart_rate'],
+                'Torsades de Pointes?': result['tdp'],
+                'Blood Pressure (mmHg)': result['blood_pressure'],
+                'Medical History': result['medical_history'],
+                'Medication History': result['medication_history'],
+                'Course of Treatment': result['treatment_course']
+            }
+            
+            # Clean up any None values
+            for key in formatted_result:
+                if formatted_result[key] is None:
+                    formatted_result[key] = ''
+            
+            results.append(formatted_result)
         
-        return pd.DataFrame(results)
+        # Create DataFrame with specific columns
+        df = pd.DataFrame(results, columns=columns)
+        
+        # Clean up the DataFrame
+        df = df.replace({None: '', 'None': '', 'nan': ''})
+        df = df.fillna('')
+        
+        return df
+        
+    def extract_numeric(self, value: str) -> Optional[float]:
+        """Extract numeric value from string."""
+        if not value or not isinstance(value, str):
+            return None
+        match = re.search(r'(\d+\.?\d*)', value)
+        return float(match.group(1)) if match else None
 
     def analyze_paper(self, paper: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Analyze a single paper for case report information."""
