@@ -68,21 +68,28 @@ def get_full_text(pmid, doi=None):
         except Exception as e:
             logger.error(f"Error getting Crossref text for {doi}: {e}")
 
-    # Finally try Sci-Hub
-    try:
-        logger.info(f"Trying Sci-Hub for {pmid}")
-        scihub_text = get_scihub_text(pmid, doi)
-        if scihub_text:
-            text = scihub_text
-            source = 'Sci-Hub'
-            logger.info(f"Successfully got text from Sci-Hub for {pmid}")
-            return text, source
-        else:
-            logger.info(f"No text found in Sci-Hub for {pmid}")
-    except Exception as e:
-        logger.error(f"Error getting Sci-Hub text for {pmid}: {e}")
+    # Finally try Sci-Hub with retries
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            logger.info(f"Trying Sci-Hub for {pmid} (attempt {attempt + 1}/{max_retries})")
+            scihub_text = get_scihub_text(pmid, doi)
+            if scihub_text:
+                text = scihub_text
+                source = 'Sci-Hub'
+                logger.info(f"Successfully got text from Sci-Hub for {pmid}")
+                return text, source
+            else:
+                logger.info(f"No text found in Sci-Hub for {pmid} on attempt {attempt + 1}")
+            # Add a delay between retries
+            if attempt < max_retries - 1:
+                time.sleep(2)
+        except Exception as e:
+            logger.error(f"Error getting Sci-Hub text for {pmid} on attempt {attempt + 1}: {e}")
+            if attempt < max_retries - 1:
+                time.sleep(2)
 
-    logger.warning(f"Could not get full text for {pmid} from any source")
+    logger.warning(f"Could not get full text for {pmid} from any source (PMC, Crossref, or Sci-Hub)")
     return text, source
 
 def get_pmcid_from_pmid(pmid):
@@ -405,11 +412,26 @@ def format_pubmed_results(records: List[Dict]) -> pd.DataFrame:
     results = []
     for record in records:
         try:
+            # Get DOI from either ELocationID or ArticleIdList
+            doi = None
+            if 'ELocationID' in record['MedlineCitation']['Article']:
+                for id in record['MedlineCitation']['Article']['ELocationID']:
+                    if id.attributes.get('EIdType') == 'doi':
+                        doi = str(id)
+                        break
+            
+            if not doi and 'ArticleIdList' in record['PubmedData']:
+                for id in record['PubmedData']['ArticleIdList']:
+                    if id.attributes.get('IdType') == 'doi':
+                        doi = str(id)
+                        break
+
             paper_dict = {
                 'PMID': record['MedlineCitation']['PMID'],
-                'Case Report Title': record['MedlineCitation']['Article']['ArticleTitle'],
+                'Title': record['MedlineCitation']['Article']['ArticleTitle'],
                 'Abstract': record['MedlineCitation']['Article'].get('Abstract', {}).get('AbstractText', [''])[0],
                 'Year': record['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate'].get('Year', ''),
+                'DOI': doi,
                 'Age': '',  # Will be extracted by regex
                 'Sex': '',  # Will be extracted by regex
                 'Oral Dose (mg)': '',  # Will be extracted by regex
@@ -452,14 +474,11 @@ def get_full_texts(papers):
         
         if text:
             texts_found += 1
-            paper_with_text = {
-                'PMID': pmid,
-                'Title': paper.get('Title', ''),
-                'Abstract': paper.get('Abstract', ''),
+            paper_with_text = paper.copy()  # Keep all original paper data
+            paper_with_text.update({
                 'FullText': text,
-                'TextSource': source,
-                'DOI': doi
-            }
+                'TextSource': source
+            })
             papers_with_text.append(paper_with_text)
         else:
             logger.warning(f"No text found for paper {pmid}")
@@ -580,23 +599,56 @@ def analyze_literature(drug_name: str) -> Dict:
             
         # Convert DataFrame to list of dicts for processing
         papers = papers.to_dict('records')
+        logger.info(f"Found {len(papers)} papers to analyze")
         
         # Get full texts
         papers_with_text = get_full_texts(papers)
+        
+        # Log detailed information about text retrieval
+        if papers_with_text:
+            texts_by_source = {}
+            for paper in papers_with_text:
+                source = paper.get('TextSource', 'Unknown')
+                texts_by_source[source] = texts_by_source.get(source, 0) + 1
+            
+            source_breakdown = ', '.join([f"{source}: {count}" for source, count in texts_by_source.items()])
+            logger.info(f"Retrieved {len(papers_with_text)} texts: {source_breakdown}")
+        
         if not papers_with_text:
-            logger.info(f"No full texts found for {drug_name}")
+            # Create a more informative message about why texts weren't found
+            paper_info = []
+            for paper in papers:
+                pmid = paper.get('PMID', 'Unknown PMID')
+                title = paper.get('Title', 'Unknown Title')
+                paper_info.append(f"PMID {pmid}: {title}")
+            
+            paper_details = "\n".join(paper_info)
+            logger.info(f"No full texts found for {drug_name}. Papers that were searched:\n{paper_details}")
+            
             return {
                 'case_reports': [],
-                'message': f"No full texts available for {drug_name}"
+                'message': f"No full texts available for {drug_name}. Found {len(papers)} papers but could not retrieve their full text content. This could be because the papers are not freely accessible or are behind a paywall."
             }
         
         # Process papers
-        return process_papers(papers_with_text)
+        results = process_papers(papers_with_text)
+        
+        # Add summary information to results
+        results['summary'] = {
+            'total_papers_found': len(papers),
+            'full_texts_retrieved': len(papers_with_text),
+            'case_reports_analyzed': len(results.get('case_reports', [])),
+            'sources_used': texts_by_source if papers_with_text else {}
+        }
+        
+        return results
         
     except Exception as e:
         logger.error(f"Error in analyze_literature: {str(e)}")
         return {
-            'error': f"Error analyzing literature: {str(e)}"
+            'error': f"Error analyzing literature: {str(e)}",
+            'case_reports': [],
+            'message': f"An error occurred while analyzing literature for {drug_name}"
         }
 
 def main():
