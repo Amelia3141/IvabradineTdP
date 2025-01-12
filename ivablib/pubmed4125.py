@@ -38,7 +38,7 @@ logger.info(f"Using email: {Entrez.email}")
 logger.info("NCBI credentials set up")
 
 def get_full_text(pmid, doi=None):
-    """Get full text from PMC, Crossref, or Sci-Hub in that order."""
+    """Get full text from PMC, Crossref, or Sci-Hub in that order. Falls back to abstract if full text unavailable."""
     text = None
     source = None
     logger.info(f"Attempting to get full text for PMID {pmid}, DOI {doi}")
@@ -51,43 +51,47 @@ def get_full_text(pmid, doi=None):
             text = get_pmc_text(pmc_id)
             if text:
                 source = 'PMC'
-                logger.info(f"Successfully got text from PMC for {pmid}")
-                return text, source
-            else:
-                logger.info(f"No text found in PMC for {pmid}")
+                logger.info(f"Got full text from PMC for {pmid}")
     except Exception as e:
-        logger.error(f"Error getting PMC text for {pmid}: {e}")
+        logger.warning(f"Error getting PMC text for {pmid}: {str(e)}")
 
-    # Try Crossref next if we have a DOI
-    if doi:
+    # Try Crossref if PMC failed
+    if not text and doi:
         try:
-            logger.info(f"Trying Crossref for {pmid} with DOI {doi}")
-            crossref_text = get_crossref_text(doi)
-            if crossref_text:
-                text = crossref_text
+            text = get_crossref_text(doi)
+            if text:
                 source = 'Crossref'
-                logger.info(f"Successfully got text from Crossref for {pmid}")
-                return text, source
-            else:
-                logger.info(f"No text found in Crossref for {pmid}")
+                logger.info(f"Got full text from Crossref for {pmid}")
         except Exception as e:
-            logger.error(f"Error getting Crossref text for {doi}: {e}")
+            logger.warning(f"Error getting Crossref text for {pmid}: {str(e)}")
 
-    # Finally try Sci-Hub
-    try:
-        logger.info(f"Trying Sci-Hub for {pmid}")
-        scihub_text = get_scihub_text(pmid, doi)
-        if scihub_text:
-            text = scihub_text
-            source = 'Sci-Hub'
-            logger.info(f"Successfully got text from Sci-Hub for {pmid}")
-            return text, source
-        else:
-            logger.info(f"No text found in Sci-Hub for {pmid}")
-    except Exception as e:
-        logger.error(f"Error getting Sci-Hub text for {pmid}: {e}")
+    # Try Sci-Hub as last resort
+    if not text:
+        try:
+            text = get_scihub_text(pmid, doi)
+            if text:
+                source = 'Sci-Hub'
+                logger.info(f"Got full text from Sci-Hub for {pmid}")
+        except Exception as e:
+            logger.warning(f"Error getting Sci-Hub text for {pmid}: {str(e)}")
 
-    logger.warning(f"Could not get full text for {pmid} from any source")
+    # If still no text, try to get abstract from PubMed
+    if not text:
+        try:
+            handle = Entrez.efetch(db="pubmed", id=pmid, rettype="abstract", retmode="text")
+            abstract = handle.read()
+            handle.close()
+            if abstract:
+                text = abstract
+                source = 'PubMed Abstract'
+                logger.info(f"Using PubMed abstract for {pmid} as fallback")
+        except Exception as e:
+            logger.warning(f"Error getting abstract for {pmid}: {str(e)}")
+
+    if not text:
+        logger.warning(f"No text returned for {pmid}")
+        return None, None
+
     return text, source
 
 def get_pmcid_from_pmid(pmid):
@@ -580,95 +584,77 @@ def get_paper_details(pmids):
 
 def get_full_texts(papers):
     """Get full texts for papers"""
-    try:
-        # Convert DataFrame to list of dictionaries if it's a DataFrame
-        if isinstance(papers, pd.DataFrame):
-            papers = papers.to_dict('records')
-            
-        pmids = [str(paper['PMID']) for paper in papers]
-        texts = get_texts_parallel(pmids)
+    papers_with_text = []
+    total_papers = len(papers)
+    texts_found = 0
+    
+    for paper in papers:
+        pmid = paper.get('PMID')
+        doi = paper.get('DOI')
         
-        for paper in papers:
-            paper['Full Text'] = texts.get(str(paper['PMID']), '')
+        if not pmid:
+            logger.warning(f"Skipping paper without PMID: {paper.get('Title', 'Unknown Title')}")
+            continue
             
-            # If we don't have full text, use the abstract as fallback
-            if not paper['Full Text'] and paper.get('Abstract'):
-                paper['Full Text'] = paper['Abstract']
-                logger.info(f"Using abstract as fallback for PMID {paper['PMID']}")
-                
-        return papers
-        
-    except Exception as e:
-        logger.error(f"Error getting full texts: {e}")
-        return papers
+        text, source = get_full_text(pmid, doi)
+        if text:
+            texts_found += 1
+            paper['FullText'] = text
+            paper['TextSource'] = source
+            papers_with_text.append(paper)
+        else:
+            # If we couldn't get full text but have abstract in the paper data
+            if paper.get('Abstract'):
+                logger.info(f"Using provided abstract for {pmid} as fallback")
+                paper['FullText'] = paper['Abstract']
+                paper['TextSource'] = 'PubMed Abstract'
+                papers_with_text.append(paper)
+                texts_found += 1
+            else:
+                logger.warning(f"No text available for {pmid}")
+    
+    logger.info(f"Got {texts_found} full texts out of {total_papers} papers")
+    return papers_with_text
 
 def process_papers(papers):
     """Process papers to extract relevant information"""
     try:
-        # Convert DataFrame to list of dictionaries if it's a DataFrame
-        if isinstance(papers, pd.DataFrame):
-            papers = papers.to_dict('records')
-            
+        analyzer = CaseReportAnalyzer()
         results = []
         for paper in papers:
             pmid = str(paper['PMID'])
-            text = paper.get('Full Text', '')
+            text = paper.get('FullText', '')
             abstract = paper.get('Abstract', '')
+            source = paper.get('TextSource', 'Unknown')
             
-            # Combine full text and abstract for better information extraction
-            combined_text = f"{text} {abstract}".strip()
-            
-            report = {
-                'PMID': pmid,
-                'Title': paper.get('Title', ''),
-                'Age': '',
-                'Sex': '',
-                'Oral Dose (mg)': '',
-                'QTc': '',
-                'Heart Rate (bpm)': '',
-                'Blood Pressure (mmHg)': '',
-                'Torsades de Pointes?': 'No',
-                'Medical History': '',
-                'Medication History': '',
-                'Course of Treatment': '',
-                'Year': paper.get('Year', ''),
-                'Abstract': paper.get('Abstract', ''),
-            }
-            
-            # Extract fields using regex patterns
-            if combined_text:
-                patterns = {
-                    'Age': r'(?:(?:aged?|age[d\s:]*|a|was)\s*)?(\d+)[\s-]*(?:year|yr|y|yo|years?)[s\s-]*(?:old|of\s+age)?|(?:age[d\s:]*|aged\s*)(\d+)',
-                    'Sex': r'\b(?:male|female|man|woman|boy|girl|[MF]\s*/\s*(?:\d+|[MF])|gender[\s:]+(?:male|female)|(?:he|she|his|her)\s+was)\b',
-                    'Oral Dose (mg)': r'(?:oral\s+dose|dose[d\s]*orally|given|administered|took|ingested|consumed|prescribed)\s*(?:with|at|of|a|total)?\s*(\d+\.?\d*)\s*(?:mg|milligrams?|g|grams?|mcg|micrograms?)',
-                    'QTc': r'(?:QTc[FBR]?|corrected\s+QT|QT\s*corrected|QT[c]?\s*interval\s*(?:corrected)?|corrected\s*QT\s*interval)[\s:]*(?:interval|duration|measurement|prolongation|value)?\s*(?:of|was|is|=|:|measured|found|documented|recorded)?\s*(\d+\.?\d*)\s*(?:ms(?:ec)?|milliseconds?|s(?:ec)?|seconds?)?',
-                    'Heart Rate (bpm)': r'(?:heart\s+rate|HR|pulse|ventricular\s+rate|heart\s+rhythm|cardiac\s+rate)[\s:]*(?:of|was|is|=|:)?\s*(\d+)(?:\s*(?:beats?\s*per\s*min(?:ute)?|bpm|min-1|/min))?',
-                    'Blood Pressure (mmHg)': r'(?:blood\s+pressure|BP|arterial\s+pressure)[\s:]*(?:of|was|is|=|:)?\s*([\d/]+)(?:\s*mm\s*Hg)?',
-                    'Medical History': r'(?:medical|clinical|past|previous|documented|known|significant)\s*(?:history|condition|diagnosis|comorbidities)[:\.]\s*([^\.]+?)(?:\.|\n|$)',
-                    'Medication History': r'(?:medication|drug|prescription|current\s+medications?|concomitant\s+medications?)\s*(?:history|list|profile|regime)[:\.]\s*([^\.]+?)(?:\.|\n|$)',
-                    'Course of Treatment': r'(?:treatment|therapy|management|intervention|administered|given)[:\.]\s*([^\.]+?)(?:\.|\n|$)'
-                }
+            # Combine text sources for analysis
+            full_text = text
+            if not text and abstract:
+                full_text = abstract
                 
-                for field, pattern in patterns.items():
-                    matches = re.finditer(pattern, combined_text, re.IGNORECASE)
-                    for match in matches:
-                        if match.groups():
-                            # Use the first non-None group
-                            value = next((g for g in match.groups() if g is not None), '')
-                            if value:
-                                report[field] = value
-                                break
+            if full_text:
+                # Extract information using the analyzer
+                info = analyzer.analyze_paper({
+                    'PMID': pmid,
+                    'Title': paper.get('Title', ''),
+                    'Abstract': abstract,
+                    'FullText': full_text,
+                    'TextSource': source
+                })
                 
-                # Check for TdP specifically
-                if re.search(r'\b(?:torsade[s]?\s*(?:de)?\s*pointes?|TdP|torsades|polymorphic\s+[vV]entricular\s+[tT]achycardia|PVT\s+(?:with|showing)\s+[tT]dP)\b', combined_text, re.IGNORECASE):
-                    report['Torsades de Pointes?'] = 'Yes'
-            
-            results.append(report)
-        
+                if info:
+                    results.append(info)
+                    logger.info(f"Successfully processed paper {pmid} from {source}")
+                else:
+                    logger.warning(f"No relevant information found in paper {pmid}")
+            else:
+                logger.warning(f"No text available to process for paper {pmid}")
+                
+        logger.info(f"Successfully processed {len(results)} papers")
         return results
         
     except Exception as e:
-        logger.error(f"Error processing papers: {e}")
+        logger.error(f"Error processing papers: {str(e)}")
         return []
 
 def main():
