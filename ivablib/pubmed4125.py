@@ -17,9 +17,11 @@ import difflib
 import csv
 import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor
+import urllib3
 
 # Suppress SSL warnings
 requests.packages.urllib3.disable_warnings()
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -307,14 +309,12 @@ def get_scihub_text(pmid, doi=None):
     try:
         # Try multiple Sci-Hub domains
         domains = [
-            'https://sci-hub.se',
-            'https://sci-hub.st',
-            'https://sci-hub.ru',
-            'https://sci-hub.ee',
-            'https://sci-hub.wf',
+            'https://sci-hub.yt',
+            'https://sci-hub.is',
             'https://sci-hub.ren',
-            'https://sci-hub.cat',
-            'https://sci-hub.do'
+            'https://sci-hub.wf',
+            'https://sci-hub.et',
+            'https://sci-hub.st'
         ]
         
         headers = {
@@ -322,15 +322,7 @@ def get_scihub_text(pmid, doi=None):
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             'Accept-Language': 'en-US,en;q=0.9',
             'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1',
-            'Cache-Control': 'max-age=0',
-            'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-            'Sec-Ch-Ua-Mobile': '?0',
-            'Sec-Ch-Ua-Platform': '"macOS"',
-            'Sec-Fetch-Dest': 'document',
-            'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'none',
-            'Sec-Fetch-User': '?1'
+            'Upgrade-Insecure-Requests': '1'
         }
         
         session = requests.Session()
@@ -346,8 +338,15 @@ def get_scihub_text(pmid, doi=None):
                 else:
                     url = f"{domain}/pubmed/{pmid}"
                 
-                response = session.get(url, timeout=30, verify=False)
-                if 'location not found' in response.text.lower():
+                logger.info(f"Trying URL: {url}")
+                response = session.get(url, timeout=30, verify=False, allow_redirects=True)
+                
+                # Check if we got redirected to the main page (paper not found)
+                if response.url.rstrip('/') == domain.rstrip('/'):
+                    logger.info(f"Redirected to main page, paper not found on {domain}")
+                    continue
+                    
+                if 'location not found' in response.text.lower() or 'article not found' in response.text.lower():
                     logger.info(f"Paper not found on {domain}")
                     continue
                     
@@ -368,19 +367,30 @@ def get_scihub_text(pmid, doi=None):
                             delay = 2 ** attempt
                             time.sleep(delay)
                             
-                            pdf_response = session.get(pdf_url, timeout=30, verify=False)
-                            if pdf_response.headers.get('content-type', '').lower() == 'application/pdf':
+                            logger.info(f"Downloading PDF from {pdf_url} (attempt {attempt + 1})")
+                            pdf_response = session.get(pdf_url, timeout=30, verify=False, allow_redirects=True)
+                            
+                            # Check content type and size
+                            content_type = pdf_response.headers.get('content-type', '').lower()
+                            content_length = int(pdf_response.headers.get('content-length', 0))
+                            
+                            if content_type == 'application/pdf' and content_length > 1000:
                                 pdf_file = io.BytesIO(pdf_response.content)
-                                pdf_reader = PyPDF2.PdfReader(pdf_file)
-                                text = ""
-                                for page in pdf_reader.pages:
-                                    text += page.extract_text()
-                                text = text.strip()
-                                if len(text) > 500:  # Only return if we got substantial text
-                                    logger.info(f"Successfully extracted {len(text)} characters from PDF")
-                                    return text
-                                else:
-                                    logger.warning(f"PDF text too short ({len(text)} chars), might be corrupted")
+                                try:
+                                    pdf_reader = PyPDF2.PdfReader(pdf_file)
+                                    text = ""
+                                    for page in pdf_reader.pages:
+                                        text += page.extract_text()
+                                    text = text.strip()
+                                    if len(text) > 500:  # Only return if we got substantial text
+                                        logger.info(f"Successfully extracted {len(text)} characters from PDF")
+                                        return text
+                                    else:
+                                        logger.warning(f"PDF text too short ({len(text)} chars), might be corrupted")
+                                except Exception as e:
+                                    logger.error(f"Error reading PDF: {e}")
+                            else:
+                                logger.warning(f"Invalid PDF response: type={content_type}, size={content_length}")
                         except Exception as e:
                             logger.error(f"Error downloading PDF from {pdf_url} (attempt {attempt + 1}): {e}")
                             if attempt < 2:  # Don't sleep after last attempt
