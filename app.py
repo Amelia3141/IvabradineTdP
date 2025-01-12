@@ -160,21 +160,36 @@ if analyze_button:
                                     st.markdown("#### Patient Information")
                                     patient_col1, patient_col2 = st.columns(2)
                                     with patient_col1:
-                                        st.write(f"**Age:** {paper.get('Age', 'N/A')}")
-                                        st.write(f"**Sex:** {paper.get('Sex', 'N/A')}")
+                                        if paper.get('Age') or paper.get('Sex'):
+                                            st.write(f"**Age:** {paper.get('Age', 'N/A')}")
+                                            st.write(f"**Sex:** {paper.get('Sex', 'N/A')}")
+                                        else:
+                                            st.write("No demographic information available")
+                                            
                                     with patient_col2:
-                                        st.write(f"**QT/QTc:** {paper.get('QTc', 'N/A')}")
-                                        st.write(f"**Heart Rate:** {paper.get('Heart Rate', 'N/A')} bpm")
+                                        if paper.get('QTc') or paper.get('Heart Rate'):
+                                            st.write(f"**QTc:** {paper.get('QTc', 'N/A')}")
+                                            st.write(f"**Heart Rate:** {paper.get('Heart Rate', 'N/A')} bpm")
+                                        else:
+                                            st.write("No ECG measurements available")
                                     
                                     # Medication Information
                                     st.markdown("#### Medication Details")
                                     med_col1, med_col2 = st.columns(2)
                                     with med_col1:
-                                        st.write(f"**Dose:** {paper.get('Oral Dose', 'N/A')} mg")
-                                        if paper.get('TdP', False):
+                                        if paper.get('Oral Dose'):
+                                            st.write(f"**Dose:** {paper.get('Oral Dose', 'N/A')} mg")
+                                        else:
+                                            st.write("No dosing information available")
+                                            
+                                        if paper.get('TdP'):
                                             st.error("⚠️ Torsades de Pointes reported")
+                                            
                                     with med_col2:
-                                        st.write(f"**Blood Pressure:** {paper.get('Blood Pressure', 'N/A')}")
+                                        if paper.get('Blood Pressure'):
+                                            st.write(f"**Blood Pressure:** {paper.get('Blood Pressure', 'N/A')}")
+                                        else:
+                                            st.write("No blood pressure data available")
                                     
                                     # Additional Information in expanders
                                     if paper.get('Medical History'):
@@ -188,6 +203,9 @@ if analyze_button:
                                     if paper.get('Treatment Course'):
                                         with st.expander("Course of Treatment"):
                                             st.write(paper['Treatment Course'])
+                                            
+                                    # Show text source
+                                    st.caption(f"Source: {paper.get('TextSource', 'Unknown')}")
                         else:
                             st.info(literature.get('message', "No case reports found."))
                     else:

@@ -152,52 +152,60 @@ def get_pmc_text(pmcid):
 def get_crossref_text(doi):
     """Get full text using DOI from Crossref."""
     try:
-        # First get the redirect URL
-        headers = {
-            'Accept': 'text/html',
-            'User-Agent': 'TdPAnalyzer/1.0 (mailto:your@email.com)'
-        }
-        response = requests.get(f"https://doi.org/{doi}", headers=headers, allow_redirects=True)
-        final_url = response.url
-        
-        logger.info(f"Redirected to: {final_url}")
-        
-        # Now get the content from the final URL
-        response = requests.get(final_url, headers=headers)
+        # Try to get the paper URL from Crossref
+        crossref_url = f"https://api.crossref.org/works/{doi}"
+        response = requests.get(crossref_url)
+        if response.status_code != 200:
+            return None
+            
+        data = response.json()
+        if 'message' not in data:
+            return None
+            
+        # Get the paper URL
+        paper_url = None
+        if 'link' in data['message']:
+            for link in data['message']['link']:
+                if link.get('content-type', '').startswith('text/html'):
+                    paper_url = link['URL']
+                    break
+                    
+        if not paper_url and 'URL' in data['message']:
+            paper_url = data['message']['URL']
+            
+        if not paper_url:
+            return None
+            
+        # Get the paper content
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(paper_url, headers=headers)
+        if response.status_code != 200:
+            return None
+            
+        # Parse the HTML content
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # Try different possible content containers
-        article_text = (
-            # Elsevier specific selectors
-            soup.find('div', {'class': 'article-body'}) or
-            soup.find('div', {'id': 'body'}) or
-            soup.find('div', {'class': 'article-text'}) or
-            soup.find('div', {'class': 'article-content'}) or
-            soup.find('div', {'class': 'main-content'}) or
-            # ScienceDirect specific
-            soup.find('div', {'id': 'centerInner'}) or
-            soup.find('div', {'class': 'article'}) or
-            # Generic article containers
-            soup.find('div', {'class': 'fulltext-view'}) or
-            soup.find('article') or
-            # Abstract as fallback
-            soup.find('div', {'class': 'abstract'}) or
-            soup.find('abstract')
-        )
-        
-        if article_text:
-            # Clean the text
-            text = article_text.get_text(separator=' ', strip=True)
-            # Remove excessive whitespace
-            text = ' '.join(text.split())
-            logger.info(f"Successfully extracted {len(text)} characters of text from {final_url}")
-            return text
-        else:
-            logger.warning(f"No article text found at {final_url}")
+        # Remove script and style elements
+        for script in soup(["script", "style"]):
+            script.decompose()
             
+        # Get text and clean it up
+        text = soup.get_text()
+        
+        # Break into lines and remove leading/trailing space
+        lines = (line.strip() for line in text.splitlines())
+        
+        # Break multi-headlines into a line each
+        chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+        
+        # Drop blank lines
+        text = ' '.join(chunk for chunk in chunks if chunk)
+        
+        return text
+        
     except Exception as e:
-        logger.error(f"Error getting Crossref text: {e}")
-    return None
+        logger.error(f"Error getting Crossref text: {str(e)}")
+        return None
 
 def get_scihub_text(pmid, doi=None):
     """Get full text from Sci-Hub."""
