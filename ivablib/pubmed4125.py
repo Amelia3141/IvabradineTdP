@@ -203,14 +203,52 @@ def build_pubmed_query(drug_names: List[str]) -> str:
     return query
 
 def search_pubmed_case_reports(drug_name: str) -> pd.DataFrame:
-    """Search PubMed for case reports about the drug."""
+    """Search PubMed for case reports about a drug"""
     try:
-        query = build_pubmed_query(get_drug_names(drug_name))
-        records = _search_pubmed(query)
-        return format_pubmed_results(records)
+        # Get all related drug names
+        drug_names = get_drug_names(drug_name)
+        logger.info(f"Found {len(drug_names)} drug names for {drug_name}: {drug_names}")
+        
+        # Build search query
+        drug_query = ' OR '.join([f'"{name}"[Title/Abstract]' for name in drug_names])
+        query = f'({drug_query}) AND (hERG[Title/Abstract] OR QT[Title/Abstract] OR QTc[Title/Abstract] OR torsad*[Title/Abstract]) AND "Humans"[Mesh] AND ("Case Reports"[Publication Type])'
+        
+        logger.info(f"Searching PubMed: {query}")
+        
+        try:
+            # Search PubMed
+            handle = Entrez.esearch(db="pubmed", term=query, retmax=100)
+            record = Entrez.read(handle)
+            handle.close()
+            
+            if not record["IdList"]:
+                return pd.DataFrame()
+                
+            # Fetch details
+            handle = Entrez.efetch(db="pubmed", id=record["IdList"], 
+                                 rettype="xml", retmode="text")
+            records = Entrez.read(handle)
+            handle.close()
+
+            results = []
+            for paper in records['PubmedArticle']:
+                paper_dict = {
+                    'PMID': paper['MedlineCitation']['PMID'],
+                    'Title': paper['MedlineCitation']['Article']['ArticleTitle'],
+                    'Abstract': paper['MedlineCitation']['Article'].get('Abstract', {}).get('AbstractText', [''])[0],
+                    'Year': paper['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate'].get('Year', '')
+                }
+                results.append(paper_dict)
+            
+            return pd.DataFrame(results)
+            
+        except Exception as e:
+            logger.error(f"Error searching PubMed: {e}")
+            return pd.DataFrame()
+            
     except Exception as e:
-        logger.error(f"Error in case reports search: {str(e)}")
-        return pd.DataFrame(columns=["Title", "Authors", "Journal", "Year", "PMID"])
+        logger.error(f"Error in search_pubmed: {e}")
+        return pd.DataFrame()
 
 def _search_pubmed(query: str) -> List[Dict]:
     """Base function to search PubMed"""
@@ -229,12 +267,12 @@ def _search_pubmed(query: str) -> List[Dict]:
 
                 # Fetch details
                 handle = Entrez.efetch(db="pubmed", id=record["IdList"], 
-                                     rettype="medline", retmode="text")
-                records = list(Entrez.parse(handle, 'medline'))
+                                     rettype="xml", retmode="text")
+                records = Entrez.read(handle)
                 handle.close()
 
-                return records
-
+                return records['PubmedArticle']
+                
             except Exception as e:
                 if attempt == max_attempts - 1:
                     raise
@@ -250,21 +288,13 @@ def format_pubmed_results(records: List[Dict]) -> pd.DataFrame:
     results = []
     for record in records:
         try:
-            # Extract authors
-            authors = record.get("AU", [])
-            author_str = ", ".join(authors) if authors else "No authors listed"
-            
-            # Get year from date
-            date = record.get("DP", "")
-            year = date.split()[0] if date else "N/A"
-            
-            results.append({
-                "Title": record.get("TI", "No title available"),
-                "Authors": author_str,
-                "Journal": record.get("JT", "Journal not specified"),
-                "Year": year,
-                "PMID": record.get("PMID", "No PMID")
-            })
+            paper_dict = {
+                'PMID': record['MedlineCitation']['PMID'],
+                'Title': record['MedlineCitation']['Article']['ArticleTitle'],
+                'Abstract': record['MedlineCitation']['Article'].get('Abstract', {}).get('AbstractText', [''])[0],
+                'Year': record['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate'].get('Year', '')
+            }
+            results.append(paper_dict)
         except Exception as e:
             logger.error(f"Error processing record: {str(e)}")
             continue
@@ -310,8 +340,15 @@ def analyze_literature(drug_name: str) -> Dict:
     try:
         logger.info(f"Searching literature for {drug_name}")
         
-        # Only search for case reports
+        # Search for case reports
         case_reports = search_pubmed_case_reports(drug_name)
+        
+        results = {
+            'case_reports': [],
+            'total_cases': 0,
+            'years': [],
+            'sources': {}
+        }
         
         if not case_reports.empty:
             # Get PMIDs
@@ -324,28 +361,23 @@ def analyze_literature(drug_name: str) -> Dict:
             for _, paper in case_reports.iterrows():
                 pmid = paper['PMID']
                 if pmid in texts:
-                    papers_to_analyze.append({
+                    case_report = {
                         'pmid': pmid,
                         'title': paper['Title'],
-                        'authors': paper['Authors'].split(', '),
                         'year': paper['Year'],
-                        'journal': paper['Journal'],
+                        'abstract': paper['Abstract'],
                         'full_text': texts[pmid]
-                    })
-        
-        # Analyze papers using CaseReportAnalyzer
-        from .case_report_analyzer import analyze_papers
-        analysis_results = analyze_papers(papers_to_analyze, drug_name)
-        
-        return {
-            "case_reports": case_reports.to_dict('records'),
-            "full_texts": papers_to_analyze,
-            "analysis": analysis_results.to_dict('records') if not analysis_results.empty else []
-        }
+                    }
+                    results['case_reports'].append(case_report)
+                    results['years'].append(paper['Year'])
+                    
+            results['total_cases'] = len(results['case_reports'])
+            
+        return results
         
     except Exception as e:
-        logger.error(f"Error analyzing literature: {str(e)}")
-        return {"error": str(e)}
+        logger.error(f"Error analyzing literature: {e}")
+        return {'error': str(e)}
 
 def main():
     if len(sys.argv) != 2:
