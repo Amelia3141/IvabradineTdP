@@ -144,22 +144,47 @@ if analyze_button:
                             
                             # Create a dataframe from case reports
                             case_reports_df = pd.DataFrame(literature['case_reports'])
-                            logger.info(f"Case reports DataFrame: {case_reports_df}")
                             
-                            if not case_reports_df.empty:
-                                # Display basic info in a table
-                                display_df = case_reports_df[['title', 'year', 'pmid']].copy()
-                                display_df.columns = ['Title', 'Year', 'PMID']
-                                st.dataframe(display_df, use_container_width=True)
-                                
-                                # Show years distribution if we have data
-                                if literature.get('years'):
-                                    years = pd.Series(literature['years']).value_counts().sort_index()
-                                    if not years.empty:
-                                        st.subheader("Publications by Year")
-                                        st.bar_chart(years)
+                            # Format numeric columns
+                            numeric_cols = ['Age', 'Oral Dose (mg)', 'QT (ms)', 'QTc (ms)', 'Heart Rate (bpm)']
+                            for col in numeric_cols:
+                                if col in case_reports_df.columns:
+                                    case_reports_df[col] = pd.to_numeric(case_reports_df[col], errors='coerce')
+                                    case_reports_df[col] = case_reports_df[col].round(1)
+                            
+                            # Add styling
+                            st.markdown("""
+                            <style>
+                            .stDataFrame {
+                                width: 100%;
+                                font-size: 14px;
+                            }
+                            .stDataFrame td {
+                                white-space: pre-wrap;
+                                max-width: 300px;
+                                overflow-wrap: break-word;
+                            }
+                            </style>
+                            """, unsafe_allow_html=True)
+                            
+                            # Display the table
+                            st.dataframe(
+                                case_reports_df,
+                                use_container_width=True,
+                                height=400
+                            )
+                            
+                            # Add download button for CSV
+                            csv = case_reports_df.to_csv(index=False)
+                            st.download_button(
+                                "Download Case Reports as CSV",
+                                csv,
+                                "case_reports.csv",
+                                "text/csv",
+                                key='download-csv'
+                            )
                         else:
-                            st.write("No case reports found")
+                            st.info("No case reports found")
                     
     except Exception as e:
         st.error(f"Error analyzing drug: {str(e)}")
