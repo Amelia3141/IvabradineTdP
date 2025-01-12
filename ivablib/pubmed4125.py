@@ -507,87 +507,169 @@ def get_texts_parallel(pmids):
     logger.info(f"Got {len(texts)} full texts out of {len(pmids)} papers")
     return texts
 
-def analyze_literature(drug_name: str) -> Dict:
-    """Analyze literature for a given drug."""
+def analyze_literature(drug_name):
+    """Analyze literature for QT-related case reports."""
     try:
-        papers = search_pubmed_case_reports(drug_name)
-        if not papers.empty:
-            # Get PMIDs
-            pmids = [p for p in papers['PMID'].tolist() if p != 'No PMID']
+        logger.info("Setting up NCBI credentials")
+        Entrez.email = os.environ.get('NCBI_EMAIL', 'your@email.com')
+        Entrez.api_key = os.environ.get('NCBI_API_KEY')
+        logger.info(f"Using email: {Entrez.email}")
+        logger.info("NCBI credentials set up")
+        
+        # Get drug names
+        drug_names = get_drug_names(drug_name)
+        logger.info(f"Found {len(drug_names)} drug names for {drug_name}: {drug_names}")
+        
+        # Build search query
+        drug_terms = ' OR '.join([f'"{name}"[Title/Abstract]' for name in drug_names])
+        query = f'({drug_terms}) AND (hERG[Title/Abstract] OR QT[Title/Abstract] OR QTc[Title/Abstract] OR torsad*[Title/Abstract]) AND "Humans"[Mesh] AND ("Case Reports"[Publication Type])'
+        
+        logger.info(f"Searching PubMed: {query}")
+        
+        # Search PubMed
+        handle = Entrez.esearch(db="pubmed", term=query, retmax=100)
+        record = Entrez.read(handle)
+        handle.close()
+        logger.info("Got esearch handle")
+        
+        pmids = record["IdList"]
+        logger.info(f"Search returned {len(pmids)} results")
+        
+        if not pmids:
+            return {"papers": []}
             
-            # Get texts in parallel using ThreadPoolExecutor
-            texts = get_texts_parallel(pmids)
+        # Get paper details
+        papers = get_paper_details(pmids)
+        logger.info(f"Got {len(papers)} paper details")
+        
+        # Get full texts and extract information
+        papers = process_papers(papers)
+        logger.info(f"Processed {len(papers)} papers successfully")
+        
+        # Get full texts
+        papers = get_full_texts(papers)
+        logger.info(f"Got {len(papers)} full texts out of {len(pmids)} papers")
+        
+        return {"papers": papers}
+        
+    except Exception as e:
+        logger.error(f"Error in analyze_literature: {str(e)}")
+        return {"error": str(e)}
+
+def get_paper_details(pmids):
+    """Get paper details from PubMed"""
+    try:
+        # Fetch details
+        logger.info(f"Fetching details for {len(pmids)} papers")
+        handle = Entrez.efetch(db="pubmed", id=pmids, 
+                             rettype="xml", retmode="text")
+        records = Entrez.read(handle)
+        logger.info(f"Got {len(records['PubmedArticle'])} paper details")
+        handle.close()
+
+        results = []
+        for paper in records['PubmedArticle']:
+            try:
+                paper_dict = {
+                    'PMID': paper['MedlineCitation']['PMID'],
+                    'Title': paper['MedlineCitation']['Article']['ArticleTitle'],
+                    'Abstract': paper['MedlineCitation']['Article'].get('Abstract', {}).get('AbstractText', [''])[0],
+                    'Year': paper['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate'].get('Year', '')
+                }
+                results.append(paper_dict)
+            except Exception as e:
+                logger.error(f"Error processing paper: {e}")
+                continue
+        
+        logger.info(f"Processed {len(results)} papers successfully")
+        return pd.DataFrame(results)
+        
+    except Exception as e:
+        logger.error(f"Error getting paper details: {e}")
+        return pd.DataFrame()
+
+def process_papers(papers):
+    """Process papers to extract relevant information"""
+    try:
+        results = []
+        for _, paper in papers.iterrows():
+            pmid = paper['PMID']
+            text = paper.get('Full Text', '')
             
-            # Create paper objects
-            case_reports = []
-            for _, paper in papers.iterrows():
-                pmid = paper['PMID']
-                text = texts.get(pmid, 'None')
-                
-                report = {
-                    'Title': paper.get('Title', ''),
-                    'Age': '',
-                    'Sex': '',
-                    'Oral Dose (mg)': '',
-                    'Theoretical Max Concentration (μM)': '',
-                    '40% Bioavailability': '',
-                    'Theoretical HERG IC50 / Concentration μM': '',
-                    '40% Plasma Concentration': '',
-                    'Uncorrected QT (ms)': '',
-                    'QTc': '',
-                    'QTR': '',
-                    'QTF': '',
-                    'Heart Rate (bpm)': '',
-                    'Torsades de Pointes?': 'No',
-                    'Blood Pressure (mmHg)': '',
-                    'Medical History': '',
-                    'Medication History': '',
-                    'Course of Treatment': '',
-                    'Year': paper.get('Year', ''),
-                    'Abstract': paper.get('Abstract', ''),
-                    'Full Text': text
+            report = {
+                'Title': paper.get('Title', ''),
+                'Age': '',
+                'Sex': '',
+                'Oral Dose (mg)': '',
+                'Theoretical Max Concentration (μM)': '',
+                '40% Bioavailability': '',
+                'Theoretical HERG IC50 / Concentration μM': '',
+                '40% Plasma Concentration': '',
+                'Uncorrected QT (ms)': '',
+                'QTc': '',
+                'QTR': '',
+                'QTF': '',
+                'Heart Rate (bpm)': '',
+                'Torsades de Pointes?': 'No',
+                'Blood Pressure (mmHg)': '',
+                'Medical History': '',
+                'Medication History': '',
+                'Course of Treatment': '',
+                'Year': paper.get('Year', ''),
+                'Abstract': paper.get('Abstract', ''),
+                'Full Text': text
+            }
+            
+            # Extract fields using regex patterns
+            if text:
+                combined_text = text + ' ' + report['Abstract']
+                patterns = {
+                    'Age': re.compile(r'(?:(?:aged?|age[d\s:]*|a|was)\s*)?(\d+)[\s-]*(?:year|yr|y|yo|years?)[s\s-]*(?:old|of\s+age)?|(?:age[d\s:]*|aged\s*)(\d+)', re.IGNORECASE),
+                    'Sex': re.compile(r'\b(?:male|female|man|woman|boy|girl|[MF]\s*/\s*(?:\d+|[MF])|gender[\s:]+(?:male|female)|(?:he|she|his|her)\s+was)\b', re.IGNORECASE),
+                    'Oral Dose (mg)': re.compile(r'(?:oral\s+dose|dose[d\s]*orally|given|administered|took|ingested|consumed|prescribed)\s*(?:with|at|of|a|total)?\s*(\d+\.?\d*)\s*(?:mg|milligrams?|g|grams?|mcg|micrograms?)', re.IGNORECASE),
+                    'Theoretical Max Concentration (μM)': re.compile(r'(?:maximum|max|peak|highest|cmax|c-?max)\s*(?:concentration|conc|level|exposure)\s*(?:of|was|is|reached|measured|observed|calculated)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*(?:μM|uM|micromolar|nmol/[lL]|μmol/[lL]|ng/m[lL]|μg/m[lL]|mg/[lL]|g/[lL])', re.IGNORECASE),
+                    '40% Bioavailability': re.compile(r'(?:bioavailability|F|absorption|systemic\s+availability)\s*(?:of|was|is|approximately|about|~)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*%?', re.IGNORECASE),
+                    'Theoretical HERG IC50 / Concentration μM': re.compile(r'(?:hERG\s+IC50|IC50\s+(?:value\s+)?(?:for|of)\s+hERG|half-?maximal\s+(?:inhibitory)?\s+concentration|IC50)\s*(?:of|was|is|=|:)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*(?:μM|uM|micromolar|nmol/[lL]|μmol/[lL])', re.IGNORECASE),
+                    '40% Plasma Concentration': re.compile(r'(?:plasma|blood|serum)\s*(?:concentration|level|exposure|Cmax|C-max)\s*(?:of|was|is|measured|found|detected|reached)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*(?:μM|uM|micromolar|ng/m[lL]|μg/m[lL]|mg/[lL]|g/[lL])', re.IGNORECASE),
+                    'Uncorrected QT (ms)': re.compile(r'\b(?:QT|uncorrected\s+QT|QT\s*interval|interval\s*QT|baseline\s*QT)[\s:]*(?:interval|duration|measurement|value)?\s*(?:of|was|is|=|:|measured|found|documented|recorded)?\s*(\d+\.?\d*)\s*(?:ms(?:ec)?|milliseconds?|s(?:ec)?|seconds?)?', re.IGNORECASE),
+                    'QTc': re.compile(r'(?:QTc[FBR]?|corrected\s+QT|QT\s*corrected|QT[c]?\s*interval\s*(?:corrected)?|corrected\s*QT\s*interval)[\s:]*(?:interval|duration|measurement|prolongation|value)?\s*(?:of|was|is|=|:|measured|found|documented|recorded)?\s*(\d+\.?\d*)\s*(?:ms(?:ec)?|milliseconds?|s(?:ec)?|seconds?)?', re.IGNORECASE),
+                    'Heart Rate (bpm)': re.compile(r'(?:heart\s+rate|HR|pulse|ventricular\s+rate|heart\s+rhythm|cardiac\s+rate)[\s:]*(?:of|was|is|=|:)?\s*(\d+)(?:\s*(?:beats?\s*per\s*min(?:ute)?|bpm|min-1|/min))?', re.IGNORECASE),
+                    'Blood Pressure (mmHg)': re.compile(r'(?:blood\s+pressure|BP|arterial\s+pressure)[\s:]*(?:of|was|is|=|:)?\s*([\d/]+)(?:\s*mm\s*Hg)?', re.IGNORECASE),
+                    'Torsades de Pointes?': re.compile(r'\b(?:torsade[s]?\s*(?:de)?\s*pointes?|TdP|torsades|polymorphic\s+[vV]entricular\s+[tT]achycardia|PVT\s+(?:with|showing)\s+[tT]dP)\b', re.IGNORECASE),
+                    'Medical History': re.compile(r'(?:medical|clinical|past|previous|documented|known|significant)\s*(?:history|condition|diagnosis|comorbidities)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE),
+                    'Medication History': re.compile(r'(?:medication|drug|prescription|current\s+medications?|concomitant\s+medications?)\s*(?:history|list|profile|regime)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE),
+                    'Course of Treatment': re.compile(r'(?:treatment|therapy|management|intervention|administered|given)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE)
                 }
                 
-                # Extract fields using regex patterns
-                if text:
-                    combined_text = text + ' ' + report['Abstract']
-                    patterns = {
-                        'Age': re.compile(r'(?:(?:aged?|age[d\s:]*|a|was)\s*)?(\d+)[\s-]*(?:year|yr|y|yo|years?)[s\s-]*(?:old|of\s+age)?|(?:age[d\s:]*|aged\s*)(\d+)', re.IGNORECASE),
-                        'Sex': re.compile(r'\b(?:male|female|man|woman|boy|girl|[MF]\s*/\s*(?:\d+|[MF])|gender[\s:]+(?:male|female)|(?:he|she|his|her)\s+was)\b', re.IGNORECASE),
-                        'Oral Dose (mg)': re.compile(r'(?:oral\s+dose|dose[d\s]*orally|given|administered|took|ingested|consumed|prescribed)\s*(?:with|at|of|a|total)?\s*(\d+\.?\d*)\s*(?:mg|milligrams?|g|grams?|mcg|micrograms?)', re.IGNORECASE),
-                        'Theoretical Max Concentration (μM)': re.compile(r'(?:maximum|max|peak|highest|cmax|c-?max)\s*(?:concentration|conc|level|exposure)\s*(?:of|was|is|reached|measured|observed|calculated)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*(?:μM|uM|micromolar|nmol/[lL]|μmol/[lL]|ng/m[lL])', re.IGNORECASE),
-                        '40% Bioavailability': re.compile(r'(?:bioavailability|F|absorption|systemic\s+availability)\s*(?:of|was|is|approximately|about|~)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*%?', re.IGNORECASE),
-                        'Theoretical HERG IC50 / Concentration μM': re.compile(r'(?:hERG\s+IC50|IC50\s+(?:value\s+)?(?:for|of)\s+hERG|half-?maximal\s+(?:inhibitory)?\s+concentration|IC50)\s*(?:of|was|is|=|:)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*(?:μM|uM|micromolar|nmol/[lL]|μmol/[lL])', re.IGNORECASE),
-                        '40% Plasma Concentration': re.compile(r'(?:plasma|blood|serum)\s*(?:concentration|level|exposure|Cmax|C-max)\s*(?:of|was|is|measured|found|detected|reached)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*(?:μM|uM|micromolar|ng/m[lL]|μg/m[lL]|mg/[lL]|g/[lL])', re.IGNORECASE),
-                        'Uncorrected QT (ms)': re.compile(r'\b(?:QT|uncorrected\s+QT|QT\s*interval|interval\s*QT|baseline\s*QT)[\s:]*(?:interval|duration|measurement|value)?\s*(?:of|was|is|=|:|measured|found|documented|recorded)?\s*(\d+\.?\d*)\s*(?:ms(?:ec)?|milliseconds?|s(?:ec)?|seconds?)?', re.IGNORECASE),
-                        'QTc': re.compile(r'(?:QTc[FBR]?|corrected\s+QT|QT\s*corrected|QT[c]?\s*interval\s*(?:corrected)?|corrected\s*QT\s*interval)[\s:]*(?:interval|duration|measurement|prolongation|value)?\s*(?:of|was|is|=|:|measured|found|documented|recorded)?\s*(\d+\.?\d*)\s*(?:ms(?:ec)?|milliseconds?|s(?:ec)?|seconds?)?', re.IGNORECASE),
-                        'Heart Rate (bpm)': re.compile(r'(?:heart\s+rate|HR|pulse|ventricular\s+rate|heart\s+rhythm|cardiac\s+rate)[\s:]*(?:of|was|is|=|:)?\s*(\d+)(?:\s*(?:beats?\s*per\s*min(?:ute)?|bpm|min-1|/min))?', re.IGNORECASE),
-                        'Blood Pressure (mmHg)': re.compile(r'(?:blood\s+pressure|BP|arterial\s+pressure)[\s:]*(?:of|was|is|=|:)?\s*([\d/]+)(?:\s*mm\s*Hg)?', re.IGNORECASE),
-                        'Torsades de Pointes?': re.compile(r'\b(?:torsade[s]?\s*(?:de)?\s*pointes?|TdP|torsades|polymorphic\s+[vV]entricular\s+[tT]achycardia|PVT\s+(?:with|showing)\s+[tT]dP)\b', re.IGNORECASE),
-                        'Medical History': re.compile(r'(?:medical|clinical|past|previous|documented|known|significant)\s*(?:history|condition|diagnosis|comorbidities)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE),
-                        'Medication History': re.compile(r'(?:medication|drug|prescription|current\s+medications?|concomitant\s+medications?)\s*(?:history|list|profile|regime)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE),
-                        'Course of Treatment': re.compile(r'(?:treatment|therapy|management|intervention|administered|given)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE)
-                    }
-                    
-                    for field, pattern in patterns.items():
-                        match = pattern.search(combined_text)
-                        if match:
-                            if field == 'Torsades de Pointes?':
-                                report[field] = 'Yes'
-                            else:
-                                groups = [g for g in match.groups() if g is not None]
-                                report[field] = groups[0] if groups else match.group(0)
+                for field, pattern in patterns.items():
+                    match = pattern.search(combined_text)
+                    if match:
+                        if field == 'Torsades de Pointes?':
+                            report[field] = 'Yes'
+                        else:
+                            groups = [g for g in match.groups() if g is not None]
+                            report[field] = groups[0] if groups else match.group(0)
                 
-                case_reports.append(report)
+                results.append(report)
                 
-            return {
-                "case_reports": case_reports,
-                "total_cases": len(case_reports)
-            }
-
+        return results
+        
     except Exception as e:
-        logger.error(f"Error analyzing literature: {e}")
-        return {"error": str(e)}
+        logger.error(f"Error processing papers: {e}")
+        return []
+
+def get_full_texts(papers):
+    """Get full texts for papers"""
+    try:
+        pmids = [paper['PMID'] for paper in papers]
+        texts = get_texts_parallel(pmids)
+        for paper in papers:
+            paper['Full Text'] = texts.get(paper['PMID'], '')
+        return papers
+        
+    except Exception as e:
+        logger.error(f"Error getting full texts: {e}")
+        return papers
 
 def main():
     if len(sys.argv) != 2:
@@ -596,7 +678,7 @@ def main():
         
     drug_name = sys.argv[1].upper()
     papers = analyze_literature(drug_name)
-    print(f"\nFound {len(papers['case_reports'])} papers")
+    print(f"\nFound {len(papers['papers'])} papers")
 
 if __name__ == "__main__":
     main()
