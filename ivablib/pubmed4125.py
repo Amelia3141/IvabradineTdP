@@ -27,8 +27,13 @@ logger = logging.getLogger(__name__)
 
 # Set your email and API key for NCBI from environment variables
 logger.info("Setting up NCBI credentials")
-Entrez.email = os.environ.get('NCBI_EMAIL', 'your@email.com')
-Entrez.api_key = os.environ.get('NCBI_API_KEY')
+try:
+    import streamlit as st
+    Entrez.email = st.secrets["NCBI_EMAIL"]
+    Entrez.api_key = st.secrets["NCBI_API_KEY"]
+except:
+    Entrez.email = os.environ.get('NCBI_EMAIL', 'your@email.com')
+    Entrez.api_key = os.environ.get('NCBI_API_KEY')
 logger.info(f"Using email: {Entrez.email}")
 logger.info("NCBI credentials set up")
 
@@ -511,8 +516,13 @@ def analyze_literature(drug_name):
     """Analyze literature for QT-related case reports."""
     try:
         logger.info("Setting up NCBI credentials")
-        Entrez.email = os.environ.get('NCBI_EMAIL', 'your@email.com')
-        Entrez.api_key = os.environ.get('NCBI_API_KEY')
+        try:
+            import streamlit as st
+            Entrez.email = st.secrets["NCBI_EMAIL"]
+            Entrez.api_key = st.secrets["NCBI_API_KEY"]
+        except:
+            Entrez.email = os.environ.get('NCBI_EMAIL', 'your@email.com')
+            Entrez.api_key = os.environ.get('NCBI_API_KEY')
         logger.info(f"Using email: {Entrez.email}")
         logger.info("NCBI credentials set up")
         

@@ -131,8 +131,10 @@ if analyze_button:
                     literature = analysis.get('literature', {})
                     logger.info(f"Literature data: {literature}")
                     
-                    if literature:
-                        papers = literature.get('papers', [])
+                    if 'error' in literature:
+                        st.error(f"Error analyzing literature: {literature['error']}")
+                    elif literature and 'papers' in literature:
+                        papers = literature['papers']
                         if papers:
                             st.write(f"Found {len(papers)} relevant papers")
                             
@@ -154,45 +156,45 @@ if analyze_button:
                                     col1, col2 = st.columns([3, 1])
                                     
                                     with col1:
-                                        st.markdown(f"### {paper.get('title', 'Untitled Paper')}")
-                                        st.markdown(f"**PMID:** {paper.get('pmid', 'N/A')}")
-                                    
-                                    with col2:
-                                        if paper.get('url'):
-                                            st.markdown(f"[View Paper]({paper['url']})")
+                                        st.markdown(f"### {paper.get('Title', 'Untitled Paper')}")
+                                        st.markdown(f"**PMID:** {paper.get('PMID', 'N/A')}")
                                     
                                     # Patient Information
                                     st.markdown("#### Patient Information")
                                     patient_col1, patient_col2 = st.columns(2)
                                     with patient_col1:
-                                        st.write(f"**Age:** {paper.get('age', 'N/A')}")
-                                        st.write(f"**Sex:** {paper.get('sex', 'N/A')}")
+                                        st.write(f"**Age:** {paper.get('Age', 'N/A')}")
+                                        st.write(f"**Sex:** {paper.get('Sex', 'N/A')}")
                                     with patient_col2:
-                                        st.write(f"**QT/QTc:** {paper.get('qt', 'N/A')}")
-                                        st.write(f"**Heart Rate:** {paper.get('heart_rate', 'N/A')}")
+                                        st.write(f"**QT/QTc:** {paper.get('QTc', 'N/A')}")
+                                        st.write(f"**Heart Rate:** {paper.get('Heart Rate (bpm)', 'N/A')}")
                                     
                                     # Medication Information
                                     st.markdown("#### Medication Details")
                                     med_col1, med_col2 = st.columns(2)
                                     with med_col1:
-                                        st.write(f"**Dose:** {paper.get('oral_dose', 'N/A')}")
-                                        st.write(f"**Concentration:** {paper.get('plasma_concentration', 'N/A')}")
+                                        st.write(f"**Dose:** {paper.get('Oral Dose (mg)', 'N/A')}")
+                                        if paper.get('Torsades de Pointes?') == 'Yes':
+                                            st.error("⚠️ Torsades de Pointes reported")
                                     with med_col2:
-                                        st.write(f"**Route:** {paper.get('route', 'N/A')}")
-                                        st.write(f"**Duration:** {paper.get('duration', 'N/A')}")
+                                        st.write(f"**Blood Pressure:** {paper.get('Blood Pressure (mmHg)', 'N/A')}")
                                     
-                                    # Additional Information
-                                    if paper.get('medical_history'):
+                                    # Additional Information in expanders
+                                    if paper.get('Medical History'):
                                         with st.expander("Medical History"):
-                                            st.write(paper['medical_history'])
+                                            st.write(paper['Medical History'])
                                     
-                                    if paper.get('medication_history'):
+                                    if paper.get('Medication History'):
                                         with st.expander("Medication History"):
-                                            st.write(paper['medication_history'])
+                                            st.write(paper['Medication History'])
                                     
-                                    if paper.get('course_of_treatment'):
+                                    if paper.get('Course of Treatment'):
                                         with st.expander("Course of Treatment"):
-                                            st.write(paper['course_of_treatment'])
+                                            st.write(paper['Course of Treatment'])
+                                    
+                                    if paper.get('Abstract'):
+                                        with st.expander("Abstract"):
+                                            st.write(paper['Abstract'])
                         else:
                             st.info("No case reports found in the literature.")
                     else:
