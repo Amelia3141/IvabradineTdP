@@ -287,34 +287,47 @@ class CaseReportAnalyzer:
             text = paper.get('full_text', '') + ' ' + paper.get('abstract', '')
             
             result = {
-                'Case Report Title': paper.get('title', ''),
-                'Age': self._extract_first_match(self.patterns['age'], text),
-                'Sex': self._extract_first_match(self.patterns['sex'], text),
-                'Oral Dose (mg)': self._extract_first_match(self.patterns['oral_dose'], text),
-                'theoretical max concentration (μM)': self._extract_first_match(self.patterns['theoretical_max'], text),
-                '40% bioavailability': self._extract_first_match(self.patterns['bioavailability'], text),
-                'Theoretical HERG IC50 / Concentration μM': self._extract_first_match(self.patterns['herg_ic50'], text),
-                '40% Plasma concentration': self._extract_first_match(self.patterns['plasma_concentration'], text),
-                'Uncorrected QT (ms)': self._extract_first_match(self.patterns['qt'], text),
-                'QTc': self._extract_first_match(self.patterns['qtc'], text),
-                'QTR': '',  # This seems to be calculated later
-                'QTF': '',  # This seems to be calculated later
-                'Heart Rate (bpm)': self._extract_first_match(self.patterns['heart_rate'], text),
-                'Torsades de Pointes?': 'Yes' if self.patterns['tdp'].search(text) else 'No',
-                'Blood Pressure (mmHg)': self._extract_first_match(self.patterns['blood_pressure'], text),
-                'Medical History': self._extract_first_match(self.patterns['medical_history'], text),
-                'Medication History': self._extract_first_match(self.patterns['medication_history'], text),
-                'Course of Treatment': self._extract_first_match(self.patterns['treatment_course'], text)
+                'title': paper.get('title', ''),
+                'age': self._extract_first_match(self.patterns['age'], text),
+                'sex': self._extract_first_match(self.patterns['sex'], text),
+                'oral_dose': self._extract_first_match(self.patterns['oral_dose'], text),
+                'theoretical_max': self._extract_first_match(self.patterns['theoretical_max'], text),
+                'bioavailability': self._extract_first_match(self.patterns['bioavailability'], text),
+                'herg_ic50': self._extract_first_match(self.patterns['herg_ic50'], text),
+                'plasma_concentration': self._extract_first_match(self.patterns['plasma_concentration'], text),
+                'qt': self._extract_first_match(self.patterns['qt'], text),
+                'qtc': self._extract_first_match(self.patterns['qtc'], text),
+                'qtr': '',  # Will be calculated later
+                'qtf': '',  # Will be calculated later
+                'heart_rate': self._extract_first_match(self.patterns['heart_rate'], text),
+                'tdp': 'Yes' if self.patterns['tdp'].search(text) else 'No',
+                'blood_pressure': self._extract_first_match(self.patterns['blood_pressure'], text),
+                'medical_history': self._extract_first_match(self.patterns['medical_history'], text),
+                'medication_history': self._extract_first_match(self.patterns['medication_history'], text),
+                'treatment_course': self._extract_first_match(self.patterns['treatment_course'], text),
+                'year': paper.get('year', ''),
+                'abstract': paper.get('abstract', ''),
+                'full_text': paper.get('full_text', '')
             }
+            
+            # Calculate QTR and QTF if possible
+            qt = self.extract_numeric(result['qt'])
+            hr = self.extract_numeric(result['heart_rate'])
+            if qt and hr:
+                try:
+                    # Calculate QTR using Rautaharju formula
+                    qtr = qt / (120 / hr) ** 0.5
+                    result['qtr'] = f"{qtr:.1f}"
+                    
+                    # Calculate QTF using Fridericia formula
+                    qtf = qt / (60 / hr) ** (1/3)
+                    result['qtf'] = f"{qtf:.1f}"
+                except Exception as e:
+                    logger.error(f"Error calculating QTR/QTF: {e}")
+            
             results.append(result)
         
-        # Create DataFrame
-        df = pd.DataFrame(results)
-        
-        # Fill NaN values
-        df = df.fillna('')
-        
-        return df
+        return pd.DataFrame(results)
 
     def analyze_paper(self, paper: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Analyze a single paper for case report information."""
@@ -398,39 +411,39 @@ class CaseReportAnalyzer:
             bp_info = self.extract_value_with_context(text, self.patterns['blood_pressure'])
             
             result = {
-                'Case Report Title': paper.get('title', ''),
+                'title': paper.get('title', ''),
                 'year': paper.get('year', ''),
                 'abstract': paper.get('abstract', ''),
                 'full_text': paper.get('full_text', 'None'),
-                'Age': age_info[0] if age_info else None,
-                'Age Context': age_info[1] if age_info else None,
-                'Sex': sex_info[0] if sex_info else None,
-                'Sex Context': sex_info[1] if sex_info else None,
-                'Oral Dose (mg)': dose_info[0] if dose_info else None,
-                'Dose Context': dose_info[1] if dose_info else None,
-                'theoretical max concentration (μM)': max_conc_info[0] if max_conc_info else None,
-                'Max Conc Context': max_conc_info[1] if max_conc_info else None,
-                '40% bioavailability': bioavail_info[0] if bioavail_info else None,
-                'Bioavailability Context': bioavail_info[1] if bioavail_info else None,
-                'Theoretical hERG IC50 / Concentration μM': herg_info[0] if herg_info else None,
-                'hERG Context': herg_info[1] if herg_info else None,
-                '40% Plasma concentration': plasma_info[0] if plasma_info else None,
-                'Plasma Context': plasma_info[1] if plasma_info else None,
-                'Uncorrected QT (ms)': qt_value,
-                'QT Context': qt_context,
-                'QT Source': qt_source,
-                'QTc': qtc_value,
-                'QTc Context': qtc_context,
-                'QTc Source': qt_source,
-                'Heart Rate (bpm)': hr_info[0] if hr_info else None,
-                'HR Context': hr_info[1] if hr_info else None,
-                'Torsades de Pointes?': 'Yes' if qt_analysis['tdp_mentions'] else 'No',
-                'TdP Context': qt_analysis['tdp_mentions'][0]['context'] if qt_analysis['tdp_mentions'] else None,
-                'Blood Pressure (mmHg)': bp_info[0] if bp_info else None,
-                'BP Context': bp_info[1] if bp_info else None,
-                'Medical History': self.extract_value(text, self.patterns['medical_history']),
-                'Medication History': self.extract_value(text, self.patterns['medication_history']),
-                'Course of Treatment': self.extract_value(text, self.patterns['treatment_course'])
+                'age': age_info[0] if age_info else None,
+                'age_context': age_info[1] if age_info else None,
+                'sex': sex_info[0] if sex_info else None,
+                'sex_context': sex_info[1] if sex_info else None,
+                'oral_dose': dose_info[0] if dose_info else None,
+                'dose_context': dose_info[1] if dose_info else None,
+                'theoretical_max': max_conc_info[0] if max_conc_info else None,
+                'max_conc_context': max_conc_info[1] if max_conc_info else None,
+                'bioavailability': bioavail_info[0] if bioavail_info else None,
+                'bioavailability_context': bioavail_info[1] if bioavail_info else None,
+                'herg_ic50': herg_info[0] if herg_info else None,
+                'herg_context': herg_info[1] if herg_info else None,
+                'plasma_concentration': plasma_info[0] if plasma_info else None,
+                'plasma_context': plasma_info[1] if plasma_info else None,
+                'qt': qt_value,
+                'qt_context': qt_context,
+                'qt_source': qt_source,
+                'qtc': qtc_value,
+                'qtc_context': qtc_context,
+                'qtc_source': qt_source,
+                'heart_rate': hr_info[0] if hr_info else None,
+                'heart_rate_context': hr_info[1] if hr_info else None,
+                'tdp': 'Yes' if qt_analysis['tdp_mentions'] else 'No',
+                'tdp_context': qt_analysis['tdp_mentions'][0]['context'] if qt_analysis['tdp_mentions'] else None,
+                'blood_pressure': bp_info[0] if bp_info else None,
+                'blood_pressure_context': bp_info[1] if bp_info else None,
+                'medical_history': self.extract_value(text, self.patterns['medical_history']),
+                'medication_history': self.extract_value(text, self.patterns['medication_history']),
+                'treatment_course': self.extract_value(text, self.patterns['treatment_course'])
             }
             
             # Add detailed QT analysis
