@@ -624,13 +624,13 @@ def get_texts_parallel(pmids):
     logger.info(f"Got {len(texts)} full texts out of {len(pmids)} papers")
     return texts
 
-def process_papers(papers):
+def process_papers(papers, drug_name):
     """Process papers using CaseReportAnalyzer"""
     from .case_report_analyzer import CaseReportAnalyzer
     
     try:
         analyzer = CaseReportAnalyzer()
-        results = analyzer.analyze_papers(papers)
+        results = analyzer.analyze_papers(papers, drug_name)
         
         if not results.empty:
             return {
@@ -649,7 +649,7 @@ def process_papers(papers):
             'error': f"Error processing papers: {str(e)}"
         }
 
-def analyze_literature(drug_name: str) -> Dict:
+def analyze_literature(drug_name: str):
     """Analyze literature for a given drug."""
     try:
         logger.info(f"Starting literature analysis for {drug_name}")
@@ -659,62 +659,38 @@ def analyze_literature(drug_name: str) -> Dict:
         if papers.empty:
             logger.info(f"No papers found for {drug_name}")
             return {
-                'case_reports': [],
-                'message': f"No case reports found for {drug_name}"
+                'error': f"No papers found for {drug_name}"
             }
             
-        # Convert DataFrame to list of dicts for processing
-        papers = papers.to_dict('records')
-        logger.info(f"Found {len(papers)} papers to analyze")
+        logger.info(f"Found {len(papers)} papers for {drug_name}")
         
         # Get full texts
         papers_with_text = get_full_texts(papers)
-        
-        # Log detailed information about text retrieval
-        if papers_with_text:
-            texts_by_source = {}
-            for paper in papers_with_text:
-                source = paper.get('TextSource', 'Unknown')
-                texts_by_source[source] = texts_by_source.get(source, 0) + 1
-            
-            source_breakdown = ', '.join([f"{source}: {count}" for source, count in texts_by_source.items()])
-            logger.info(f"Retrieved {len(papers_with_text)} texts: {source_breakdown}")
-        
         if not papers_with_text:
-            # Create a more informative message about why texts weren't found
-            paper_info = []
-            for paper in papers:
-                pmid = paper.get('PMID', 'Unknown PMID')
-                title = paper.get('Title', 'Unknown Title')
-                paper_info.append(f"PMID {pmid}: {title}")
-            
-            paper_details = "\n".join(paper_info)
-            logger.info(f"No full texts found for {drug_name}. Papers that were searched:\n{paper_details}")
-            
             return {
-                'case_reports': [],
-                'message': f"No full texts available for {drug_name}. Found {len(papers)} papers but could not retrieve their full text content. This could be because the papers are not freely accessible or are behind a paywall."
+                'error': f"No full texts available for {drug_name}. Found {len(papers)} papers but could not retrieve their full text content. This could be because the papers are not freely accessible or are behind a paywall."
             }
+            
+        logger.info(f"Retrieved {len(papers_with_text)} full texts for {drug_name}")
         
         # Process papers
-        results = process_papers(papers_with_text)
+        results = process_papers(papers_with_text, drug_name)  # Pass drug_name here
         
-        # Add summary information to results
-        results['summary'] = {
-            'total_papers_found': len(papers),
-            'full_texts_retrieved': len(papers_with_text),
-            'case_reports_analyzed': len(results.get('case_reports', [])),
-            'sources_used': texts_by_source if papers_with_text else {}
-        }
+        # Add summary statistics
+        results.update({
+            'stats': {
+                'total_papers': len(papers),
+                'papers_with_text': len(papers_with_text),
+                'success_rate': f"{(len(papers_with_text) / len(papers) * 100):.1f}%"
+            }
+        })
         
         return results
         
     except Exception as e:
         logger.error(f"Error in analyze_literature: {str(e)}")
         return {
-            'error': f"Error analyzing literature: {str(e)}",
-            'case_reports': [],
-            'message': f"An error occurred while analyzing literature for {drug_name}"
+            'error': f"Error analyzing literature: {str(e)}"
         }
 
 def main():
@@ -724,7 +700,7 @@ def main():
         
     drug_name = sys.argv[1].upper()
     papers = analyze_literature(drug_name)
-    print(f"\nFound {len(papers['case_reports'])} papers")
+    print(f"\nFound {len(papers.get('case_reports', []))} papers")
 
 if __name__ == "__main__":
     main()
