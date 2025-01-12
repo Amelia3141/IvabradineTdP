@@ -36,51 +36,65 @@ def get_full_text(pmid, doi=None):
     """Get full text from PMC, Crossref, or Sci-Hub in that order."""
     text = None
     source = None
+    logger.info(f"Attempting to get full text for PMID {pmid}, DOI {doi}")
 
     # Try PMC first
     try:
         pmc_id = get_pmcid_from_pmid(pmid)
+        logger.info(f"PMC ID for {pmid}: {pmc_id}")
         if pmc_id:
             text = get_pmc_text(pmc_id)
             if text:
                 source = 'PMC'
+                logger.info(f"Successfully got text from PMC for {pmid}")
                 return text, source
+            else:
+                logger.info(f"No text found in PMC for {pmid}")
     except Exception as e:
-        logging.error(f"Error getting PMC text for {pmid}: {e}")
+        logger.error(f"Error getting PMC text for {pmid}: {e}")
 
     # Try Crossref next if we have a DOI
     if doi:
         try:
+            logger.info(f"Trying Crossref for {pmid} with DOI {doi}")
             crossref_text = get_crossref_text(doi)
             if crossref_text:
                 text = crossref_text
                 source = 'Crossref'
+                logger.info(f"Successfully got text from Crossref for {pmid}")
                 return text, source
+            else:
+                logger.info(f"No text found in Crossref for {pmid}")
         except Exception as e:
-            logging.error(f"Error getting Crossref text for {doi}: {e}")
+            logger.error(f"Error getting Crossref text for {doi}: {e}")
 
     # Finally try Sci-Hub
     try:
+        logger.info(f"Trying Sci-Hub for {pmid}")
         scihub_text = get_scihub_text(pmid, doi)
         if scihub_text:
             text = scihub_text
             source = 'Sci-Hub'
+            logger.info(f"Successfully got text from Sci-Hub for {pmid}")
             return text, source
+        else:
+            logger.info(f"No text found in Sci-Hub for {pmid}")
     except Exception as e:
-        logging.error(f"Error getting Sci-Hub text for {pmid}: {e}")
+        logger.error(f"Error getting Sci-Hub text for {pmid}: {e}")
 
+    logger.warning(f"Could not get full text for {pmid} from any source")
     return text, source
 
 def get_pmcid_from_pmid(pmid):
     """Convert PMID to PMCID using NCBI's ID converter."""
     try:
-        url = f"https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/?tool=my_tool&email=my.email@example.com&ids={pmid}&format=json"
+        url = f"https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/?tool=tdp_analyzer&email={Entrez.email}&ids={pmid}&format=json"
         response = requests.get(url)
         data = response.json()
         if 'records' in data and data['records']:
             return data['records'][0].get('pmcid')
     except Exception as e:
-        logging.error(f"Error converting PMID to PMCID: {e}")
+        logger.error(f"Error converting PMID to PMCID: {e}")
     return None
 
 def get_pmc_text(pmcid):
@@ -89,28 +103,43 @@ def get_pmc_text(pmcid):
         url = f"https://www.ncbi.nlm.nih.gov/pmc/articles/{pmcid}/"
         response = requests.get(url)
         soup = BeautifulSoup(response.text, 'html.parser')
-        article_text = soup.find('div', {'class': 'jig-ncbiinpagenav'})
+        # Try different possible content containers
+        article_text = (
+            soup.find('div', {'class': 'article-body'}) or
+            soup.find('div', {'class': 'jig-ncbiinpagenav'}) or
+            soup.find('article') or
+            soup.find('div', {'id': 'body'})
+        )
         if article_text:
-            return article_text.get_text()
+            return article_text.get_text(separator=' ', strip=True)
     except Exception as e:
-        logging.error(f"Error getting PMC text: {e}")
+        logger.error(f"Error getting PMC text: {e}")
     return None
 
 def get_crossref_text(doi):
     """Get full text using DOI from Crossref."""
     try:
-        url = f"https://api.crossref.org/works/{doi}"
-        response = requests.get(url)
-        data = response.json()
-        if 'message' in data and 'URL' in data['message']:
-            publisher_url = data['message']['URL']
-            response = requests.get(publisher_url)
-            soup = BeautifulSoup(response.text, 'html.parser')
-            article_text = soup.find('div', {'class': ['article-body', 'main-content']})
-            if article_text:
-                return article_text.get_text()
+        # First get the redirect URL
+        headers = {'Accept': 'text/html', 'User-Agent': 'TdPAnalyzer/1.0'}
+        response = requests.get(f"https://doi.org/{doi}", headers=headers, allow_redirects=True)
+        final_url = response.url
+        
+        # Now get the content from the final URL
+        response = requests.get(final_url, headers=headers)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # Try different possible content containers
+        article_text = (
+            soup.find('div', {'class': 'fulltext-view'}) or
+            soup.find('div', {'class': 'article-body'}) or
+            soup.find('div', {'id': 'body'}) or
+            soup.find('article')
+        )
+        
+        if article_text:
+            return article_text.get_text(separator=' ', strip=True)
     except Exception as e:
-        logging.error(f"Error getting Crossref text: {e}")
+        logger.error(f"Error getting Crossref text: {e}")
     return None
 
 def get_scihub_text(pmid, doi=None):
@@ -131,7 +160,7 @@ def get_scihub_text(pmid, doi=None):
                 text += page.extract_text()
             return text
     except Exception as e:
-        logging.error(f"Error getting Sci-Hub text: {e}")
+        logger.error(f"Error getting Sci-Hub text: {e}")
     return None
 
 def get_drug_names(drug_name: str) -> List[str]:
@@ -314,35 +343,64 @@ def format_pubmed_results(records: List[Dict]) -> pd.DataFrame:
 def get_texts_parallel(pmids):
     """Get full texts for multiple PMIDs in parallel using ThreadPoolExecutor"""
     texts = {}
+    logger.info(f"Getting full texts for {len(pmids)} papers")
     
-    def fetch_single_text(pmid):
+    # First get DOIs for all papers
+    dois = {}
+    for pmid in pmids:
         try:
-            # Get DOI from PubMed
+            # Query NCBI for DOI
             handle = Entrez.efetch(db="pubmed", id=pmid, rettype="xml", retmode="text")
-            xml = handle.read()
+            records = Entrez.read(handle)
             handle.close()
             
-            doi_match = re.search(r'<ELocationID EIdType="doi">(.*?)</ELocationID>', str(xml))
-            doi = doi_match.group(1) if doi_match else None
+            article = records['PubmedArticle'][0]['MedlineCitation']['Article']
+            # Try both ELocationID and ArticleId for DOI
+            doi = None
             
-            text, source = get_full_text(pmid, doi)
-            if text:
-                logger.info(f"Got text for {pmid} from {source}")
-                return pmid, text
-            return None
+            # Check ELocationID
+            if 'ELocationID' in article:
+                for id in article['ELocationID']:
+                    if id.attributes['EIdType'] == 'doi':
+                        doi = str(id)
+                        break
+            
+            # If not found, check ArticleIdList
+            if not doi and 'ArticleIdList' in records['PubmedArticle'][0]['PubmedData']:
+                for id in records['PubmedArticle'][0]['PubmedData']['ArticleIdList']:
+                    if id.attributes['IdType'] == 'doi':
+                        doi = str(id)
+                        break
+            
+            if doi:
+                dois[pmid] = doi
+                logger.info(f"Found DOI for {pmid}: {doi}")
+            
         except Exception as e:
-            logger.error(f"Error fetching text for {pmid}: {e}")
-            return None
-
+            logger.error(f"Error getting DOI for {pmid}: {e}")
+    
     # Use ThreadPoolExecutor to run requests in parallel
     with ThreadPoolExecutor(max_workers=5) as executor:
-        futures = [executor.submit(fetch_single_text, pmid) for pmid in pmids]
-        for future in concurrent.futures.as_completed(futures):
-            result = future.result()
-            if result:
-                pmid, text = result
-                texts[pmid] = text
+        future_to_pmid = {
+            executor.submit(get_full_text, pmid, dois.get(pmid)): pmid 
+            for pmid in pmids
+        }
+        
+        for future in concurrent.futures.as_completed(future_to_pmid):
+            pmid = future_to_pmid[future]
+            try:
+                result = future.result()
+                if result:
+                    text, source = result
+                    if text:
+                        texts[pmid] = text
+                        logger.info(f"Successfully got text for {pmid} from {source}")
+                    else:
+                        logger.warning(f"No text returned for {pmid}")
+            except Exception as e:
+                logger.error(f"Error processing {pmid}: {e}")
                 
+    logger.info(f"Got {len(texts)} full texts out of {len(pmids)} papers")
     return texts
 
 def analyze_literature(drug_name: str) -> Dict:
@@ -370,16 +428,18 @@ def analyze_literature(drug_name: str) -> Dict:
             # Create paper objects
             for _, paper in case_reports.iterrows():
                 pmid = paper['PMID']
+                case_report = {
+                    'pmid': pmid,
+                    'title': paper['Title'],
+                    'year': paper['Year'],
+                    'abstract': paper['Abstract']
+                }
+                # Add full text if available
                 if pmid in texts:
-                    case_report = {
-                        'pmid': pmid,
-                        'title': paper['Title'],
-                        'year': paper['Year'],
-                        'abstract': paper['Abstract'],
-                        'full_text': texts[pmid]
-                    }
-                    results['case_reports'].append(case_report)
-                    results['years'].append(paper['Year'])
+                    case_report['full_text'] = texts[pmid]
+                
+                results['case_reports'].append(case_report)
+                results['years'].append(paper['Year'])
                     
             results['total_cases'] = len(results['case_reports'])
             
