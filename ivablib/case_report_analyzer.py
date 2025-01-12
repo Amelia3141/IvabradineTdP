@@ -34,8 +34,13 @@ def clean_text(text: str) -> str:
     return text
 
 class CaseReportAnalyzer:
-    """Analyzes medical case reports for relevant information."""
-    
+    """
+    Analyzes medical case reports for relevant information.
+
+    Attributes:
+        patterns (dict): A dictionary of compiled regex patterns for information extraction.
+    """
+
     def __init__(self):
         """Initialize the analyzer with regex patterns."""
         # Compile regex patterns for better performance
@@ -475,7 +480,7 @@ class CaseReportAnalyzer:
         return None
 
 def convert_pdf_to_text(pdf_path: str) -> Optional[str]:
-    """Convert a PDF file to text and save it"""
+    """Convert a PDF file to text and save it."""
     try:
         # Create text file path
         text_path = pdf_path.rsplit('.', 1)[0] + '.txt'
