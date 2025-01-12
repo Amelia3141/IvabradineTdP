@@ -129,6 +129,7 @@ if analyze_button:
                 with tab2:
                     st.subheader("Literature Review")
                     literature = analysis.get('literature', {})
+                    logger.info(f"Literature data: {literature}")
                     
                     if 'error' in literature:
                         st.error(f"Error analyzing literature: {literature['error']}")
@@ -137,11 +138,14 @@ if analyze_button:
                         
                         # Display case reports
                         st.subheader("Case Reports")
+                        logger.info(f"Case reports: {literature.get('case_reports')}")
                         if literature.get('case_reports'):
                             st.metric("Total Case Reports", literature['total_cases'])
                             
                             # Create a dataframe from case reports
                             case_reports_df = pd.DataFrame(literature['case_reports'])
+                            logger.info(f"Case reports DataFrame: {case_reports_df}")
+                            
                             if not case_reports_df.empty:
                                 # Display basic info in a table
                                 display_df = case_reports_df[['title', 'year', 'pmid']].copy()
