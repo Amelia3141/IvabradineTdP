@@ -24,57 +24,12 @@ class CaseReportAnalyzer:
             'sex': re.compile(r'\b(?:male|female|man|woman|boy|girl|[MF]\s*/\s*(?:\d+|[MF])|gender[\s:]+(?:male|female)|(?:he|she|his|her)\s+was)\b', re.IGNORECASE),
             
             # Enhanced dosing patterns with medical abbreviations
-            'oral_dose': re.compile(r"""
-                (?:
-                    (?:oral|po|by\s+mouth|orally|per\s+os)\s+
-                    (?:dose|dosage|doses|administration|administered|given|taken|prescribed|started|initiated|received|treated\s+with)|
-                    (?:dose[d\s]*|given|administered|took|ingested|consumed|prescribed|started|initiated|received|treated\s+with)\s+
-                    (?:orally|po|by\s+mouth|per\s+os)
-                )
-                \s*
-                (?:with|at|of|a|total|daily|once|twice|thrice|[1-4]x|q\.?d|bid|tid|qid)?\s*
-                (?:dose\s+of\s+)?
-                (\d+\.?\d*)\s*
-                (?:mg|milligrams?|g|grams?|mcg|micrograms?|µg)
-                (?:\s*(?:per|a|each|every|q|q\.)\s*(?:day|daily|d|qd|od|q\.?d\.?|24\s*h(?:ours?)?|diem))?
-            """, re.VERBOSE | re.IGNORECASE),
+            'oral_dose': re.compile(r'(?:oral|po|by\s+mouth|orally|per\s+os)\s*(?:dose|dosage|doses|administration|administered|given|taken|prescribed|started|initiated|received|treated\s+with)?\s*(?:with|at|of|a|total|daily|once|twice|thrice|[1-4]x|q\.?d|bid|tid|qid)?\s*(?:dose\s+of\s+)?(\d+\.?\d*)\s*(?:mg|milligrams?|g|grams?|mcg|micrograms?|µg)', re.IGNORECASE),
             
             # Enhanced ECG patterns with more variations
-            'qtc': re.compile(r"""
-                (?:
-                    QTc[FBR]?|
-                    corrected\s+QT|
-                    QT\s*corrected|
-                    QT[c]?\s*interval\s*(?:corrected)?|
-                    corrected\s*QT\s*interval
-                )
-                [\s:]*
-                (?:interval|duration|measurement|prolongation|value)?
-                \s*
-                (?:of|was|is|=|:|measured|found|documented|recorded|increased\s+to)?
-                \s*
-                (\d+\.?\d*)
-                \s*
-                (?:ms(?:ec)?|milliseconds?|s(?:ec)?|seconds?)?
-            """, re.VERBOSE | re.IGNORECASE),
-
-            'qt': re.compile(r"""
-                \b(?:
-                    QT|
-                    uncorrected\s+QT|
-                    QT\s*interval|
-                    interval\s*QT|
-                    baseline\s*QT
-                )
-                [\s:]*
-                (?:interval|duration|measurement|value)?
-                \s*
-                (?:of|was|is|=|:|measured|found|documented|recorded|increased\s+to)?
-                \s*
-                (\d+\.?\d*)
-                \s*
-                (?:ms(?:ec)?|milliseconds?|s(?:ec)?|seconds?)?
-            """, re.VERBOSE | re.IGNORECASE),
+            'qtc': re.compile(r'(?:QTc[FBR]?|corrected\s+QT|QT\s*corrected|QT[c]?\s*interval\s*(?:corrected)?|corrected\s*QT\s*interval)[\s:]*(?:interval|duration|measurement|prolongation|value)?\s*(?:of|was|is|=|:|measured|found|documented|recorded|increased\s+to)?\s*(\d+\.?\d*)\s*(?:ms(?:ec)?|milliseconds?|s(?:ec)?|seconds?)?', re.IGNORECASE),
+            
+            'qt': re.compile(r'\b(?:QT|uncorrected\s+QT|QT\s*interval|interval\s*QT|baseline\s*QT)[\s:]*(?:interval|duration|measurement|value)?\s*(?:of|was|is|=|:|measured|found|documented|recorded|increased\s+to)?\s*(\d+\.?\d*)\s*(?:ms(?:ec)?|milliseconds?|s(?:ec)?|seconds?)?', re.IGNORECASE),
             
             'heart_rate': re.compile(r'(?:heart\s+rate|HR|pulse|ventricular\s+rate|heart\s+rhythm|cardiac\s+rate)[\s:]*(?:of|was|is|=|:|decreased\s+to|increased\s+to)?\s*(\d+)(?:\s*(?:beats?\s*per\s*min(?:ute)?|bpm|min-1|/min))?', re.IGNORECASE),
             
