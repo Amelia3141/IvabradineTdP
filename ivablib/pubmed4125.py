@@ -229,70 +229,75 @@ def get_crossref_text(doi):
         
         logger.info(f"Redirected to: {final_url}")
         
-        # Check if we're redirected to a known publisher domain
-        publisher_domains = ['sciencedirect.com', 'springer.com', 'wiley.com', 'nature.com', 'bmj.com', 'tandfonline.com']
-        if any(domain in final_url for domain in publisher_domains):
-            # Now get the content from the final URL
-            response = session.get(final_url, verify=False, timeout=30)
-            soup = BeautifulSoup(response.text, 'html.parser')
-            
-            # Check for common paywall indicators
-            paywall_indicators = [
-                'div[class*="paywall"]',
-                'div[id*="paywall"]',
-                'div[class*="access-denied"]',
-                'div[class*="access-restricted"]',
-                'div[class*="subscription-required"]',
-                'div[class*="purchase-options"]',
-                'div[class*="login-required"]',
-                'div[class*="sign-in"]'
-            ]
-            
-            for indicator in paywall_indicators:
-                if soup.select(indicator):
-                    logger.info(f"Paywall detected at {final_url}")
-                    return None
-            
-            # Try different possible content containers
-            article_text = None
-            selectors = [
-                # Elsevier
-                ('div', {'class': ['article-body', 'article-text', 'article-content', 'full-text', 'article__body']}),
-                # Springer
-                ('div', {'class': ['c-article-body', 'c-article-section', 'main-content']}),
-                # Wiley
-                ('div', {'class': ['article-body', 'article__body', 'fulltext', 'main-content']}),
-                # Nature
-                ('div', {'class': ['c-article-body', 'article-body', 'article__body', 'content-container']}),
-                # BMJ
-                ('div', {'class': ['article-body', 'content-block', 'article-content']}),
-                # Taylor & Francis
-                ('div', {'class': ['article-body', 'article-text', 'NLM__article-body']}),
-                # Generic
-                ('div', {'id': ['body', 'main-content', 'content-main', 'article-content']}),
-                ('article', {}),
-                ('div', {'class': ['content', 'main', 'article']}),
-            ]
-            
-            for tag, attrs in selectors:
-                contents = soup.find_all(tag, attrs)
-                for content in contents:
-                    if content:
-                        # Remove unwanted elements
-                        for unwanted in content.find_all(['div', 'section'], {'class': [
-                            'ref-list', 'supplementary-material', 'copyright', 'author-notes',
-                            'references', 'footnotes', 'article-footer', 'metrics', 'figure'
-                        ]}):
-                            unwanted.decompose()
-                        text = content.get_text(separator=' ', strip=True)
-                        if len(text) > 500:  # Only return if we got substantial text
-                            logger.info(f"Successfully extracted {len(text)} characters of text from {final_url}")
-                            return text
-            
-            logger.warning(f"No article text found at {final_url}")
-        else:
-            logger.info(f"URL {final_url} not recognized as a supported publisher")
-            
+        # Get the content from the final URL
+        response = session.get(final_url, verify=False, timeout=30)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # Check for common paywall indicators
+        paywall_indicators = [
+            'div[class*="paywall"]',
+            'div[id*="paywall"]',
+            'div[class*="access-denied"]',
+            'div[class*="access-restricted"]',
+            'div[class*="subscription-required"]',
+            'div[class*="purchase-options"]',
+            'div[class*="login-required"]',
+            'div[class*="sign-in"]',
+            'div[class*="purchase-access"]',
+            'div[class*="subscribe"]',
+            'div[class*="membership"]'
+        ]
+        
+        for indicator in paywall_indicators:
+            if soup.select(indicator):
+                logger.info(f"Paywall detected at {final_url}")
+                return None
+        
+        # Try different possible content containers
+        selectors = [
+            # Common article containers
+            ('div', {'class': ['article-body', 'article-text', 'article-content', 'full-text', 'article__body', 'content-main']}),
+            ('div', {'class': ['c-article-body', 'c-article-section', 'main-content', 'content-container']}),
+            ('div', {'class': ['content-block', 'article-content', 'NLM__article-body', 'main-article']}),
+            ('div', {'id': ['body', 'main-content', 'content-main', 'article-content', 'article-body', 'main']}),
+            ('article', {}),
+            # Publisher-specific containers
+            ('div', {'class': ['article-body', 'article__body', 'fulltext', 'content-container']}),  # Wiley, Nature
+            ('div', {'class': ['article-body', 'content-block', 'article-content']}),  # BMJ
+            ('div', {'class': ['article-body', 'article-text', 'NLM__article-body']}),  # Taylor & Francis
+            ('div', {'class': ['article-body', 'article-text', 'article-content', 'full-text']}),  # Elsevier
+            ('div', {'class': ['c-article-body', 'c-article-section']}),  # Springer
+            # Generic containers
+            ('div', {'class': ['content', 'main', 'article', 'paper', 'manuscript']}),
+            ('main', {}),
+            ('div', {'role': 'main'}),
+            ('div', {'id': ['content', 'main', 'article', 'paper']}),
+        ]
+        
+        # Try to find content in any of the selectors
+        for tag, attrs in selectors:
+            contents = soup.find_all(tag, attrs)
+            for content in contents:
+                if content:
+                    # Remove unwanted elements
+                    for unwanted in content.find_all(['div', 'section'], {'class': [
+                        'ref-list', 'supplementary-material', 'copyright', 'author-notes',
+                        'references', 'footnotes', 'article-footer', 'metrics', 'figure',
+                        'acknowledgments', 'peer-review', 'related-content', 'article-comments',
+                        'article-tools', 'social-share', 'citation'
+                    ]}):
+                        unwanted.decompose()
+                        
+                    # Get text and clean it
+                    text = content.get_text(separator=' ', strip=True)
+                    text = ' '.join(text.split())  # Normalize whitespace
+                    
+                    if len(text) > 500:  # Only return if we got substantial text
+                        logger.info(f"Successfully extracted {len(text)} characters of text from {final_url}")
+                        return text
+        
+        logger.warning(f"No article text found at {final_url}")
+        
     except Exception as e:
         logger.error(f"Error getting Crossref text: {e}")
     return None
