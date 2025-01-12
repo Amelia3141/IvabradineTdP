@@ -332,87 +332,52 @@ class CaseReportAnalyzer:
     def analyze_paper(self, paper: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Analyze a single paper for case report information."""
         try:
-            # Get text from both full text and abstract
-            text = ' '.join(filter(None, [
-                paper.get('FullText', ''),
-                paper.get('Abstract', '')
-            ]))
-            
+            # Combine full text and abstract
+            text = paper.get('FullText', '') + ' ' + paper.get('Abstract', '')
             if not text.strip():
-                logger.warning(f"No text content found for paper {paper.get('PMID', 'Unknown')}")
                 return {}
 
-            # Clean text
-            text = self._clean_text(text)
-            
-            # Extract values with context
-            result = {
-                'title': paper.get('Title', ''),
-                'pmid': paper.get('PMID', ''),
-                'doi': paper.get('DOI', '')
+            # Initialize report
+            report = {
+                'Title': paper.get('Title', ''),
+                'PMID': paper.get('PMID', ''),
+                'DOI': paper.get('DOI', ''),
+                'Abstract': paper.get('Abstract', '')
             }
 
-            # Extract demographic info
-            age_match = self._extract_with_context(text, self.patterns['age'])
-            result['age'] = age_match[0] if age_match else None
-            result['age_context'] = age_match[1] if age_match else None
+            # Define patterns for information extraction
+            patterns = {
+                'Age': re.compile(r'(?:(?:aged?|age[d\s:]*|a|was)\s*)?(\d+)[\s-]*(?:year|yr|y|yo|years?)[s\s-]*(?:old|of\s+age)?|(?:age[d\s:]*|aged\s*)(\d+)', re.IGNORECASE),
+                'Sex': re.compile(r'\b(?:male|female|man|woman|boy|girl|[MF]\s*/\s*(?:\d+|[MF])|gender[\s:]+(?:male|female)|(?:he|she|his|her)\s+was)\b', re.IGNORECASE),
+                'Oral Dose (mg)': re.compile(r'(?:oral|po|by\s+mouth|orally|per\s+os)\s*(?:dose|dosage|doses|administration|administered|given|taken|prescribed|started|initiated|received|treated\s+with)?\s*(?:with|at|of|a|total|daily|once|twice|thrice|[1-4]x|q\.?d|bid|tid|qid)?\s*(?:dose\s+of\s+)?(\d+\.?\d*)\s*(?:mg|milligrams?|g|grams?|mcg|micrograms?|µg)', re.IGNORECASE),
+                'Theoretical Max Concentration (μM)': re.compile(r'(?:theoretical|max|maximum|peak)\s*(?:concentration|level|plasma|blood)\s*(?:of|was|is|=|:)?\s*(\d+\.?\d*)\s*(?:μM|uM|micromolar)', re.IGNORECASE),
+                '40% Bioavailability': re.compile(r'(?:bioavailability|F|BA)\s*(?:of|was|is|=|:)?\s*(\d+\.?\d*)\s*%', re.IGNORECASE),
+                'Theoretical HERG IC50 / Concentration μM': re.compile(r'(?:herg|ikr)\s*(?:ic50|ic\s*50)\s*(?:of|was|is|=|:)?\s*(\d+\.?\d*)\s*(?:μM|uM|micromolar)', re.IGNORECASE),
+                '40% Plasma Concentration': re.compile(r'(?:plasma|blood|serum)\s*(?:concentration|level)\s*(?:of|was|is|=|:)?\s*(\d+\.?\d*)\s*(?:μM|uM|micromolar)', re.IGNORECASE),
+                'Uncorrected QT (ms)': re.compile(r'\b(?:QT|uncorrected\s+QT|QT\s*interval|interval\s*QT|baseline\s*QT)[\s:]*(?:interval|duration|measurement|value)?\s*(?:of|was|is|=|:|measured|found|documented|recorded|increased\s+to)?\s*(\d+\.?\d*)\s*(?:ms(?:ec)?|milliseconds?|s(?:ec)?|seconds?)?', re.IGNORECASE),
+                'QTc': re.compile(r'(?:QTc[FBR]?|corrected\s+QT|QT\s*corrected|QT[c]?\s*interval\s*(?:corrected)?|corrected\s*QT\s*interval)[\s:]*(?:interval|duration|measurement|prolongation|value)?\s*(?:of|was|is|=|:|measured|found|documented|recorded|increased\s+to)?\s*(\d+\.?\d*)\s*(?:ms(?:ec)?|milliseconds?|s(?:ec)?|seconds?)?', re.IGNORECASE),
+                'Heart Rate (bpm)': re.compile(r'(?:heart\s+rate|HR|pulse|ventricular\s+rate|heart\s+rhythm|cardiac\s+rate)[\s:]*(?:of|was|is|=|:|decreased\s+to|increased\s+to)?\s*(\d+)(?:\s*(?:beats?\s*per\s*min(?:ute)?|bpm|min-1|/min))?', re.IGNORECASE),
+                'Blood Pressure (mmHg)': re.compile(r'(?:blood\s+pressure|BP|arterial\s+pressure)[\s:]*(?:of|was|is|=|:|measured)?\s*([\d/]+)(?:\s*mm\s*Hg)?', re.IGNORECASE),
+                'Torsades de Pointes?': re.compile(r'\b(?:torsade[s]?\s*(?:de)?\s*pointes?|TdP|torsades|polymorphic\s+[vV]entricular\s+[tT]achycardia|PVT\s+(?:with|showing)\s+[tT]dP)\b', re.IGNORECASE),
+                'Medical History': re.compile(r'(?:medical|clinical|past|previous|documented|known|significant)\s*(?:history|condition|diagnosis|comorbidities)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE),
+                'Medication History': re.compile(r'(?:medication|drug|prescription|current\s+medications?|concomitant\s+medications?)\s*(?:history|list|profile|regime)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE),
+                'Course of Treatment': re.compile(r'(?:treatment|therapy|management|intervention|administered|given)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE),
+            }
 
-            sex_match = self._extract_with_context(text, self.patterns['sex'])
-            result['sex'] = self._clean_sex(sex_match[0]) if sex_match else None
-            result['sex_context'] = sex_match[1] if sex_match else None
+            # Extract information using patterns
+            for field, pattern in patterns.items():
+                match = pattern.search(text)
+                if match:
+                    if field == 'Torsades de Pointes?':
+                        report[field] = 'Yes'
+                    else:
+                        groups = [g for g in match.groups() if g]
+                        report[field] = groups[0] if groups else ''
 
-            # Extract dosing info
-            dose_match = self._extract_with_context(text, self.patterns['oral_dose'])
-            if dose_match:
-                result['oral_dose_value'] = self._extract_numeric(dose_match[0])
-                result['oral_dose_unit'] = self._extract_unit(dose_match[0])
-                result['oral_dose_freq'] = self._extract_frequency(dose_match[0])
-                result['oral_dose_context'] = dose_match[1]
-
-            # Extract ECG measurements
-            qt_match = self._extract_with_context(text, self.patterns['qt'])
-            if qt_match:
-                result['qt_value'] = self._extract_numeric(qt_match[0])
-                result['qt_context'] = qt_match[1]
-
-            qtc_match = self._extract_with_context(text, self.patterns['qtc'])
-            if qtc_match:
-                result['qtc_value'] = self._extract_numeric(qtc_match[0])
-                result['qtc_context'] = qtc_match[1]
-
-            # Extract vital signs
-            hr_match = self._extract_with_context(text, self.patterns['heart_rate'])
-            if hr_match:
-                result['heart_rate_value'] = self._extract_numeric(hr_match[0])
-                result['heart_rate_context'] = hr_match[1]
-
-            bp_match = self._extract_with_context(text, self.patterns['blood_pressure'])
-            if bp_match:
-                result['blood_pressure_value'] = bp_match[0]
-                result['blood_pressure_context'] = bp_match[1]
-
-            # Check for TdP
-            tdp_match = self._extract_with_context(text, self.patterns['tdp'])
-            result['tdp_present'] = bool(tdp_match)
-            result['tdp_context'] = tdp_match[1] if tdp_match else None
-
-            # Extract history
-            med_history = self._extract_with_context(text, self.patterns['medical_history'])
-            result['medical_history'] = med_history[0] if med_history else None
-            result['medical_history_context'] = med_history[1] if med_history else None
-
-            med_list = self._extract_with_context(text, self.patterns['medication_history'])
-            result['medication_history'] = med_list[0] if med_list else None
-            result['medication_history_context'] = med_list[1] if med_list else None
-
-            treatment = self._extract_with_context(text, self.patterns['treatment_course'])
-            result['treatment_course'] = treatment[0] if treatment else None
-            result['treatment_course_context'] = treatment[1] if treatment else None
-
-            return result
+            return report
 
         except Exception as e:
-            logger.error(f"Error analyzing paper {paper.get('PMID', 'Unknown')}: {str(e)}")
+            logger.error(f"Error analyzing paper: {str(e)}")
             return {}
 
     def _extract_with_context(self, text: str, pattern: re.Pattern) -> str:
