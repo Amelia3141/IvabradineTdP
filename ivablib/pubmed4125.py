@@ -17,7 +17,6 @@ import difflib
 import csv
 import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor
-from .case_report_analyzer import CaseReportAnalyzer
 
 # Suppress SSL warnings
 requests.packages.urllib3.disable_warnings()
@@ -28,18 +27,13 @@ logger = logging.getLogger(__name__)
 
 # Set your email and API key for NCBI from environment variables
 logger.info("Setting up NCBI credentials")
-try:
-    import streamlit as st
-    Entrez.email = st.secrets["NCBI_EMAIL"]
-    Entrez.api_key = st.secrets["NCBI_API_KEY"]
-except:
-    Entrez.email = os.environ.get('NCBI_EMAIL', 'your@email.com')
-    Entrez.api_key = os.environ.get('NCBI_API_KEY')
+Entrez.email = os.environ.get('NCBI_EMAIL', 'your@email.com')
+Entrez.api_key = os.environ.get('NCBI_API_KEY')
 logger.info(f"Using email: {Entrez.email}")
 logger.info("NCBI credentials set up")
 
 def get_full_text(pmid, doi=None):
-    """Get full text from PMC, Crossref, or Sci-Hub in that order. Falls back to abstract if full text unavailable."""
+    """Get full text from PMC, Crossref, or Sci-Hub in that order."""
     text = None
     source = None
     logger.info(f"Attempting to get full text for PMID {pmid}, DOI {doi}")
@@ -52,47 +46,43 @@ def get_full_text(pmid, doi=None):
             text = get_pmc_text(pmc_id)
             if text:
                 source = 'PMC'
-                logger.info(f"Got full text from PMC for {pmid}")
+                logger.info(f"Successfully got text from PMC for {pmid}")
+                return text, source
+            else:
+                logger.info(f"No text found in PMC for {pmid}")
     except Exception as e:
-        logger.warning(f"Error getting PMC text for {pmid}: {str(e)}")
+        logger.error(f"Error getting PMC text for {pmid}: {e}")
 
-    # Try Crossref if PMC failed
-    if not text and doi:
+    # Try Crossref next if we have a DOI
+    if doi:
         try:
-            text = get_crossref_text(doi)
-            if text:
+            logger.info(f"Trying Crossref for {pmid} with DOI {doi}")
+            crossref_text = get_crossref_text(doi)
+            if crossref_text:
+                text = crossref_text
                 source = 'Crossref'
-                logger.info(f"Got full text from Crossref for {pmid}")
+                logger.info(f"Successfully got text from Crossref for {pmid}")
+                return text, source
+            else:
+                logger.info(f"No text found in Crossref for {pmid}")
         except Exception as e:
-            logger.warning(f"Error getting Crossref text for {pmid}: {str(e)}")
+            logger.error(f"Error getting Crossref text for {doi}: {e}")
 
-    # Try Sci-Hub as last resort
-    if not text:
-        try:
-            text = get_scihub_text(pmid, doi)
-            if text:
-                source = 'Sci-Hub'
-                logger.info(f"Got full text from Sci-Hub for {pmid}")
-        except Exception as e:
-            logger.warning(f"Error getting Sci-Hub text for {pmid}: {str(e)}")
+    # Finally try Sci-Hub
+    try:
+        logger.info(f"Trying Sci-Hub for {pmid}")
+        scihub_text = get_scihub_text(pmid, doi)
+        if scihub_text:
+            text = scihub_text
+            source = 'Sci-Hub'
+            logger.info(f"Successfully got text from Sci-Hub for {pmid}")
+            return text, source
+        else:
+            logger.info(f"No text found in Sci-Hub for {pmid}")
+    except Exception as e:
+        logger.error(f"Error getting Sci-Hub text for {pmid}: {e}")
 
-    # If still no text, try to get abstract from PubMed
-    if not text:
-        try:
-            handle = Entrez.efetch(db="pubmed", id=pmid, rettype="abstract", retmode="text")
-            abstract = handle.read()
-            handle.close()
-            if abstract:
-                text = abstract
-                source = 'PubMed Abstract'
-                logger.info(f"Using PubMed abstract for {pmid} as fallback")
-        except Exception as e:
-            logger.warning(f"Error getting abstract for {pmid}: {str(e)}")
-
-    if not text:
-        logger.warning(f"No text returned for {pmid}")
-        return None, None
-
+    logger.warning(f"Could not get full text for {pmid} from any source")
     return text, source
 
 def get_pmcid_from_pmid(pmid):
@@ -153,60 +143,52 @@ def get_pmc_text(pmcid):
 def get_crossref_text(doi):
     """Get full text using DOI from Crossref."""
     try:
-        # Try to get the paper URL from Crossref
-        crossref_url = f"https://api.crossref.org/works/{doi}"
-        response = requests.get(crossref_url)
-        if response.status_code != 200:
-            return None
-            
-        data = response.json()
-        if 'message' not in data:
-            return None
-            
-        # Get the paper URL
-        paper_url = None
-        if 'link' in data['message']:
-            for link in data['message']['link']:
-                if link.get('content-type', '').startswith('text/html'):
-                    paper_url = link['URL']
-                    break
-                    
-        if not paper_url and 'URL' in data['message']:
-            paper_url = data['message']['URL']
-            
-        if not paper_url:
-            return None
-            
-        # Get the paper content
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(paper_url, headers=headers)
-        if response.status_code != 200:
-            return None
-            
-        # Parse the HTML content
+        # First get the redirect URL
+        headers = {
+            'Accept': 'text/html',
+            'User-Agent': 'TdPAnalyzer/1.0 (mailto:your@email.com)'
+        }
+        response = requests.get(f"https://doi.org/{doi}", headers=headers, allow_redirects=True)
+        final_url = response.url
+        
+        logger.info(f"Redirected to: {final_url}")
+        
+        # Now get the content from the final URL
+        response = requests.get(final_url, headers=headers)
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # Remove script and style elements
-        for script in soup(["script", "style"]):
-            script.decompose()
+        # Try different possible content containers
+        article_text = (
+            # Elsevier specific selectors
+            soup.find('div', {'class': 'article-body'}) or
+            soup.find('div', {'id': 'body'}) or
+            soup.find('div', {'class': 'article-text'}) or
+            soup.find('div', {'class': 'article-content'}) or
+            soup.find('div', {'class': 'main-content'}) or
+            # ScienceDirect specific
+            soup.find('div', {'id': 'centerInner'}) or
+            soup.find('div', {'class': 'article'}) or
+            # Generic article containers
+            soup.find('div', {'class': 'fulltext-view'}) or
+            soup.find('article') or
+            # Abstract as fallback
+            soup.find('div', {'class': 'abstract'}) or
+            soup.find('abstract')
+        )
+        
+        if article_text:
+            # Clean the text
+            text = article_text.get_text(separator=' ', strip=True)
+            # Remove excessive whitespace
+            text = ' '.join(text.split())
+            logger.info(f"Successfully extracted {len(text)} characters of text from {final_url}")
+            return text
+        else:
+            logger.warning(f"No article text found at {final_url}")
             
-        # Get text and clean it up
-        text = soup.get_text()
-        
-        # Break into lines and remove leading/trailing space
-        lines = (line.strip() for line in text.splitlines())
-        
-        # Break multi-headlines into a line each
-        chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-        
-        # Drop blank lines
-        text = ' '.join(chunk for chunk in chunks if chunk)
-        
-        return text
-        
     except Exception as e:
-        logger.error(f"Error getting Crossref text: {str(e)}")
-        return None
+        logger.error(f"Error getting Crossref text: {e}")
+    return None
 
 def get_scihub_text(pmid, doi=None):
     """Get full text from Sci-Hub."""
@@ -453,6 +435,38 @@ def format_pubmed_results(records: List[Dict]) -> pd.DataFrame:
             
     return pd.DataFrame(results)
 
+def get_full_texts(papers):
+    """Get full texts for papers"""
+    papers_with_text = []
+    total_papers = len(papers)
+    texts_found = 0
+    
+    for paper in papers:
+        pmid = str(paper.get('PMID', ''))
+        doi = paper.get('DOI', '')
+        
+        logger.info(f"Getting text for paper {pmid}")
+        
+        # Get text from various sources
+        text, source = get_full_text(pmid, doi)
+        
+        if text:
+            texts_found += 1
+            paper_with_text = {
+                'PMID': pmid,
+                'Title': paper.get('Title', ''),
+                'Abstract': paper.get('Abstract', ''),
+                'FullText': text,
+                'TextSource': source,
+                'DOI': doi
+            }
+            papers_with_text.append(paper_with_text)
+        else:
+            logger.warning(f"No text found for paper {pmid}")
+            
+    logger.info(f"Found text for {texts_found} out of {total_papers} papers")
+    return papers_with_text
+
 def get_texts_parallel(pmids):
     """Get full texts for multiple PMIDs in parallel using ThreadPoolExecutor"""
     texts = {}
@@ -525,14 +539,39 @@ def get_texts_parallel(pmids):
     logger.info(f"Got {len(texts)} full texts out of {len(pmids)} papers")
     return texts
 
-def analyze_literature(drug_name):
-    """Analyze literature for QT-related case reports."""
+def process_papers(papers):
+    """Process papers using CaseReportAnalyzer"""
+    from .case_report_analyzer import CaseReportAnalyzer
+    
+    try:
+        analyzer = CaseReportAnalyzer()
+        results = analyzer.analyze_papers(papers)
+        
+        if not results.empty:
+            return {
+                'case_reports': results.to_dict('records'),
+                'message': f"Found {len(results)} case reports"
+            }
+        else:
+            return {
+                'case_reports': [],
+                'message': "No relevant case reports found"
+            }
+            
+    except Exception as e:
+        logger.error(f"Error in process_papers: {str(e)}")
+        return {
+            'error': f"Error processing papers: {str(e)}"
+        }
+
+def analyze_literature(drug_name: str) -> Dict:
+    """Analyze literature for a given drug."""
     try:
         logger.info(f"Starting literature analysis for {drug_name}")
         
         # Search for papers
         papers = search_pubmed_case_reports(drug_name)
-        if papers.empty:  
+        if papers.empty:
             logger.info(f"No papers found for {drug_name}")
             return {
                 'case_reports': [],
@@ -543,8 +582,8 @@ def analyze_literature(drug_name):
         papers = papers.to_dict('records')
         
         # Get full texts
-        papers = get_full_texts(papers)
-        if not papers:
+        papers_with_text = get_full_texts(papers)
+        if not papers_with_text:
             logger.info(f"No full texts found for {drug_name}")
             return {
                 'case_reports': [],
@@ -552,114 +591,13 @@ def analyze_literature(drug_name):
             }
         
         # Process papers
-        result = process_papers(papers)
-        if 'error' in result:
-            return result
-        
-        if not result.get('case_reports'):
-            return {
-                'case_reports': [],
-                'message': f"No relevant case reports found for {drug_name}"
-            }
-            
-        return result
+        return process_papers(papers_with_text)
         
     except Exception as e:
         logger.error(f"Error in analyze_literature: {str(e)}")
         return {
             'error': f"Error analyzing literature: {str(e)}"
         }
-
-def get_full_texts(papers):
-    """Get full texts for papers"""
-    papers_with_text = []
-    total_papers = len(papers)
-    texts_found = 0
-    
-    for paper in papers:
-        pmid = str(paper.get('PMID', ''))
-        doi = paper.get('DOI', '')
-        
-        logger.info(f"Getting text for paper {pmid}")
-        
-        # Get text from various sources
-        text, source = get_full_text(pmid, doi)
-        
-        if text:
-            texts_found += 1
-            paper_with_text = {
-                'PMID': pmid,
-                'Title': paper.get('Title', ''),
-                'Abstract': paper.get('Abstract', ''),
-                'FullText': text,
-                'TextSource': source,
-                'DOI': doi
-            }
-            papers_with_text.append(paper_with_text)
-            logger.info(f"Added text for paper {pmid} from {source}")
-        else:
-            logger.warning(f"No text found for paper {pmid}")
-    
-    logger.info(f"Found text for {texts_found} out of {total_papers} papers")
-    return papers_with_text
-
-def process_papers(papers):
-    """Process papers to extract relevant information"""
-    try:
-        analyzer = CaseReportAnalyzer()
-        results = []
-        
-        for paper in papers:
-            # Extract information using the analyzer
-            info = analyzer.analyze_paper(paper)
-            if info:
-                results.append(info)
-                logger.info(f"Successfully processed paper {paper.get('PMID', 'Unknown')}")
-            else:
-                logger.warning(f"No relevant information found in paper {paper.get('PMID', 'Unknown')}")
-                
-        if results:
-            logger.info(f"Successfully processed {len(results)} papers")
-            return {'case_reports': results}
-        else:
-            logger.warning("No case reports found in any papers")
-            return {'message': "No case reports found in the literature."}
-        
-    except Exception as e:
-        logger.error(f"Error processing papers: {str(e)}")
-        return {'error': str(e)}
-
-def get_paper_details(pmids):
-    """Get paper details from PubMed"""
-    try:
-        # Fetch details
-        logger.info(f"Fetching details for {len(pmids)} papers")
-        handle = Entrez.efetch(db="pubmed", id=pmids, 
-                             rettype="xml", retmode="text")
-        records = Entrez.read(handle)
-        logger.info(f"Got {len(records['PubmedArticle'])} paper details")
-        handle.close()
-
-        results = []
-        for paper in records['PubmedArticle']:
-            try:
-                paper_dict = {
-                    'PMID': paper['MedlineCitation']['PMID'],
-                    'Title': paper['MedlineCitation']['Article']['ArticleTitle'],
-                    'Abstract': paper['MedlineCitation']['Article'].get('Abstract', {}).get('AbstractText', [''])[0],
-                    'Year': paper['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate'].get('Year', '')
-                }
-                results.append(paper_dict)
-            except Exception as e:
-                logger.error(f"Error processing paper: {e}")
-                continue
-        
-        logger.info(f"Processed {len(results)} papers successfully")
-        return pd.DataFrame(results)
-        
-    except Exception as e:
-        logger.error(f"Error getting paper details: {e}")
-        return pd.DataFrame()
 
 def main():
     if len(sys.argv) != 2:

@@ -398,65 +398,131 @@ class CaseReportAnalyzer:
     def analyze_paper(self, paper: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Analyze a single paper for case report information."""
         try:
-            text = paper.get('FullText', '')
+            # Get text from full text if available, otherwise use title and abstract
+            text = paper.get('full_text', '')
             if not text:
-                text = paper.get('Abstract', '')
-
-            if not text:
-                logger.warning(f"No text available for analysis in paper {paper.get('PMID', 'Unknown')}")
+                text = f"{paper.get('title', '')} {paper.get('abstract', '')}"
+            
+            # Skip if no meaningful text to analyze
+            if not text.strip():
                 return None
-
-            # Initialize report with basic info
-            report = {
-                'PMID': paper.get('PMID', ''),
-                'Title': paper.get('Title', ''),
-                'Age': '',
-                'Sex': '',
-                'Oral Dose': '',
-                'QTc': '',
-                'Heart Rate': '',
-                'Blood Pressure': '',
-                'TdP': False,
-                'Medical History': '',
-                'Medication History': '',
-                'Treatment Course': '',
-                'TextSource': paper.get('TextSource', 'Unknown')
-            }
-
-            # Extract values using patterns
-            for field, pattern in self.patterns.items():
-                matches = re.finditer(pattern, text, re.IGNORECASE | re.MULTILINE)
-                for match in matches:
-                    if match.groups():
-                        # Use the first non-None group
-                        value = next((g for g in match.groups() if g is not None), '')
+            
+            # Perform comprehensive QT analysis
+            qt_analysis = self.analyze_qt_comprehensive(text)
+            
+            # Extract QT/QTc values from comprehensive analysis
+            qtc_value = None
+            qt_value = None
+            qtc_context = None
+            qt_context = None
+            qt_source = None
+            
+            # Function to extract numeric value from text
+            def extract_numeric(text):
+                match = re.search(r'(\d+\.?\d*)', text)
+                return float(match.group(1)) if match else None
+            
+            # Check all sources for QT/QTc values in priority order
+            sources = [
+                ('Main Text', qt_analysis['numeric_values']),
+                ('Figure', qt_analysis['figure_qt']),
+                ('Table', qt_analysis['table_qt']),
+                ('Supplementary', qt_analysis['supp_qt'])
+            ]
+            
+            for source_name, values in sources:
+                # For numeric values from main text
+                if source_name == 'Main Text':
+                    for pattern_name, pattern_values in values.items():
+                        if pattern_values:
+                            max_value_dict = max(pattern_values, key=lambda x: x['value'])
+                            if 'qtc' in pattern_name and (qtc_value is None or max_value_dict['value'] > qtc_value):
+                                qtc_value = max_value_dict['value']
+                                qtc_context = max_value_dict['context']
+                                qt_source = 'Main Text'
+                            elif 'qt' in pattern_name and (qt_value is None or max_value_dict['value'] > qt_value):
+                                qt_value = max_value_dict['value']
+                                qt_context = max_value_dict['context']
+                                qt_source = 'Main Text'
+                else:
+                    # For figure/table/supplementary values
+                    for item in values:
+                        value = extract_numeric(item['text'])
                         if value:
-                            if field == 'sex':
-                                # Normalize sex to Male/Female
-                                value = self._normalize_sex(value)
-                            elif field == 'tdp':
-                                report['TdP'] = True
-                                continue
-                            report[field] = value.strip()
-                            break
-
-            # Only return report if we found some relevant information
-            if any(v for k, v in report.items() if k not in ['PMID', 'Title', 'TextSource']):
-                return report
+                            # Assume milliseconds if no unit specified
+                            if 'sec' in item['text'].lower():
+                                value *= 1000
+                            
+                            # Update QT/QTc based on context
+                            if 'qtc' in item['text'].lower():
+                                if qtc_value is None or value > qtc_value:
+                                    qtc_value = value
+                                    qtc_context = item['context']
+                                    qt_source = source_name
+                            else:
+                                if qt_value is None or value > qt_value:
+                                    qt_value = value
+                                    qt_context = item['context']
+                                    qt_source = source_name
+            
+            # Extract other information with context
+            age_info = self.extract_value_with_context(text, self.patterns['age'])
+            sex_info = self.extract_value_with_context(text, self.patterns['sex'])
+            dose_info = self.extract_value_with_context(text, self.patterns['oral_dose'])
+            max_conc_info = self.extract_value_with_context(text, self.patterns['theoretical_max'])
+            bioavail_info = self.extract_value_with_context(text, self.patterns['bioavailability'])
+            herg_info = self.extract_value_with_context(text, self.patterns['herg_ic50'])
+            plasma_info = self.extract_value_with_context(text, self.patterns['plasma_concentration'])
+            hr_info = self.extract_value_with_context(text, self.patterns['heart_rate'])
+            bp_info = self.extract_value_with_context(text, self.patterns['blood_pressure'])
+            
+            result = {
+                'title': paper.get('title', ''),
+                'year': paper.get('year', ''),
+                'abstract': paper.get('abstract', ''),
+                'full_text': paper.get('full_text', 'None'),
+                'age': age_info[0] if age_info else None,
+                'age_context': age_info[1] if age_info else None,
+                'sex': sex_info[0] if sex_info else None,
+                'sex_context': sex_info[1] if sex_info else None,
+                'oral_dose': dose_info[0] if dose_info else None,
+                'dose_context': dose_info[1] if dose_info else None,
+                'theoretical_max': max_conc_info[0] if max_conc_info else None,
+                'max_conc_context': max_conc_info[1] if max_conc_info else None,
+                'bioavailability': bioavail_info[0] if bioavail_info else None,
+                'bioavailability_context': bioavail_info[1] if bioavail_info else None,
+                'herg_ic50': herg_info[0] if herg_info else None,
+                'herg_context': herg_info[1] if herg_info else None,
+                'plasma_concentration': plasma_info[0] if plasma_info else None,
+                'plasma_context': plasma_info[1] if plasma_info else None,
+                'qt': qt_value,
+                'qt_context': qt_context,
+                'qt_source': qt_source,
+                'qtc': qtc_value,
+                'qtc_context': qtc_context,
+                'qtc_source': qt_source,
+                'heart_rate': hr_info[0] if hr_info else None,
+                'heart_rate_context': hr_info[1] if hr_info else None,
+                'tdp': 'Yes' if qt_analysis['tdp_mentions'] else 'No',
+                'tdp_context': qt_analysis['tdp_mentions'][0]['context'] if qt_analysis['tdp_mentions'] else None,
+                'blood_pressure': bp_info[0] if bp_info else None,
+                'blood_pressure_context': bp_info[1] if bp_info else None,
+                'medical_history': self.extract_value(text, self.patterns['medical_history']),
+                'medication_history': self.extract_value(text, self.patterns['medication_history']),
+                'treatment_course': self.extract_value(text, self.patterns['treatment_course'])
+            }
+            
+            # Add detailed QT analysis
+            result['detailed_qt_analysis'] = qt_analysis
+            
+            # Only return if we found some meaningful information
+            if any(v for v in result.values() if v not in (None, '', 'No')):
+                return result
             return None
-
+            
         except Exception as e:
             logger.error(f"Error analyzing paper: {str(e)}")
             return None
-
-    def _normalize_sex(self, sex_value: str) -> str:
-        """Normalize sex values to Male/Female."""
-        sex_value = sex_value.lower()
-        if any(m in sex_value for m in ['male', 'man', 'boy', 'm/']):
-            return 'Male'
-        elif any(f in sex_value for f in ['female', 'woman', 'girl', 'f/']):
-            return 'Female'
-        return sex_value.capitalize()
 
     def _extract_first_match(self, pattern, text):
         """Helper method to extract first regex match from text."""
