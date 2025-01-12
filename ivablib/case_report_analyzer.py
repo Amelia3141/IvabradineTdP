@@ -197,10 +197,8 @@ class CaseReportAnalyzer:
             
         match = pattern.search(text)
         if match:
-            value = next((g for g in match.groups() if g is not None), None)
-            if value:
-                context = self.get_smart_context(text, match.start(), match.end())
-                return value, context
+            # Return the first non-None group
+            return next((g for g in match.groups() if g is not None), None)
         return None
 
     def analyze_qt_comprehensive(self, text: str) -> Dict[str, Any]:
@@ -285,49 +283,52 @@ class CaseReportAnalyzer:
         """Analyze a list of papers and create a case report table."""
         results = []
         for paper in papers:
-            result = self.analyze_paper(paper)
-            if result:
-                results.append(result)
+            # Extract all the required fields using regex patterns
+            text = paper.get('full_text', '') + ' ' + paper.get('abstract', '')
+            
+            result = {
+                'Case Report Title': paper.get('title', ''),
+                'Age': self._extract_first_match(self.patterns['age'], text),
+                'Sex': self._extract_first_match(self.patterns['sex'], text),
+                'Oral Dose (mg)': self._extract_first_match(self.patterns['oral_dose'], text),
+                'theoretical max concentration (μM)': self._extract_first_match(self.patterns['theoretical_max'], text),
+                '40% bioavailability': self._extract_first_match(self.patterns['bioavailability'], text),
+                'Theoretical HERG IC50 / Concentration μM': self._extract_first_match(self.patterns['herg_ic50'], text),
+                '40% Plasma concentration': self._extract_first_match(self.patterns['plasma_concentration'], text),
+                'Uncorrected QT (ms)': self._extract_first_match(self.patterns['qt'], text),
+                'QTc': self._extract_first_match(self.patterns['qtc'], text),
+                'QTR': '',  # This seems to be calculated later
+                'QTF': '',  # This seems to be calculated later
+                'Heart Rate (bpm)': self._extract_first_match(self.patterns['heart_rate'], text),
+                'Torsades de Pointes?': 'Yes' if self.patterns['tdp'].search(text) else 'No',
+                'Blood Pressure (mmHg)': self._extract_first_match(self.patterns['blood_pressure'], text),
+                'Medical History': self._extract_first_match(self.patterns['medical_history'], text),
+                'Medication History': self._extract_first_match(self.patterns['medication_history'], text),
+                'Course of Treatment': self._extract_first_match(self.patterns['treatment_course'], text)
+            }
+            results.append(result)
         
-        # Create DataFrame with all required columns
+        # Create DataFrame
         df = pd.DataFrame(results)
         
-        # Ensure all required columns exist with proper formatting
-        required_columns = [
-            'Case Report Title',
-            'Authors',
-            'Year',
-            'Age',
-            'Sex',
-            'Oral Dose (mg)',
-            'QT (ms)',
-            'QTc (ms)',
-            'Heart Rate (bpm)',
-            'Blood Pressure',
-            'Medical History',
-            'Treatment Course',
-            'Outcome'
-        ]
-        
-        # Add missing columns with NaN values
-        for col in required_columns:
-            if col not in df.columns:
-                df[col] = pd.NA
-        
-        # Convert numeric columns
-        numeric_cols = ['Age', 'Oral Dose (mg)', 'QT (ms)', 'QTc (ms)', 'Heart Rate (bpm)']
-        for col in numeric_cols:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
-        
-        # Clean up text columns
-        text_cols = ['Medical History', 'Treatment Course', 'Outcome']
-        for col in text_cols:
-            df[col] = df[col].fillna('').astype(str).apply(lambda x: x.strip())
-        
-        # Reorder columns
-        df = df[required_columns]
+        # Ensure all columns exist
+        for col in df.columns:
+            if col not in df:
+                df[col] = ''
+                
+        # Fill NaN values
+        df = df.fillna('')
         
         return df
+
+    def _extract_first_match(self, pattern, text):
+        """Helper method to extract first regex match from text."""
+        match = pattern.search(text)
+        if match:
+            # Get the first non-None group
+            groups = [g for g in match.groups() if g is not None]
+            return groups[0] if groups else match.group(0)
+        return ''
 
     def analyze_paper(self, paper: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Analyze a single paper for case report information."""
