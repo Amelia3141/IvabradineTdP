@@ -515,56 +515,36 @@ def get_texts_parallel(pmids):
 def analyze_literature(drug_name):
     """Analyze literature for QT-related case reports."""
     try:
-        logger.info("Setting up NCBI credentials")
-        try:
-            import streamlit as st
-            Entrez.email = st.secrets["NCBI_EMAIL"]
-            Entrez.api_key = st.secrets["NCBI_API_KEY"]
-        except:
-            Entrez.email = os.environ.get('NCBI_EMAIL', 'your@email.com')
-            Entrez.api_key = os.environ.get('NCBI_API_KEY')
-        logger.info(f"Using email: {Entrez.email}")
-        logger.info("NCBI credentials set up")
+        logger.info(f"Starting literature analysis for {drug_name}")
         
-        # Get drug names
-        drug_names = get_drug_names(drug_name)
-        logger.info(f"Found {len(drug_names)} drug names for {drug_name}: {drug_names}")
-        
-        # Build search query
-        drug_terms = ' OR '.join([f'"{name}"[Title/Abstract]' for name in drug_names])
-        query = f'({drug_terms}) AND (hERG[Title/Abstract] OR QT[Title/Abstract] OR QTc[Title/Abstract] OR torsad*[Title/Abstract]) AND "Humans"[Mesh] AND ("Case Reports"[Publication Type])'
-        
-        logger.info(f"Searching PubMed: {query}")
-        
-        # Search PubMed
-        handle = Entrez.esearch(db="pubmed", term=query, retmax=100)
-        record = Entrez.read(handle)
-        handle.close()
-        logger.info("Got esearch handle")
-        
-        pmids = record["IdList"]
-        logger.info(f"Search returned {len(pmids)} results")
-        
-        if not pmids:
-            return {"papers": []}
+        # Search for papers
+        papers = search_pubmed_case_reports(drug_name)
+        if not papers:
+            logger.info(f"No papers found for {drug_name}")
+            return {
+                'case_reports': [],
+                'total_cases': 0,
+                'message': f"No case reports found for {drug_name}"
+            }
             
-        # Get paper details
-        papers = get_paper_details(pmids)
-        logger.info(f"Got {len(papers)} paper details")
-        
-        # Get full texts and extract information
-        papers = process_papers(papers)
-        logger.info(f"Processed {len(papers)} papers successfully")
-        
         # Get full texts
         papers = get_full_texts(papers)
-        logger.info(f"Got {len(papers)} full texts out of {len(pmids)} papers")
         
-        return {"papers": papers}
+        # Process papers
+        processed_papers = process_papers(papers)
+        
+        return {
+            'case_reports': processed_papers,
+            'total_cases': len(processed_papers)
+        }
         
     except Exception as e:
         logger.error(f"Error in analyze_literature: {str(e)}")
-        return {"error": str(e)}
+        return {
+            'error': f"Error analyzing literature: {str(e)}",
+            'case_reports': [],
+            'total_cases': 0
+        }
 
 def get_paper_details(pmids):
     """Get paper details from PubMed"""
@@ -698,7 +678,7 @@ def main():
         
     drug_name = sys.argv[1].upper()
     papers = analyze_literature(drug_name)
-    print(f"\nFound {len(papers['papers'])} papers")
+    print(f"\nFound {len(papers['case_reports'])} papers")
 
 if __name__ == "__main__":
     main()
