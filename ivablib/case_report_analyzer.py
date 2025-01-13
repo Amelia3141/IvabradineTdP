@@ -642,11 +642,11 @@ class CaseReportAnalyzer:
 
     def _extract_first_match(self, pattern, text):
         """Helper method to extract first regex match from text."""
-            match = pattern.search(text)
-            if match:
+        match = pattern.search(text)
+        if match:
             # Get the first non-None group
-                groups = [g for g in match.groups() if g is not None]
-                return groups[0] if groups else match.group(0)
+            groups = [g for g in match.groups() if g is not None]
+            return groups[0] if groups else match.group(0)
         return ''
 
 def analyze_papers(papers: List[Dict[str, Any]], drug_name: str) -> pd.DataFrame:
