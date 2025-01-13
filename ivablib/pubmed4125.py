@@ -6,7 +6,7 @@ import random
 from typing import List, Dict, Any, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
-from Bio import Entrez
+from Bio import Entrez, Medline
 import requests
 from bs4 import BeautifulSoup
 import PyPDF2
@@ -386,61 +386,78 @@ def build_pubmed_query(drug_names: List[str]) -> str:
     return query
 
 def search_pubmed_case_reports(drug_name: str) -> pd.DataFrame:
-    """Search PubMed for case reports about a drug"""
+    """Search PubMed for case reports about a drug."""
     try:
-        # Get all related drug names
-        drug_names = get_drug_names(drug_name)
-        logger.info(f"Found {len(drug_names)} drug names for {drug_name}: {drug_names}")
+        # Initialize Entrez
+        Entrez.email = os.getenv('NCBI_EMAIL')
+        Entrez.api_key = os.getenv('NCBI_API_KEY')
         
-        # Build search query
-        drug_query = ' OR '.join([f'"{name}"[Title/Abstract]' for name in drug_names])
-        query = f'({drug_query}) AND (hERG[Title/Abstract] OR QT[Title/Abstract] OR QTc[Title/Abstract] OR torsad*[Title/Abstract]) AND "Humans"[Mesh] AND ("Case Reports"[Publication Type])'
+        # Search PubMed
+        search_query = f"{drug_name}[Title/Abstract] AND (case report[Title/Abstract] OR case reports[Title/Abstract])"
+        handle = Entrez.esearch(db="pubmed", term=search_query, retmax=100)
+        record = Entrez.read(handle)
+        handle.close()
         
-        logger.info(f"Searching PubMed: {query}")
-        
-        try:
-            # Search PubMed
-            handle = Entrez.esearch(db="pubmed", term=query, retmax=100)
-            logger.info("Got esearch handle")
-            record = Entrez.read(handle)
-            logger.info(f"Search returned {len(record['IdList'])} results")
-            handle.close()
-            
-            if not record["IdList"]:
-                logger.info("No results found")
-                return pd.DataFrame()
-                
-            # Fetch details
-            logger.info(f"Fetching details for {len(record['IdList'])} papers")
-            handle = Entrez.efetch(db="pubmed", id=record["IdList"], 
-                                 rettype="xml", retmode="text")
-            records = Entrez.read(handle)
-            logger.info(f"Got {len(records['PubmedArticle'])} paper details")
-            handle.close()
-
-            results = []
-            for paper in records['PubmedArticle']:
-                try:
-                    paper_dict = {
-                        'PMID': paper['MedlineCitation']['PMID'],
-                        'Title': paper['MedlineCitation']['Article']['ArticleTitle'],
-                        'Abstract': paper['MedlineCitation']['Article'].get('Abstract', {}).get('AbstractText', [''])[0],
-                        'Year': paper['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate'].get('Year', '')
-                    }
-                    results.append(paper_dict)
-                except Exception as e:
-                    logger.error(f"Error processing paper: {e}")
-                    continue
-            
-            logger.info(f"Processed {len(results)} papers successfully")
-            return pd.DataFrame(results)
-            
-        except Exception as e:
-            logger.error(f"Error searching PubMed: {e}")
+        if not record['IdList']:
+            logger.warning(f"No results found for {drug_name}")
             return pd.DataFrame()
             
+        # Get paper details
+        handle = Entrez.efetch(db="pubmed", id=record['IdList'], rettype="medline", retmode="text")
+        records = Medline.parse(handle)
+        papers = []
+        
+        for record in records:
+            try:
+                # Get basic paper info
+                paper_dict = {
+                    'Case Report Title': record.get('TI', ''),
+                    'Abstract': record.get('AB', ''),
+                    'PMID': record.get('PMID', ''),
+                    'Year': record.get('DP', '').split()[0] if record.get('DP') else '',
+                    'Authors': '; '.join(record.get('AU', [])),  # Join author list
+                    'Journal': record.get('JT', ''),  # Full journal title
+                    'DOI': '',  # Will be filled by get_doi_from_crossref
+                    'PubMed URL': f"https://pubmed.ncbi.nlm.nih.gov/{record.get('PMID', '')}/",
+                    'Age': '',
+                    'Sex': '',
+                    'Oral Dose (mg)': '',
+                    'Uncorrected QT (ms)': '',
+                    'QTc': '',
+                    'Heart Rate (bpm)': '',
+                    'Blood Pressure (mmHg)': '',
+                    'Torsades de Pointes?': 'No',
+                    'Medical History': '',
+                    'Medication History': '',
+                    'Course of Treatment': '',
+                    'Source': '',
+                    'Text Length': ''
+                }
+                papers.append(paper_dict)
+            except Exception as e:
+                logger.error(f"Error processing paper: {e}")
+                continue
+                
+        handle.close()
+        
+        # Convert to DataFrame
+        df = pd.DataFrame(papers)
+        
+        # Get DOIs using Crossref
+        for idx, row in df.iterrows():
+            try:
+                if row['PMID']:
+                    doi = get_doi_from_crossref(row['PMID'])
+                    if doi:
+                        df.at[idx, 'DOI'] = doi
+            except Exception as e:
+                logger.error(f"Error getting DOI for {row['PMID']}: {e}")
+                continue
+        
+        return df
+        
     except Exception as e:
-        logger.error(f"Error in search_pubmed: {e}")
+        logger.error(f"Error in search_pubmed_case_reports: {e}")
         return pd.DataFrame()
 
 def _search_pubmed(query: str) -> List[Dict]:
