@@ -30,37 +30,40 @@ Entrez.api_key = os.environ.get('NCBI_API_KEY')
 logger.info(f"Using email: {Entrez.email}")
 logger.info("NCBI credentials set up")
 
-def get_full_text(pmid: str, doi=None) -> Optional[Tuple[str, str]]:
+def get_full_text(pmid: str) -> Optional[str]:
     """Get full text for a paper using multiple methods."""
     try:
         # Try PMC first
         pmc_id = get_pmcid_from_pmid(pmid)
         if pmc_id:
+            logger.info(f"Found PMC ID for {pmid}: {pmc_id}")
             text = get_pmc_text(pmc_id)
             if text and len(text) > 500:
-                logger.info(f"Successfully got text from PMC for {pmid}")
-                return text, 'PMC'
+                logger.info(f"Got {len(text)} chars from PMC for {pmid}")
+                return text
         
         # Try Crossref next
+        doi = get_doi_from_crossref(pmid)
         if doi:
+            logger.info(f"Found DOI for {pmid}: {doi}")
             text = get_crossref_text(doi)
             if text and len(text) > 500:
-                logger.info(f"Successfully got text from Crossref for {pmid}")
-                return text, 'Crossref'
+                logger.info(f"Got {len(text)} chars from Crossref for {pmid}")
+                return text
         
         # Try Sci-Hub as last resort
         logger.info(f"Trying Sci-Hub for {pmid}")
-        text = get_scihub_text(pmid, doi)
+        text = get_scihub_text(pmid)
         if text and len(text) > 500:
-            logger.info(f"Successfully got text from Sci-Hub for {pmid}")
-            return text, 'Sci-Hub'
+            logger.info(f"Got {len(text)} chars from Sci-Hub for {pmid}")
+            return text
             
         logger.warning(f"Could not get full text for {pmid} from any source")
-        return None, None
+        return None
         
     except Exception as e:
         logger.error(f"Error getting full text for {pmid}: {e}")
-        return None, None
+        return None
 
 def get_pmcid_from_pmid(pmid):
     """Convert PMID to PMCID using NCBI's ID converter."""
@@ -247,96 +250,75 @@ def get_crossref_text(doi: str) -> Optional[str]:
         logger.error(f"Error in get_crossref_text: {e}")
         return None
 
-def get_scihub_text(pmid, doi=None):
+def get_scihub_text(pmid: str) -> Optional[str]:
     """Get full text from Sci-Hub."""
     try:
         # Only use .se domain
-        scihub_domains = ['https://sci-hub.se']
+        domain = 'https://sci-hub.se'
         
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5'
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
         }
         
         # Add initial delay
         delay = random.uniform(5, 10)
-        logger.info(f"Waiting {delay:.1f}s before starting Sci-Hub request")
+        logger.info(f"Waiting {delay:.1f}s before Sci-Hub request")
         time.sleep(delay)
         
-        for domain in scihub_domains:
+        url = f"{domain}/pubmed/{pmid}"
+        logger.info(f"Trying Sci-Hub URL: {url}")
+        
+        response = requests.get(url, headers=headers, timeout=30, verify=False)
+        if response.status_code != 200:
+            logger.warning(f"Got status code {response.status_code} from Sci-Hub")
+            return None
+            
+        soup = BeautifulSoup(response.text, 'html.parser')
+        iframe = soup.find('iframe', {'id': 'pdf'})
+        
+        if not iframe:
+            logger.warning("No PDF iframe found on Sci-Hub")
+            return None
+            
+        pdf_url = iframe.get('src', '')
+        if not pdf_url:
+            logger.warning("No PDF URL found in iframe")
+            return None
+            
+        if not pdf_url.startswith('http'):
+            pdf_url = urljoin(domain, pdf_url)
+        
+        # Add delay before PDF request
+        delay = random.uniform(5, 10)
+        logger.info(f"Waiting {delay:.1f}s before PDF request")
+        time.sleep(delay)
+        
+        logger.info(f"Downloading PDF from: {pdf_url}")
+        pdf_response = requests.get(pdf_url, headers=headers, timeout=30, verify=False)
+        
+        if pdf_response.status_code == 200:
             try:
-                logger.info(f"Trying Sci-Hub domain: {domain}")
-                
-                # Try DOI first if available, then PMID
-                if doi:
-                    url = f"{domain}/{doi}"
+                pdf_file = io.BytesIO(pdf_response.content)
+                pdf_reader = PyPDF2.PdfReader(pdf_file)
+                text = ""
+                for page in pdf_reader.pages:
+                    text += page.extract_text()
+                text = text.strip()
+                if len(text) > 500:
+                    logger.info(f"Got {len(text)} chars from PDF")
+                    return text
                 else:
-                    url = f"{domain}/pubmed/{pmid}"
-                
-                # Longer delay between domains
-                delay = random.uniform(8, 15)
-                logger.info(f"Waiting {delay:.1f}s before next attempt")
-                time.sleep(delay)
-                
-                response = requests.get(url, headers=headers, timeout=30, verify=False)
-                if response.status_code != 200:
-                    logger.warning(f"Got status code {response.status_code} from {domain}")
-                    continue
-                    
-                soup = BeautifulSoup(response.text, 'html.parser')
-                
-                # First try to get text directly from the page
-                article_text = soup.find('div', {'id': 'pdf'}) or soup.find('embed', {'id': 'pdf'})
-                if article_text:
-                    text = article_text.get_text(separator=' ', strip=True)
-                    if len(text) > 500:
-                        logger.info(f"Got {len(text)} chars directly from page")
-                        return text
-                
-                # Look for embedded PDF
-                pdf_iframe = soup.find('iframe', {'id': 'pdf'}) or soup.find('embed', {'id': 'pdf'})
-                if pdf_iframe and 'src' in pdf_iframe.attrs:
-                    pdf_url = pdf_iframe['src']
-                    if not pdf_url.startswith('http'):
-                        pdf_url = urljoin(domain, pdf_url) if pdf_url.startswith('/') else f"https:{pdf_url}"
-                    
-                    logger.info(f"Found PDF at {pdf_url}")
-                    
-                    # Add longer delay before PDF download
-                    delay = random.uniform(5, 10)
-                    logger.info(f"Waiting {delay:.1f}s before PDF request")
-                    time.sleep(delay)
-                    
-                    logger.info(f"Downloading PDF from: {pdf_url}")
-                    pdf_response = requests.get(pdf_url, headers=headers, timeout=30, verify=False)
-                    
-                    if pdf_response.status_code == 200:
-                        try:
-                            pdf_file = io.BytesIO(pdf_response.content)
-                            pdf_reader = PyPDF2.PdfReader(pdf_file)
-                            text = ""
-                            for page in pdf_reader.pages:
-                                text += page.extract_text()
-                            text = text.strip()
-                            if len(text) > 500:
-                                logger.info(f"Got {len(text)} chars from PDF")
-                                return text
-                        except Exception as e:
-                            logger.error(f"Error extracting PDF text: {e}")
-                            continue
-                    else:
-                        logger.warning(f"Got status code {pdf_response.status_code} for PDF")
-                    
+                    logger.warning(f"PDF text too short: {len(text)} chars")
             except Exception as e:
-                logger.error(f"Error with {domain}: {e}")
-                continue
-                
-        logger.warning(f"Could not get text from any Sci-Hub domain for {pmid}")
+                logger.error(f"Error extracting PDF text: {e}")
+        else:
+            logger.warning(f"Got status code {pdf_response.status_code} for PDF")
+            
         return None
         
     except Exception as e:
-        logger.error(f"Error in Sci-Hub retrieval: {e}")
+        logger.error(f"Error in get_scihub_text: {e}")
         return None
 
 def get_drug_names(drug_name: str) -> List[str]:
@@ -538,37 +520,43 @@ def format_pubmed_results(records: List[Dict]) -> pd.DataFrame:
             
     return pd.DataFrame(results)
 
-def get_texts_parallel(pmids: List[str]) -> List[Dict[str, Any]]:
-    """Get full texts for multiple PMIDs in parallel using ThreadPoolExecutor."""
+def process_papers(pmids: List[str]) -> List[Dict]:
+    """Process a list of papers in parallel."""
     try:
         with ThreadPoolExecutor(max_workers=4) as executor:
             futures = []
             for pmid in pmids:
                 future = executor.submit(get_full_text, pmid)
                 futures.append((pmid, future))
-            
+                
             texts = []
             for pmid, future in futures:
                 try:
-                    text, source = future.result(timeout=300)  # 5 minute timeout per paper
-                    texts.append({
-                        'pmid': pmid,
-                        'full_text': text,
-                        'source': source
-                    })
+                    text = future.result(timeout=300)  # 5 minute timeout per paper
+                    if text and len(text) > 500:
+                        logger.info(f"Got {len(text)} chars for {pmid}")
+                        texts.append({
+                            'pmid': pmid,
+                            'full_text': text
+                        })
+                    else:
+                        logger.warning(f"No substantial text for {pmid}")
+                        texts.append({
+                            'pmid': pmid,
+                            'full_text': None
+                        })
                 except Exception as e:
-                    logger.error(f"Error getting text for {pmid}: {e}")
+                    logger.error(f"Error processing {pmid}: {e}")
                     texts.append({
                         'pmid': pmid,
-                        'full_text': None,
-                        'source': None
+                        'full_text': None
                     })
             
-        logger.info(f"Got {len(texts)} full texts out of {len(pmids)} papers")
+        logger.info(f"Retrieved {len(texts)} full texts")
         return texts
         
     except Exception as e:
-        logger.error(f"Error in get_texts_parallel: {e}")
+        logger.error(f"Error in process_papers: {e}")
         return []
 
 def analyze_literature(drug_name: str) -> pd.DataFrame:
@@ -595,8 +583,8 @@ def analyze_literature(drug_name: str) -> pd.DataFrame:
         pmids = df['PMID'].tolist()
         logger.info(f"Found {len(pmids)} papers to analyze")
         
-        # Get texts in parallel
-        case_reports = get_texts_parallel(pmids)
+        # Process papers in parallel
+        case_reports = process_papers(pmids)
         logger.info(f"Retrieved {len(case_reports)} full texts")
         
         # Analyze each case report
@@ -604,7 +592,6 @@ def analyze_literature(drug_name: str) -> pd.DataFrame:
             try:
                 pmid = report['pmid']
                 text = report.get('full_text', '')
-                source = report.get('source', '')
                 
                 if text and len(text) > 100:  # Ensure substantial text
                     logger.info(f"Text length for {pmid}: {len(text)} characters")
