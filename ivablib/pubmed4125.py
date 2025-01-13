@@ -405,8 +405,13 @@ def search_pubmed_case_reports(drug_name: str) -> pd.DataFrame:
         Entrez.email = os.getenv('NCBI_EMAIL')
         Entrez.api_key = os.getenv('NCBI_API_KEY')
         
+        # Get all drug name variants
+        drug_names = get_drug_names(drug_name)
+        
+        # Build search query with cardiac terms
+        search_query = build_pubmed_query(drug_names)
+        
         # Search PubMed
-        search_query = f"{drug_name}[Title/Abstract] AND (case report[Title/Abstract] OR case reports[Title/Abstract])"
         handle = Entrez.esearch(db="pubmed", term=search_query, retmax=100)
         record = Entrez.read(handle)
         handle.close()
