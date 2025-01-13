@@ -30,58 +30,37 @@ Entrez.api_key = os.environ.get('NCBI_API_KEY')
 logger.info(f"Using email: {Entrez.email}")
 logger.info("NCBI credentials set up")
 
-def get_full_text(pmid, doi=None):
-    """Get full text from PMC, Crossref, or Sci-Hub in that order."""
-    text = None
-    source = None
-    logger.info(f"Attempting to get full text for PMID {pmid}, DOI {doi}")
-
-    # Try PMC first
+def get_full_text(pmid: str, doi=None) -> Optional[Tuple[str, str]]:
+    """Get full text for a paper using multiple methods."""
     try:
+        # Try PMC first
         pmc_id = get_pmcid_from_pmid(pmid)
-        logger.info(f"PMC ID for {pmid}: {pmc_id}")
         if pmc_id:
             text = get_pmc_text(pmc_id)
-            if text:
-                source = 'PMC'
+            if text and len(text) > 500:
                 logger.info(f"Successfully got text from PMC for {pmid}")
-                return text, source
-            else:
-                logger.info(f"No text found in PMC for {pmid}")
-    except Exception as e:
-        logger.error(f"Error getting PMC text for {pmid}: {e}")
-
-    # Try Crossref next if we have a DOI
-    if doi:
-        try:
-            logger.info(f"Trying Crossref for {pmid} with DOI {doi}")
-            crossref_text = get_crossref_text(doi)
-            if crossref_text:
-                text = crossref_text
-                source = 'Crossref'
+                return text, 'PMC'
+        
+        # Try Crossref next
+        if doi:
+            text = get_crossref_text(doi)
+            if text and len(text) > 500:
                 logger.info(f"Successfully got text from Crossref for {pmid}")
-                return text, source
-            else:
-                logger.info(f"No text found in Crossref for {pmid}")
-        except Exception as e:
-            logger.error(f"Error getting Crossref text for {doi}: {e}")
-
-    # Finally try Sci-Hub
-    try:
+                return text, 'Crossref'
+        
+        # Try Sci-Hub as last resort
         logger.info(f"Trying Sci-Hub for {pmid}")
-        scihub_text = get_scihub_text(pmid, doi)
-        if scihub_text:
-            text = scihub_text
-            source = 'Sci-Hub'
+        text = get_scihub_text(pmid, doi)
+        if text and len(text) > 500:
             logger.info(f"Successfully got text from Sci-Hub for {pmid}")
-            return text, source
-        else:
-            logger.info(f"No text found in Sci-Hub for {pmid}")
+            return text, 'Sci-Hub'
+            
+        logger.warning(f"Could not get full text for {pmid} from any source")
+        return None, None
+        
     except Exception as e:
-        logger.error(f"Error getting Sci-Hub text for {pmid}: {e}")
-
-    logger.warning(f"Could not get full text for {pmid} from any source")
-    return text, source
+        logger.error(f"Error getting full text for {pmid}: {e}")
+        return None, None
 
 def get_pmcid_from_pmid(pmid):
     """Convert PMID to PMCID using NCBI's ID converter."""
@@ -95,74 +74,73 @@ def get_pmcid_from_pmid(pmid):
         logger.error(f"Error converting PMID to PMCID: {e}")
     return None
 
-def get_pmc_text(pmcid):
+def get_pmc_text(pmcid: str) -> Optional[str]:
     """Get full text from PMC."""
     try:
+        # Construct PMC URL
         url = f"https://www.ncbi.nlm.nih.gov/pmc/articles/{pmcid}/"
+        
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
-        response = requests.get(url, headers=headers)
+        
+        response = requests.get(url, headers=headers, timeout=30)
+        if response.status_code != 200:
+            logger.warning(f"Got status code {response.status_code} from PMC")
+            return None
+            
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # Try multiple possible content containers in order
-        article_text = None
+        # Find the main article content
+        article = soup.find('div', {'class': 'jig-ncbiinpagenav'})
+        if not article:
+            article = soup.find('article')
+        if not article:
+            article = soup.find('div', {'class': 'article'})
         
-        # First try the main article content
-        content = soup.find('article')
-        if content:
-            # Only remove specific sections that aren't part of the main text
-            for div in content.find_all(['div', 'section'], {'class': ['ref-list', 'copyright']}):
-                div.decompose()
-            article_text = content
+        if not article:
+            logger.warning("Could not find article content in PMC")
+            return None
+            
+        # Extract text, preserving some structure
+        text_parts = []
         
-        # If no article tag, try other containers
-        if not article_text:
-            selectors = [
-                ('div', {'class': 'jig-ncbiinpagenav'}),
-                ('div', {'id': 'mc'}),
-                ('div', {'class': 'article-body'}),
-                ('div', {'id': 'body'}),
-                ('div', {'class': 'content'}),
-                ('div', {'class': 'article'})
-            ]
+        # Get title
+        title = soup.find('h1', {'class': 'content-title'})
+        if title:
+            text_parts.append(title.get_text())
             
-            for tag, attrs in selectors:
-                content = soup.find(tag, attrs)
-                if content:
-                    # Only remove specific sections
-                    for div in content.find_all(['div', 'section'], {'class': ['ref-list', 'copyright']}):
-                        div.decompose()
-                    article_text = content
-                    break
+        # Get abstract
+        abstract = soup.find('div', {'class': 'abstract'})
+        if abstract:
+            text_parts.append(abstract.get_text())
+            
+        # Get main content sections
+        sections = article.find_all(['div', 'section'], {'class': ['section', 'sec']})
+        for section in sections:
+            # Get section title
+            section_title = section.find(['h2', 'h3', 'h4'])
+            if section_title:
+                text_parts.append(section_title.get_text())
+            
+            # Get paragraphs
+            paragraphs = section.find_all('p')
+            for p in paragraphs:
+                text_parts.append(p.get_text())
+                
+        text = '\n\n'.join(text_parts)
+        text = ' '.join(text.split())  # Normalize whitespace
         
-        if article_text:
-            # Extract text while preserving some structure
-            paragraphs = []
-            for p in article_text.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']):
-                text = p.get_text(strip=True)
-                if text:  # Only add non-empty paragraphs
-                    paragraphs.append(text)
+        if len(text) > 500:
+            logger.info(f"Successfully extracted {len(text)} characters from PMC")
+            return text
+        else:
+            logger.warning(f"PMC text too short: {len(text)} chars")
+            return None
             
-            # Join paragraphs with newlines to preserve structure
-            text = '\n'.join(paragraphs)
-            
-            # Clean up the text
-            text = ' '.join(text.split())  # Remove excessive whitespace
-            text = text.replace('- ', '')  # Remove hyphenation
-            
-            if len(text) > 500:  # Only return if we got substantial text
-                logger.info(f"Successfully extracted {len(text)} characters from PMC")
-                return text
-            else:
-                logger.warning("PMC text too short, might be incomplete")
-            
-        logger.warning("No article text found in PMC")
-        
     except Exception as e:
         logger.error(f"Error getting PMC text: {e}")
-    return None
+        return None
 
 def get_crossref_text(doi: str) -> Optional[str]:
     """Get full text using DOI from Crossref."""
@@ -272,30 +250,21 @@ def get_crossref_text(doi: str) -> Optional[str]:
 def get_scihub_text(pmid, doi=None):
     """Get full text from Sci-Hub."""
     try:
-        # Try multiple Sci-Hub domains (removed .ru due to 403 errors)
-        domains = [
-            'https://sci-hub.st',
-            'https://sci-hub.se',
-            'https://sci-hub.wf',
-            'https://sci-hub.cat'
-        ]
+        # Only use .se domain
+        scihub_domains = ['https://sci-hub.se']
         
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1'
+            'Accept-Language': 'en-US,en;q=0.5'
         }
         
-        session = requests.Session()
-        session.headers.update(headers)
-        session.verify = False  # Disable SSL verification
+        # Add initial delay
+        delay = random.uniform(5, 10)
+        logger.info(f"Waiting {delay:.1f}s before starting Sci-Hub request")
+        time.sleep(delay)
         
-        # Initial delay before starting
-        time.sleep(random.uniform(5, 10))
-        
-        for domain in domains:
+        for domain in scihub_domains:
             try:
                 logger.info(f"Trying Sci-Hub domain: {domain}")
                 
@@ -306,15 +275,13 @@ def get_scihub_text(pmid, doi=None):
                     url = f"{domain}/pubmed/{pmid}"
                 
                 # Longer delay between domains
-                time.sleep(random.uniform(8, 15))
+                delay = random.uniform(8, 15)
+                logger.info(f"Waiting {delay:.1f}s before next attempt")
+                time.sleep(delay)
                 
-                response = session.get(url, timeout=30)
+                response = requests.get(url, headers=headers, timeout=30, verify=False)
                 if response.status_code != 200:
                     logger.warning(f"Got status code {response.status_code} from {domain}")
-                    continue
-                
-                if 'location not found' in response.text.lower() or 'article not found' in response.text.lower():
-                    logger.info(f"Paper not found on {domain}")
                     continue
                     
                 soup = BeautifulSoup(response.text, 'html.parser')
@@ -337,27 +304,34 @@ def get_scihub_text(pmid, doi=None):
                     logger.info(f"Found PDF at {pdf_url}")
                     
                     # Add longer delay before PDF download
-                    time.sleep(random.uniform(5, 10))
+                    delay = random.uniform(5, 10)
+                    logger.info(f"Waiting {delay:.1f}s before PDF request")
+                    time.sleep(delay)
                     
-                    # Download PDF
-                    pdf_response = session.get(pdf_url, timeout=30)
-                    if pdf_response.headers.get('content-type', '').lower() == 'application/pdf':
-                        pdf_file = io.BytesIO(pdf_response.content)
-                        pdf_reader = PyPDF2.PdfReader(pdf_file)
-                        text = ""
-                        for page in pdf_reader.pages:
-                            text += page.extract_text()
-                        text = text.strip()
-                        if len(text) > 500:
-                            logger.info(f"Got {len(text)} chars from PDF")
-                            return text
-                        else:
-                            logger.warning(f"PDF text too short ({len(text)} chars)")
-                
+                    logger.info(f"Downloading PDF from: {pdf_url}")
+                    pdf_response = requests.get(pdf_url, headers=headers, timeout=30, verify=False)
+                    
+                    if pdf_response.status_code == 200:
+                        try:
+                            pdf_file = io.BytesIO(pdf_response.content)
+                            pdf_reader = PyPDF2.PdfReader(pdf_file)
+                            text = ""
+                            for page in pdf_reader.pages:
+                                text += page.extract_text()
+                            text = text.strip()
+                            if len(text) > 500:
+                                logger.info(f"Got {len(text)} chars from PDF")
+                                return text
+                        except Exception as e:
+                            logger.error(f"Error extracting PDF text: {e}")
+                            continue
+                    else:
+                        logger.warning(f"Got status code {pdf_response.status_code} for PDF")
+                    
             except Exception as e:
-                logger.error(f"Error with domain {domain}: {e}")
+                logger.error(f"Error with {domain}: {e}")
                 continue
-        
+                
         logger.warning(f"Could not get text from any Sci-Hub domain for {pmid}")
         return None
         
@@ -576,16 +550,18 @@ def get_texts_parallel(pmids: List[str]) -> List[Dict[str, Any]]:
             texts = []
             for pmid, future in futures:
                 try:
-                    text = future.result(timeout=300)  # 5 minute timeout per paper
+                    text, source = future.result(timeout=300)  # 5 minute timeout per paper
                     texts.append({
                         'pmid': pmid,
-                        'full_text': text
+                        'full_text': text,
+                        'source': source
                     })
                 except Exception as e:
                     logger.error(f"Error getting text for {pmid}: {e}")
                     texts.append({
                         'pmid': pmid,
-                        'full_text': None
+                        'full_text': None,
+                        'source': None
                     })
             
         logger.info(f"Got {len(texts)} full texts out of {len(pmids)} papers")
@@ -628,6 +604,7 @@ def analyze_literature(drug_name: str) -> pd.DataFrame:
             try:
                 pmid = report['pmid']
                 text = report.get('full_text', '')
+                source = report.get('source', '')
                 
                 if text and len(text) > 100:  # Ensure substantial text
                     logger.info(f"Text length for {pmid}: {len(text)} characters")
