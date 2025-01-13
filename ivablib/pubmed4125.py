@@ -14,6 +14,7 @@ import random
 import re
 import csv
 import sys
+from .case_report_analyzer import CaseReportAnalyzer
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -603,84 +604,42 @@ def get_texts_parallel(pmids):
     logger.info(f"Got {len(texts)} full texts out of {len(pmids)} papers")
     return texts
 
-def analyze_literature(drug_name: str) -> pd.DataFrame:
-    """Analyze literature for a given drug."""
+def analyze_literature(pmids: List[str], drug_name: str) -> pd.DataFrame:
+    """Analyze literature for case reports."""
     try:
-        # Get drug names (including synonyms)
-        drug_names = get_drug_names(drug_name)
-        logger.info(f"Searching for drug names: {drug_names}")
+        # Initialize analyzer
+        analyzer = CaseReportAnalyzer()
         
-        # Search PubMed
-        df = search_pubmed_case_reports(drug_name)
-        if df.empty:
-            logger.warning("No results found in PubMed")
-            return pd.DataFrame()
-            
-        # Get PMIDs
-        pmids = df['PMID'].tolist()
-        logger.info(f"Found {len(pmids)} papers to analyze")
+        # Get full texts
+        papers = get_texts_parallel(pmids)
+        logger.info(f"Retrieved {len(papers)} full texts")
         
-        # Get texts in parallel
-        texts = get_texts_parallel(pmids)
-        logger.info(f"Retrieved {len(texts)} full texts")
-        
-        # Analyze each case report
-        for pmid, text in texts.items():
+        # Analyze each paper
+        results = []
+        for pmid, text in papers.items():
             try:
                 if text:
-                    # Get abstract from DataFrame
-                    abstract = df.loc[df['PMID'] == pmid, 'Abstract'].iloc[0]
-                    combined_text = text + ' ' + (abstract if abstract else '')
-                    logger.info(f"Text length for {pmid}: {len(combined_text)} characters")
-                    
-                    analyzer = CaseReportAnalyzer()
-                    analyzed = analyzer.analyze(combined_text)
-                    
-                    # Update DataFrame with analyzed fields
-                    idx = df.index[df['PMID'] == pmid][0]
-                    df.loc[idx, 'Age'] = analyzed.get('age', '')
-                    df.loc[idx, 'Sex'] = analyzed.get('sex', '')
-                    df.loc[idx, 'Oral Dose (mg)'] = analyzed.get('oral_dose_value', '')
-                    df.loc[idx, 'Uncorrected QT (ms)'] = analyzed.get('qt_value', '')
-                    df.loc[idx, 'QTc'] = analyzed.get('qtc_value', '')
-                    df.loc[idx, 'Heart Rate (bpm)'] = analyzed.get('heart_rate_value', '')
-                    df.loc[idx, 'Blood Pressure (mmHg)'] = analyzed.get('blood_pressure_value', '')
-                    df.loc[idx, 'Torsades de Pointes?'] = 'Yes' if analyzed.get('tdp_present', False) else 'No'
-                    df.loc[idx, 'Medical History'] = analyzed.get('medical_history', '')
-                    df.loc[idx, 'Medication History'] = analyzed.get('medication_history', '')
-                    df.loc[idx, 'Course of Treatment'] = analyzed.get('treatment_course', '')
-                    
-                    # Log what was found
-                    found_fields = {k: v for k, v in analyzed.items() if v}
-                    logger.info(f"Found fields for {pmid}: {found_fields}")
+                    logger.info(f"Text length for {pmid}: {len(text)} characters")
+                result = analyzer.analyze_paper({'PMID': pmid, 'FullText': text})
+                if result:
+                    results.append(result)
+                else:
+                    logger.warning(f"No results for paper {pmid}")
             except Exception as e:
-                logger.error(f"Error analyzing paper {pmid}: {e}")
+                logger.error(f"Error analyzing paper {pmid}: {str(e)}")
                 continue
         
-        # Sort by year descending
-        df = df.sort_values('Year', ascending=False)
-        
-        # Reorder columns to match the image
-        columns = [
-            'Case Report Title', 'Age', 'Sex', 'Oral Dose (mg)',
-            'theoretical max concentration (μM)', '40% bioavailability',
-            'Theoretical HERG IC50 / Concentration μM', '40% Plasma concentration',
-            'Uncorrected QT (ms)', 'QTc', 'QTR', 'QTF', 'Heart Rate (bpm)',
-            'Torsades de Pointes?', 'Blood Pressure (mmHg)',
-            'Medical History', 'Medication History', 'Course of Treatment'
-        ]
-        
-        # Make sure all columns exist
-        for col in columns:
-            if col not in df.columns:
-                df[col] = ''
-                
-        df = df[columns]
-        logger.info(f"Final dataframe has {len(df)} rows and columns: {df.columns.tolist()}")
-        return df
-        
+        # Create DataFrame
+        if results:
+            df = pd.DataFrame(results)
+            logger.info(f"Final dataframe has {len(df)} rows and columns: {list(df.columns)}")
+            return df
+        else:
+            logger.warning("No results to create DataFrame")
+            return pd.DataFrame()
+            
     except Exception as e:
-        logger.error(f"Error in analyze_literature: {e}")
+        logger.error(f"Error in analyze_literature: {str(e)}")
         return pd.DataFrame()
 
 def main():
@@ -689,7 +648,7 @@ def main():
         sys.exit(1)
         
     drug_name = sys.argv[1].upper()
-    papers = analyze_literature(drug_name)
+    papers = analyze_literature([], drug_name)
     print(f"\nFound {len(papers)} papers")
 
 if __name__ == "__main__":

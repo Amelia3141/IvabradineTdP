@@ -2,8 +2,8 @@
 
 import re
 import logging
+from typing import Dict, Any, Optional, List, Tuple
 import pandas as pd
-from typing import List, Dict, Any, Optional, Tuple
 import os
 import PyPDF2
 
@@ -32,7 +32,7 @@ class CaseReportAnalyzer:
                     (?:orally|po|by\s+mouth|per\s+os)
                 )
                 \s*
-                (?:with|at|of|a|total|daily|once|twice|thrice|[1-4]x|q\.?d|bid|tid|qid)?\s*
+                (?:with|at|of|a|total|daily|once|twice|thrice|[1-4]x|q\.?d|bid|tid|qid|per\s+day|/day)?\s*
                 (?:dose\s+of\s+)?
                 (\d+\.?\d*)\s*
                 (?:mg|milligrams?|g|grams?|mcg|micrograms?|µg)
@@ -343,20 +343,38 @@ class CaseReportAnalyzer:
                 matches = list(pattern.finditer(cleaned_text))
                 if matches:
                     if field == 'tdp':
-                        tdp_contexts = [self.get_smart_context(cleaned_text, m.start(), m.end()) for m in matches]
-                        # Check if any context indicates negation
-                        has_tdp = False
-                        for context in tdp_contexts:
-                            if not any(neg in context.lower() for neg in ['no', 'not', 'without', 'negative for', 'absence of']):
-                                has_tdp = True
-                                break
-                        results['tdp_present'] = 'Yes' if has_tdp else 'No'
-                        results['tdp_context'] = tdp_contexts[0] if tdp_contexts else ''
+                        # First check title for TdP mention
+                        title = text.split('\n')[0]
+                        title_has_tdp = bool(pattern.search(title))
+                        
+                        # Then check content
+                        matches = list(pattern.finditer(cleaned_text))
+                        if matches or title_has_tdp:
+                            tdp_contexts = []
+                            if title_has_tdp:
+                                tdp_contexts.append(f"Title: {title}")
+                            tdp_contexts.extend([self.get_smart_context(cleaned_text, m.start(), m.end()) for m in matches])
+                            
+                            # Check for negation, but title mention overrides negation
+                            has_tdp = title_has_tdp
+                            if not has_tdp:
+                                for context in tdp_contexts:
+                                    # Skip title context for negation check
+                                    if context.startswith('Title:'):
+                                        continue
+                                    # More thorough negation check
+                                    words_before = context.split('torsade')[0].lower()
+                                    if not any(neg in words_before.split() for neg in ['no', 'not', 'without', 'negative', 'absence']):
+                                        has_tdp = True
+                                        break
+                            
+                            results['tdp_present'] = 'Yes' if has_tdp else 'No'
+                            results['tdp_context'] = ' | '.join(tdp_contexts)
                     elif field == 'oral_dose':
                         # Use the first match for dosing info
                         match = matches[0]
                         dose_text = match.group(0)
-                        value_match = re.search(r'(\d+(?:\.\d+)?)', dose_text)
+                        value_match = re.search(r'(\d+\.?\d*)', dose_text)
                         unit_match = re.search(r'(mg|milligrams?|g|grams?|mcg|micrograms?|µg)', dose_text, re.IGNORECASE)
                         freq_match = re.search(r'(daily|once|twice|thrice|[1-4]x|q\.?d|bid|tid|qid|per\s+day|/day)', dose_text, re.IGNORECASE)
                         
@@ -589,224 +607,37 @@ class CaseReportAnalyzer:
     def analyze_paper(self, paper: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Analyze a single paper for case report information."""
         try:
-            # Get text from full text if available, otherwise use title and abstract
-            text = paper.get('full_text', '')
-            if not text:
-                text = f"{paper.get('title', '')} {paper.get('abstract', '')}"
+            # Extract text from paper
+            title = paper.get('Title', '')
+            abstract = paper.get('Abstract', '')
+            full_text = paper.get('FullText', '')
             
-            # Skip if no meaningful text to analyze
+            # Combine text, but keep track of sections
+            text_sections = []
+            if title:
+                text_sections.append(f"TITLE: {title}")
+            if abstract:
+                text_sections.append(f"ABSTRACT: {abstract}")
+            if full_text:
+                text_sections.append(f"FULL TEXT: {full_text}")
+                
+            text = "\n\n".join(text_sections)
+            
             if not text.strip():
-                logger.warning(f"No text content found for paper {paper.get('PMID', 'Unknown')}")
-                return {}
-
-            # Clean text
-            text = self._clean_text(text)
+                logger.warning(f"No text available for paper {paper.get('PMID', 'Unknown PMID')}")
+                return None
+                
+            # Store original title for reference
+            result = {'title': title}
             
-            # Extract values with context
-            result = {
-                'title': paper.get('Title', ''),
-                'pmid': paper.get('PMID', ''),
-                'doi': paper.get('DOI', '')
-            }
-
-            # Extract demographic info
-            age_match = self._extract_with_context(text, self.patterns['age'])
-            result['age'] = age_match[0] if age_match else None
-            result['age_context'] = age_match[1] if age_match else None
-
-            sex_match = self._extract_with_context(text, self.patterns['sex'])
-            result['sex'] = self._clean_sex(sex_match[0]) if sex_match else None
-            result['sex_context'] = sex_match[1] if sex_match else None
-
-            # Extract dosing info
-            dose_match = self._extract_with_context(text, self.patterns['oral_dose'])
-            if dose_match:
-                result['oral_dose_value'] = self._extract_numeric(dose_match[0])
-                result['oral_dose_unit'] = self._extract_unit(dose_match[0])
-                result['oral_dose_freq'] = self._extract_frequency(dose_match[0])
-                result['oral_dose_context'] = dose_match[1]
-
-            # Extract ECG measurements
-            qt_match = self._extract_with_context(text, self.patterns['qt'])
-            if qt_match:
-                result['qt_value'] = self._extract_numeric(qt_match[0])
-                result['qt_context'] = qt_match[1]
-
-            qtc_match = self._extract_with_context(text, self.patterns['qtc'])
-            if qtc_match:
-                result['qtc_value'] = self._extract_numeric(qtc_match[0])
-                result['qtc_context'] = qtc_match[1]
-
-            # Extract vital signs
-            hr_match = self._extract_with_context(text, self.patterns['heart_rate'])
-            if hr_match:
-                result['heart_rate_value'] = self._extract_numeric(hr_match[0])
-                result['heart_rate_context'] = hr_match[1]
-
-            bp_match = self._extract_with_context(text, self.patterns['blood_pressure'])
-            if bp_match:
-                result['blood_pressure_value'] = bp_match[0]
-                result['blood_pressure_context'] = bp_match[1]
-
-            # Analyze TdP mentions with context
-            tdp_matches = list(self.patterns['tdp'].finditer(text))
-            if tdp_matches:
-                tdp_contexts = [self.get_smart_context(text, m.start(), m.end()) for m in tdp_matches]
-                # Check if any context indicates negation
-                has_tdp = False
-                for context in tdp_contexts:
-                    if not any(neg in context.lower() for neg in ['no', 'not', 'without', 'negative for', 'absence of']):
-                        has_tdp = True
-                        break
-                result['tdp_present'] = 'Yes' if has_tdp else 'No'
-                result['tdp_context'] = tdp_contexts[0] if tdp_contexts else ''
-            else:
-                result['tdp_present'] = 'No'
-                result['tdp_context'] = ''
-
-            # Extract history
-            med_history = self._extract_with_context(text, self.patterns['medical_history'])
-            result['medical_history'] = med_history[0] if med_history else None
-            result['medical_history_context'] = med_history[1] if med_history else None
-
-            med_list = self._extract_with_context(text, self.patterns['medication_history'])
-            result['medication_history'] = med_list[0] if med_list else None
-            result['medication_history_context'] = med_list[1] if med_list else None
-
-            treatment = self._extract_with_context(text, self.patterns['treatment_course'])
-            result['treatment_course'] = treatment[0] if treatment else None
-            result['treatment_course_context'] = treatment[1] if treatment else None
-
+            # Analyze the combined text
+            analysis = self.analyze(text)
+            result.update(analysis)
+            
             return result
-
-        except Exception as e:
-            logger.error(f"Error analyzing paper: {str(e)}")
-            return None
-
-    def _extract_with_context(self, text: str, pattern: re.Pattern) -> Optional[Tuple[str, str]]:
-        """Extract value and context using pattern."""
-        if not text:
-            return None
-            
-        match = pattern.search(text)
-        if not match:
-            return None
-            
-            # Perform comprehensive QT analysis
-            qt_analysis = self.analyze_qt_comprehensive(text)
-            
-            # Extract QT/QTc values from comprehensive analysis
-            qtc_value = None
-            qt_value = None
-            qtc_context = None
-            qt_context = None
-            qt_source = None
-            
-            # Function to extract numeric value from text
-            def extract_numeric(text):
-        match = re.search(r'(\d+\.?\d*)', text)
-        return float(match.group(1)) if match else None
-
-            # Check all sources for QT/QTc values in priority order
-            sources = [
-                ('Main Text', qt_analysis['numeric_values']),
-                ('Figure', qt_analysis['figure_qt']),
-                ('Table', qt_analysis['table_qt']),
-                ('Supplementary', qt_analysis['supp_qt'])
-            ]
-            
-            for source_name, values in sources:
-                # For numeric values from main text
-                if source_name == 'Main Text':
-                    for pattern_name, pattern_values in values.items():
-                        if pattern_values:
-                            max_value_dict = max(pattern_values, key=lambda x: x['value'])
-                            if 'qtc' in pattern_name and (qtc_value is None or max_value_dict['value'] > qtc_value):
-                                qtc_value = max_value_dict['value']
-                                qtc_context = max_value_dict['context']
-                                qt_source = 'Main Text'
-                            elif 'qt' in pattern_name and (qt_value is None or max_value_dict['value'] > qt_value):
-                                qt_value = max_value_dict['value']
-                                qt_context = max_value_dict['context']
-                                qt_source = 'Main Text'
-                else:
-                    # For figure/table/supplementary values
-                    for item in values:
-                        value = extract_numeric(item['text'])
-                        if value:
-                            # Assume milliseconds if no unit specified
-                            if 'sec' in item['text'].lower():
-                                value *= 1000
-                            
-                            # Update QT/QTc based on context
-                            if 'qtc' in item['text'].lower():
-                                if qtc_value is None or value > qtc_value:
-                                    qtc_value = value
-                                    qtc_context = item['context']
-                                    qt_source = source_name
-                            else:
-                                if qt_value is None or value > qt_value:
-                                    qt_value = value
-                                    qt_context = item['context']
-                                    qt_source = source_name
-            
-            # Extract other information with context
-            age_info = self.extract_value_with_context(text, self.patterns['age'])
-            sex_info = self.extract_value_with_context(text, self.patterns['sex'])
-            dose_info = self.extract_value_with_context(text, self.patterns['oral_dose'])
-            max_conc_info = self.extract_value_with_context(text, self.patterns['theoretical_max'])
-            bioavail_info = self.extract_value_with_context(text, self.patterns['bioavailability'])
-            herg_info = self.extract_value_with_context(text, self.patterns['herg_ic50'])
-            plasma_info = self.extract_value_with_context(text, self.patterns['plasma_concentration'])
-            hr_info = self.extract_value_with_context(text, self.patterns['heart_rate'])
-            bp_info = self.extract_value_with_context(text, self.patterns['blood_pressure'])
-            
-            result = {
-                'title': paper.get('title', ''),
-                'year': paper.get('year', ''),
-                'abstract': paper.get('abstract', ''),
-                'full_text': paper.get('full_text', 'None'),
-                'age': age_info[0] if age_info else None,
-                'age_context': age_info[1] if age_info else None,
-                'sex': sex_info[0] if sex_info else None,
-                'sex_context': sex_info[1] if sex_info else None,
-                'oral_dose': dose_info[0] if dose_info else None,
-                'dose_context': dose_info[1] if dose_info else None,
-                'theoretical_max': max_conc_info[0] if max_conc_info else None,
-                'max_conc_context': max_conc_info[1] if max_conc_info else None,
-                'bioavailability': bioavail_info[0] if bioavail_info else None,
-                'bioavailability_context': bioavail_info[1] if bioavail_info else None,
-                'herg_ic50': herg_info[0] if herg_info else None,
-                'herg_context': herg_info[1] if herg_info else None,
-                'plasma_concentration': plasma_info[0] if plasma_info else None,
-                'plasma_context': plasma_info[1] if plasma_info else None,
-                'qt': qt_value,
-                'qt_context': qt_context,
-                'qt_source': qt_source,
-                'qtc': qtc_value,
-                'qtc_context': qtc_context,
-                'qtc_source': qt_source,
-                'heart_rate': hr_info[0] if hr_info else None,
-                'heart_rate_context': hr_info[1] if hr_info else None,
-                'tdp': 'Yes' if qt_analysis['tdp_mentions'] else 'No',
-                'tdp_context': qt_analysis['tdp_mentions'][0]['context'] if qt_analysis['tdp_mentions'] else None,
-                'blood_pressure': bp_info[0] if bp_info else None,
-                'blood_pressure_context': bp_info[1] if bp_info else None,
-                'medical_history': self.extract_value(text, self.patterns['medical_history']),
-                'medication_history': self.extract_value(text, self.patterns['medication_history']),
-                'treatment_course': self.extract_value(text, self.patterns['treatment_course'])
-            }
-            
-            # Add detailed QT analysis
-            result['detailed_qt_analysis'] = qt_analysis
-            
-            # Only return if we found some meaningful information
-            if any(v for v in result.values() if v not in (None, '', 'No')):
-                return result
-            return None
             
         except Exception as e:
-            logger.error(f"Error analyzing paper: {str(e)}")
+            logger.error(f"Error analyzing paper {paper.get('PMID', 'Unknown')}: {str(e)}")
             return None
 
     def _extract_first_match(self, pattern, text):
