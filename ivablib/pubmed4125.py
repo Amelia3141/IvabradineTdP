@@ -377,8 +377,21 @@ def build_pubmed_query(drug_names: List[str]) -> str:
     # Build full query with cardiac terms
     query = (
         f'({drug_names_query}) AND '
-        '(hERG[Title/Abstract] OR QT[Title/Abstract] OR QTc[Title/Abstract] OR '
-        'torsad*[Title/Abstract]) AND '
+        '('
+        'hERG[Title/Abstract] OR '
+        'QT[Title/Abstract] OR QTc[Title/Abstract] OR '
+        'torsad*[Title/Abstract] OR '
+        '"long QT"[Title/Abstract] OR '
+        '"prolonged QT"[Title/Abstract] OR '
+        '"QT prolongation"[Title/Abstract] OR '
+        '"QTc prolongation"[Title/Abstract] OR '
+        '"QT interval"[Title/Abstract] OR '
+        '"QTc interval"[Title/Abstract] OR '
+        '"ventricular tachycardia"[Title/Abstract] OR '
+        '"ventricular arrhythmia"[Title/Abstract] OR '
+        '"cardiac arrhythmia"[Title/Abstract] OR '
+        '"sudden cardiac"[Title/Abstract]'
+        ') AND '
         '"Humans"[Mesh] AND ("Case Reports"[Publication Type])'
     )
     
