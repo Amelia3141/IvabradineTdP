@@ -604,8 +604,14 @@ def analyze_literature(drug_name: str) -> pd.DataFrame:
             logger.warning("No results found in PubMed")
             return pd.DataFrame()
             
-        # Ensure necessary columns exist
-        for col in ['DOI', 'PubMed URL']:
+        # Initialize all required columns
+        required_columns = [
+            'Title', 'Abstract', 'PMID', 'DOI', 'PubMed URL', 'Year',
+            'Age', 'Sex', 'Oral Dose (mg)', 'QT (ms)', 'QTc (ms)',
+            'Heart Rate (bpm)', 'Blood Pressure (mmHg)', 'TdP'
+        ]
+        
+        for col in required_columns:
             if col not in df.columns:
                 df[col] = ''
         
@@ -655,19 +661,19 @@ def analyze_literature(drug_name: str) -> pd.DataFrame:
                 continue
         
         # Sort by year descending
-        df = df.sort_values('Year', ascending=False)
+        if 'Year' in df.columns:
+            df = df.sort_values('Year', ascending=False)
         
-        # Reorder columns
-        columns = [
-            'Title', 'Abstract', 'PMID', 'DOI', 'PubMed URL', 'Year',
-            'Age', 'Sex', 'Oral Dose (mg)', 'QT (ms)', 'QTc (ms)',
-            'Heart Rate (bpm)', 'Blood Pressure (mmHg)', 'TdP'
-        ]
+        # Reorder columns, keeping only those that exist
+        columns = [col for col in required_columns if col in df.columns]
         df = df[columns]
         
-        # Log summary
-        found_data = df[df[['Age', 'Sex', 'QT (ms)', 'QTc (ms)', 'Heart Rate (bpm)']].notna().any(axis=1)]
-        logger.info(f"Found data in {len(found_data)} out of {len(df)} papers")
+        # Log summary of papers with data
+        data_columns = ['Age', 'Sex', 'QT (ms)', 'QTc (ms)', 'Heart Rate (bpm)']
+        data_columns = [col for col in data_columns if col in df.columns]
+        if data_columns:
+            found_data = df[df[data_columns].notna().any(axis=1)]
+            logger.info(f"Found data in {len(found_data)} out of {len(df)} papers")
         
         return df
         
