@@ -3,20 +3,16 @@ import logging
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
-import re
-import json
 from Bio import Entrez
-import PyPDF2
-import io
-import logging
-from urllib.parse import urljoin
-from typing import List, Dict, Optional
-import sys
 import time
-import difflib
-import csv
+import re
+import io
+import PyPDF2
 import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor
+from urllib.parse import urljoin
+from typing import List, Dict, Any, Optional, Tuple
+from .case_report_analyzer import CaseReportAnalyzer
 
 # Suppress SSL warnings
 requests.packages.urllib3.disable_warnings()
