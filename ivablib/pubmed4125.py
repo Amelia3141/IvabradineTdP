@@ -1,27 +1,27 @@
 import os
+import sys
+import time
+import json
 import logging
 import pandas as pd
 import requests
-from bs4 import BeautifulSoup
-from Bio import Entrez
-import time
-import re
 import io
+import csv
+import random
+from bs4 import BeautifulSoup
 import PyPDF2
-import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urljoin
 from typing import List, Dict, Any, Optional, Tuple
 from .case_report_analyzer import CaseReportAnalyzer
-import random
-import sys
+from Bio import Entrez
 
 # Suppress SSL warnings
 requests.packages.urllib3.disable_warnings()
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 # Set your email and API key for NCBI from environment variables
 logger.info("Setting up NCBI credentials")
@@ -263,9 +263,8 @@ def get_crossref_text(doi: str) -> Optional[str]:
 def get_scihub_text(pmid, doi=None):
     """Get full text from Sci-Hub."""
     try:
-        # Try multiple Sci-Hub domains
+        # Try multiple Sci-Hub domains (removed .ru due to 403 errors)
         domains = [
-            'https://sci-hub.ru',
             'https://sci-hub.st',
             'https://sci-hub.se',
             'https://sci-hub.wf',
@@ -284,8 +283,8 @@ def get_scihub_text(pmid, doi=None):
         session.headers.update(headers)
         session.verify = False  # Disable SSL verification
         
-        # Add delay between requests
-        time.sleep(random.uniform(2, 5))
+        # Initial delay before starting
+        time.sleep(random.uniform(5, 10))
         
         for domain in domains:
             try:
@@ -297,8 +296,8 @@ def get_scihub_text(pmid, doi=None):
                 else:
                     url = f"{domain}/pubmed/{pmid}"
                 
-                # Add delay between attempts
-                time.sleep(random.uniform(1, 3))
+                # Longer delay between domains
+                time.sleep(random.uniform(8, 15))
                 
                 response = session.get(url, timeout=30)
                 if response.status_code != 200:
@@ -328,8 +327,8 @@ def get_scihub_text(pmid, doi=None):
                     
                     logger.info(f"Found PDF at {pdf_url}")
                     
-                    # Add delay before PDF download
-                    time.sleep(random.uniform(1, 3))
+                    # Add longer delay before PDF download
+                    time.sleep(random.uniform(5, 10))
                     
                     # Download PDF
                     pdf_response = session.get(pdf_url, timeout=30)
@@ -345,34 +344,6 @@ def get_scihub_text(pmid, doi=None):
                             return text
                         else:
                             logger.warning(f"PDF text too short ({len(text)} chars)")
-                
-                # Also try to find direct download links
-                for link in soup.find_all('a', href=True):
-                    href = link['href']
-                    if href.lower().endswith('.pdf'):
-                        try:
-                            pdf_url = urljoin(domain, href)
-                            logger.info(f"Found direct PDF link: {pdf_url}")
-                            
-                            # Add delay before PDF download
-                            time.sleep(random.uniform(1, 3))
-                            
-                            pdf_response = session.get(pdf_url, timeout=30)
-                            if pdf_response.headers.get('content-type', '').lower() == 'application/pdf':
-                                pdf_file = io.BytesIO(pdf_response.content)
-                                pdf_reader = PyPDF2.PdfReader(pdf_file)
-                                text = ""
-                                for page in pdf_reader.pages:
-                                    text += page.extract_text()
-                                text = text.strip()
-                                if len(text) > 500:
-                                    logger.info(f"Got {len(text)} chars from direct PDF")
-                                    return text
-                                else:
-                                    logger.warning(f"Direct PDF text too short ({len(text)} chars)")
-                        except Exception as e:
-                            logger.error(f"Error with direct PDF link: {e}")
-                            continue
                 
             except Exception as e:
                 logger.error(f"Error with domain {domain}: {e}")
@@ -659,10 +630,6 @@ def get_texts_parallel(pmids):
 def analyze_literature(drug_name: str) -> pd.DataFrame:
     """Analyze literature for a given drug."""
     try:
-        # Get drug names (including synonyms)
-        drug_names = get_drug_names(drug_name)
-        logger.info(f"Searching for drug names: {drug_names}")
-        
         # Search PubMed
         df = search_pubmed_case_reports(drug_name)
         if df.empty:
@@ -679,28 +646,42 @@ def analyze_literature(drug_name: str) -> pd.DataFrame:
         
         # Analyze each case report
         for report in case_reports:
-            text = report.get('full_text', '')
-            if text:
-                combined_text = text + ' ' + report['abstract']
-                logger.info(f"Text length for {report['pmid']}: {len(combined_text)} characters")
+            try:
+                pmid = report['pmid']
+                text = report.get('full_text', '')
+                abstract = report.get('abstract', '')
                 
-                analyzer = CaseReportAnalyzer()
-                analyzed = analyzer.analyze(combined_text)
-                
-                # Update DataFrame with analyzed fields
-                idx = df[df['PMID'] == report['pmid']].index[0]
-                df.loc[idx, 'Age'] = analyzed.get('age', '')
-                df.loc[idx, 'Sex'] = analyzed.get('sex', '')
-                df.loc[idx, 'Oral Dose (mg)'] = analyzed.get('oral_dose_value', '')
-                df.loc[idx, 'QT (ms)'] = analyzed.get('qt_value', '')
-                df.loc[idx, 'QTc (ms)'] = analyzed.get('qtc_value', '')
-                df.loc[idx, 'Heart Rate (bpm)'] = analyzed.get('heart_rate_value', '')
-                df.loc[idx, 'Blood Pressure (mmHg)'] = analyzed.get('blood_pressure_value', '')
-                df.loc[idx, 'TdP'] = 'Yes' if analyzed.get('tdp_present', False) else 'No'
-                
-                # Log what was found
-                found_fields = {k: v for k, v in analyzed.items() if v}
-                logger.info(f"Found fields for {report['pmid']}: {found_fields}")
+                if text or abstract:
+                    combined_text = (text + ' ' + abstract).strip()
+                    logger.info(f"Text length for {pmid}: {len(combined_text)} characters")
+                    
+                    analyzer = CaseReportAnalyzer()
+                    analyzed = analyzer.analyze(combined_text)
+                    
+                    # Update DataFrame with analyzed fields
+                    idx = df.index[df['PMID'] == pmid].tolist()
+                    if idx:
+                        idx = idx[0]
+                        df.loc[idx, 'Age'] = analyzed.get('age', '')
+                        df.loc[idx, 'Sex'] = analyzed.get('sex', '')
+                        df.loc[idx, 'Oral Dose (mg)'] = analyzed.get('oral_dose_value', '')
+                        df.loc[idx, 'QT (ms)'] = analyzed.get('qt_value', '')
+                        df.loc[idx, 'QTc (ms)'] = analyzed.get('qtc_value', '')
+                        df.loc[idx, 'Heart Rate (bpm)'] = analyzed.get('heart_rate_value', '')
+                        df.loc[idx, 'Blood Pressure (mmHg)'] = analyzed.get('blood_pressure_value', '')
+                        df.loc[idx, 'TdP'] = 'Yes' if analyzed.get('tdp_present', False) else 'No'
+                        
+                        # Log what was found
+                        found_fields = {k: v for k, v in analyzed.items() if v}
+                        logger.info(f"Found fields for {pmid}: {found_fields}")
+                    else:
+                        logger.warning(f"Could not find PMID {pmid} in DataFrame")
+                else:
+                    logger.warning(f"No text available for {pmid}")
+                    
+            except Exception as e:
+                logger.error(f"Error analyzing paper {pmid}: {e}")
+                continue
         
         # Sort by year descending
         df = df.sort_values('Year', ascending=False)
@@ -712,6 +693,10 @@ def analyze_literature(drug_name: str) -> pd.DataFrame:
             'Heart Rate (bpm)', 'Blood Pressure (mmHg)', 'TdP'
         ]
         df = df[columns]
+        
+        # Log summary
+        found_data = df[df[['Age', 'Sex', 'QT (ms)', 'QTc (ms)', 'Heart Rate (bpm)']].notna().any(axis=1)]
+        logger.info(f"Found data in {len(found_data)} out of {len(df)} papers")
         
         return df
         
