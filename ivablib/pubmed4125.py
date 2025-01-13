@@ -707,7 +707,7 @@ def get_texts_parallel(pmids):
             logger.error(f"Error getting DOI for {pmid}: {e}")
     
     def get_text_with_delay(pmid):
-        """Wrapper to add delay between requests"""
+        # Wrapper to add delay between requests
         text, source = get_full_text(pmid, dois.get(pmid))
         time.sleep(2)  # Add delay between full text requests
         return text, source
