@@ -13,6 +13,8 @@ from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urljoin
 from typing import List, Dict, Any, Optional, Tuple
 from .case_report_analyzer import CaseReportAnalyzer
+import random
+import sys
 
 # Suppress SSL warnings
 requests.packages.urllib3.disable_warnings()
@@ -162,88 +164,112 @@ def get_pmc_text(pmcid):
         logger.error(f"Error getting PMC text: {e}")
     return None
 
-def get_crossref_text(doi):
+def get_crossref_text(doi: str) -> Optional[str]:
     """Get full text using DOI from Crossref."""
     try:
-        # First try direct DOI resolution
+        if not doi:
+            return None
+            
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5'
         }
         
-        # Try resolving DOI
-        doi_url = f"https://doi.org/{doi}"
-        response = requests.get(doi_url, headers=headers, allow_redirects=True, verify=False)
+        # Try to get the paper URL from Crossref
+        crossref_url = f"https://api.crossref.org/works/{doi}"
+        logger.info(f"Querying Crossref API: {crossref_url}")
         
-        if response.status_code == 200:
-            final_url = response.url
-            logger.info(f"DOI resolved to: {final_url}")
+        response = requests.get(crossref_url, headers=headers, timeout=30)
+        if response.status_code != 200:
+            logger.warning(f"Crossref API returned status code {response.status_code}")
+            return None
             
-            # Handle different publisher sites
-            if 'sciencedirect.com' in final_url:
-                # For ScienceDirect
-                soup = BeautifulSoup(response.text, 'html.parser')
-                article = soup.find('div', {'id': 'centerInner'}) or soup.find('div', {'id': 'main-content'})
-                if article:
-                    text = article.get_text(separator=' ', strip=True)
-                    return text
+        data = response.json()
+        if 'message' not in data:
+            logger.warning("No message in Crossref response")
+            return None
+            
+        # Try to get the paper URL
+        urls = []
+        
+        # Check for free PDF URL
+        if 'link' in data['message']:
+            for link in data['message']['link']:
+                if link.get('content-type', '').lower() == 'application/pdf':
+                    urls.append(link['URL'])
+        
+        # Check for alternative URLs
+        if 'resource' in data['message']:
+            urls.extend([r['URL'] for r in data['message']['resource']])
+            
+        # Add the main URL if available
+        if 'url' in data['message']:
+            urls.append(data['message']['url'])
+            
+        logger.info(f"Found {len(urls)} URLs from Crossref")
+        
+        # Try each URL
+        for url in urls:
+            try:
+                logger.info(f"Trying URL: {url}")
+                response = requests.get(url, headers=headers, timeout=30, verify=True)
+                
+                if response.status_code == 200:
+                    content_type = response.headers.get('content-type', '').lower()
                     
-            elif 'springer.com' in final_url:
-                # For Springer
-                soup = BeautifulSoup(response.text, 'html.parser')
-                article = soup.find('div', {'class': 'c-article-body'}) or soup.find('div', {'id': 'body'})
-                if article:
-                    text = article.get_text(separator=' ', strip=True)
-                    return text
-                    
-            elif 'wiley.com' in final_url:
-                # For Wiley
-                soup = BeautifulSoup(response.text, 'html.parser')
-                article = soup.find('div', {'class': 'article-body'}) or soup.find('div', {'class': 'main-content'})
-                if article:
-                    text = article.get_text(separator=' ', strip=True)
-                    return text
-                    
-            elif 'nature.com' in final_url:
-                # For Nature
-                soup = BeautifulSoup(response.text, 'html.parser')
-                article = soup.find('div', {'class': 'c-article-body'}) or soup.find('article')
-                if article:
-                    text = article.get_text(separator=' ', strip=True)
-                    return text
-                    
-            # Try generic article extraction
-            soup = BeautifulSoup(response.text, 'html.parser')
-            article = (
-                soup.find('article') or
-                soup.find('div', {'class': ['article', 'paper', 'content', 'main']}) or
-                soup.find('div', {'id': ['article', 'paper', 'content', 'main']})
-            )
-            
-            if article:
-                text = article.get_text(separator=' ', strip=True)
-                if len(text) > 500:  # Only return if we got substantial text
-                    logger.info(f"Successfully extracted {len(text)} characters from {final_url}")
-                    return text
-            
-            logger.warning(f"Could not extract article text from {final_url}")
-            
-        else:
-            logger.warning(f"Failed to resolve DOI {doi}: {response.status_code}")
-            
+                    if 'pdf' in content_type:
+                        # Handle PDF
+                        pdf_file = io.BytesIO(response.content)
+                        pdf_reader = PyPDF2.PdfReader(pdf_file)
+                        text = ""
+                        for page in pdf_reader.pages:
+                            text += page.extract_text()
+                        text = text.strip()
+                        if len(text) > 500:
+                            logger.info(f"Successfully extracted {len(text)} characters from PDF")
+                            return text
+                    else:
+                        # Handle HTML
+                        soup = BeautifulSoup(response.text, 'html.parser')
+                        
+                        # Try different article content selectors
+                        article_text = (
+                            soup.find('div', {'class': 'fulltext-view'}) or
+                            soup.find('article') or
+                            soup.find('div', {'class': 'article-body'}) or
+                            soup.find('div', {'class': 'main-content'}) or
+                            soup.find('div', {'class': 'content'})
+                        )
+                        
+                        if article_text:
+                            text = article_text.get_text(separator=' ', strip=True)
+                            text = ' '.join(text.split())
+                            if len(text) > 500:
+                                logger.info(f"Successfully extracted {len(text)} characters from HTML")
+                                return text
+                            
+            except Exception as e:
+                logger.error(f"Error processing URL {url}: {e}")
+                continue
+                
+        logger.warning(f"Could not extract text from any Crossref URLs for DOI {doi}")
+        return None
+        
     except Exception as e:
         logger.error(f"Error in get_crossref_text: {e}")
-        
-    return None
+        return None
 
 def get_scihub_text(pmid, doi=None):
     """Get full text from Sci-Hub."""
     try:
         # Try multiple Sci-Hub domains
         domains = [
+            'https://sci-hub.ru',
+            'https://sci-hub.st',
             'https://sci-hub.se',
             'https://sci-hub.wf',
-            'https://sci-hub.ren'
+            'https://sci-hub.cat'
         ]
         
         headers = {
@@ -256,6 +282,10 @@ def get_scihub_text(pmid, doi=None):
         
         session = requests.Session()
         session.headers.update(headers)
+        session.verify = False  # Disable SSL verification
+        
+        # Add delay between requests
+        time.sleep(random.uniform(2, 5))
         
         for domain in domains:
             try:
@@ -267,7 +297,10 @@ def get_scihub_text(pmid, doi=None):
                 else:
                     url = f"{domain}/pubmed/{pmid}"
                 
-                response = session.get(url, timeout=30, verify=False)
+                # Add delay between attempts
+                time.sleep(random.uniform(1, 3))
+                
+                response = session.get(url, timeout=30)
                 if response.status_code != 200:
                     logger.warning(f"Got status code {response.status_code} from {domain}")
                     continue
@@ -295,8 +328,11 @@ def get_scihub_text(pmid, doi=None):
                     
                     logger.info(f"Found PDF at {pdf_url}")
                     
+                    # Add delay before PDF download
+                    time.sleep(random.uniform(1, 3))
+                    
                     # Download PDF
-                    pdf_response = session.get(pdf_url, timeout=30, verify=False)
+                    pdf_response = session.get(pdf_url, timeout=30)
                     if pdf_response.headers.get('content-type', '').lower() == 'application/pdf':
                         pdf_file = io.BytesIO(pdf_response.content)
                         pdf_reader = PyPDF2.PdfReader(pdf_file)
@@ -318,7 +354,10 @@ def get_scihub_text(pmid, doi=None):
                             pdf_url = urljoin(domain, href)
                             logger.info(f"Found direct PDF link: {pdf_url}")
                             
-                            pdf_response = session.get(pdf_url, timeout=30, verify=False)
+                            # Add delay before PDF download
+                            time.sleep(random.uniform(1, 3))
+                            
+                            pdf_response = session.get(pdf_url, timeout=30)
                             if pdf_response.headers.get('content-type', '').lower() == 'application/pdf':
                                 pdf_file = io.BytesIO(pdf_response.content)
                                 pdf_reader = PyPDF2.PdfReader(pdf_file)
@@ -511,79 +550,43 @@ def format_pubmed_results(records: List[Dict]) -> pd.DataFrame:
     for record in records:
         try:
             # Get PMID
-            pmid = str(record['MedlineCitation']['PMID'])
-            
-            # Get title and abstract
-            article = record['MedlineCitation']['Article']
-            title = article['ArticleTitle']
-            if isinstance(title, (list, str)):
-                title = ' '.join(str(t) for t in title) if isinstance(title, list) else str(title)
-            
-            # Handle abstract text which can be a string or list
-            abstract = ''
-            if 'Abstract' in article:
-                abstract_text = article['Abstract'].get('AbstractText', [])
-                if isinstance(abstract_text, (list, str)):
-                    abstract = ' '.join(str(t) for t in abstract_text) if isinstance(abstract_text, list) else str(abstract_text)
+            pmid = record['MedlineCitation']['PMID']
             
             # Get DOI
             doi = None
             if 'ArticleIdList' in record['PubmedData']:
-                for id_obj in record['PubmedData']['ArticleIdList']:
-                    if str(id_obj.attributes.get('IdType', '')).lower() == 'doi':
-                        doi = str(id_obj)
+                for id in record['PubmedData']['ArticleIdList']:
+                    if id.attributes['IdType'] == 'doi':
+                        doi = str(id)
                         break
-            
-            # Get year from PubDate
-            year = ''
-            pub_date = article['Journal']['JournalIssue']['PubDate']
-            if isinstance(pub_date, dict):
-                if 'Year' in pub_date:
-                    year = str(pub_date['Year'])
-                elif 'MedlineDate' in pub_date:
-                    # Try to extract year from MedlineDate
-                    medline_date = str(pub_date['MedlineDate'])
-                    year_match = re.search(r'\d{4}', medline_date)
-                    if year_match:
-                        year = year_match.group(0)
             
             # Create result dict with key fields
             paper_dict = {
-                'Case Report Title': title,
-                'Age': '',
-                'Sex': '',
-                'Oral Dose (mg)': '',
-                'theoretical max concentration (μM)': '',
-                '40% bioavailability': '',
-                'Theoretical HERG IC50 / Concentration μM': '',
-                '40% Plasma concentration': '',
-                'Uncorrected QT (ms)': '',
-                'QTc': '',
-                'QTR': '',
-                'QTF': '',
-                'Heart Rate (bpm)': '',
-                'Torsades de Pointes?': 'No',
-                'Blood Pressure (mmHg)': '',
-                'Medical History': '',
-                'Medication History': '',
-                'Course of Treatment': '',
-                # Hidden fields for internal use
+                'Title': record['MedlineCitation']['Article']['ArticleTitle'],
+                'Abstract': record['MedlineCitation']['Article'].get('Abstract', {}).get('AbstractText', [''])[0],
                 'PMID': pmid,
                 'DOI': doi or '',
                 'PubMed URL': f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
-                'Year': year,
-                'Abstract': abstract
+                'Year': record['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate'].get('Year', ''),
+                'Age': '',
+                'Sex': '',
+                'Oral Dose (mg)': '',
+                'QT (ms)': '',
+                'QTc (ms)': '',
+                'Heart Rate (bpm)': '',
+                'Blood Pressure (mmHg)': '',
+                'TdP': 'No'
             }
             results.append(paper_dict)
         except Exception as e:
-            logger.error(f"Error processing record {record.get('MedlineCitation', {}).get('PMID', 'unknown')}: {str(e)}")
+            logger.error(f"Error processing record: {str(e)}")
             continue
             
     return pd.DataFrame(results)
 
 def get_texts_parallel(pmids):
     """Get full texts for multiple PMIDs in parallel using ThreadPoolExecutor"""
-    texts = []
+    texts = {}
     logger.info(f"Getting full texts for {len(pmids)} papers")
     
     # First get DOIs for all papers
@@ -614,45 +617,20 @@ def get_texts_parallel(pmids):
                         break
             
             if doi:
-                dois[pmid] = {
-                    'doi': doi,
-                    'abstract': ''
-                }
+                dois[pmid] = doi
                 logger.info(f"Found DOI for {pmid}: {doi}")
-                
-            # Get abstract
-            abstract = ''
-            if 'Abstract' in article:
-                abstract_text = article['Abstract'].get('AbstractText', [])
-                if isinstance(abstract_text, (list, str)):
-                    abstract = ' '.join(str(t) for t in abstract_text) if isinstance(abstract_text, list) else str(abstract_text)
-            
-            dois[pmid] = {
-                'doi': doi,
-                'abstract': abstract
-            }
             
             # Add a small delay between requests
             time.sleep(1)
             
         except Exception as e:
             logger.error(f"Error getting DOI for {pmid}: {e}")
-            dois[pmid] = {'doi': None, 'abstract': ''}
     
     def get_text_with_delay(pmid):
         """Wrapper to add delay between requests"""
-        try:
-            text, source = get_full_text(pmid, dois.get(pmid, {}).get('doi'))
-            time.sleep(2)  # Add delay between full text requests
-            return {
-                'pmid': pmid,
-                'full_text': text if text else '',
-                'abstract': dois.get(pmid, {}).get('abstract', ''),
-                'source': source
-            }
-        except Exception as e:
-            logger.error(f"Error in get_text_with_delay for {pmid}: {e}")
-            return None
+        text, source = get_full_text(pmid, dois.get(pmid))
+        time.sleep(2)  # Add delay between full text requests
+        return text, source
     
     # Use ThreadPoolExecutor to run requests in parallel
     with ThreadPoolExecutor(max_workers=3) as executor:  # Reduced max_workers to avoid overwhelming servers
@@ -665,11 +643,13 @@ def get_texts_parallel(pmids):
             pmid = future_to_pmid[future]
             try:
                 result = future.result()
-                if result and result.get('full_text'):
-                    texts.append(result)
-                    logger.info(f"Successfully got text for {pmid} from {result.get('source')}")
-                else:
-                    logger.warning(f"No text returned for {pmid}")
+                if result:
+                    text, source = result
+                    if text:
+                        texts[pmid] = text
+                        logger.info(f"Successfully got text for {pmid} from {source}")
+                    else:
+                        logger.warning(f"No text returned for {pmid}")
             except Exception as e:
                 logger.error(f"Error processing {pmid}: {e}")
                 
@@ -699,67 +679,40 @@ def analyze_literature(drug_name: str) -> pd.DataFrame:
         
         # Analyze each case report
         for report in case_reports:
-            try:
-                # Convert report to dict if it's not already
-                if not isinstance(report, dict):
-                    report = {'full_text': str(report), 'pmid': None, 'abstract': ''}
+            text = report.get('full_text', '')
+            if text:
+                combined_text = text + ' ' + report['abstract']
+                logger.info(f"Text length for {report['pmid']}: {len(combined_text)} characters")
                 
-                full_text = str(report.get('full_text', ''))
-                abstract = str(report.get('abstract', ''))
-                pmid = str(report.get('pmid', ''))
+                analyzer = CaseReportAnalyzer()
+                analyzed = analyzer.analyze(combined_text)
                 
-                if full_text:
-                    combined_text = full_text + ' ' + abstract
-                    logger.info(f"Text length for {pmid}: {len(combined_text)} characters")
-                    
-                    analyzer = CaseReportAnalyzer()
-                    analyzed = analyzer.analyze(combined_text)
-                    
-                    # Find the matching row in the DataFrame
-                    matching_rows = df[df['PMID'] == pmid]
-                    if not matching_rows.empty:
-                        idx = matching_rows.index[0]
-                        
-                        # Update DataFrame with analyzed fields
-                        df.loc[idx, 'Age'] = analyzed.get('age', '')
-                        df.loc[idx, 'Sex'] = analyzed.get('sex', '')
-                        df.loc[idx, 'Oral Dose (mg)'] = analyzed.get('oral_dose_value', '')
-                        df.loc[idx, 'Uncorrected QT (ms)'] = analyzed.get('qt_value', '')
-                        df.loc[idx, 'QTc'] = analyzed.get('qtc_value', '')
-                        df.loc[idx, 'Heart Rate (bpm)'] = analyzed.get('heart_rate_value', '')
-                        df.loc[idx, 'Blood Pressure (mmHg)'] = analyzed.get('blood_pressure_value', '')
-                        df.loc[idx, 'Torsades de Pointes?'] = 'Yes' if analyzed.get('tdp_present', False) else 'No'
-                        df.loc[idx, 'Medical History'] = analyzed.get('medical_history', '')
-                        df.loc[idx, 'Medication History'] = analyzed.get('medication_history', '')
-                        df.loc[idx, 'Course of Treatment'] = analyzed.get('treatment_course', '')
-                        
-                        # Log what was found
-                        found_fields = {k: v for k, v in analyzed.items() if v}
-                        logger.info(f"Found fields for {pmid}: {found_fields}")
-            except Exception as e:
-                logger.error(f"Error analyzing report: {str(e)}")
-                continue
+                # Update DataFrame with analyzed fields
+                idx = df[df['PMID'] == report['pmid']].index[0]
+                df.loc[idx, 'Age'] = analyzed.get('age', '')
+                df.loc[idx, 'Sex'] = analyzed.get('sex', '')
+                df.loc[idx, 'Oral Dose (mg)'] = analyzed.get('oral_dose_value', '')
+                df.loc[idx, 'QT (ms)'] = analyzed.get('qt_value', '')
+                df.loc[idx, 'QTc (ms)'] = analyzed.get('qtc_value', '')
+                df.loc[idx, 'Heart Rate (bpm)'] = analyzed.get('heart_rate_value', '')
+                df.loc[idx, 'Blood Pressure (mmHg)'] = analyzed.get('blood_pressure_value', '')
+                df.loc[idx, 'TdP'] = 'Yes' if analyzed.get('tdp_present', False) else 'No'
+                
+                # Log what was found
+                found_fields = {k: v for k, v in analyzed.items() if v}
+                logger.info(f"Found fields for {report['pmid']}: {found_fields}")
         
         # Sort by year descending
         df = df.sort_values('Year', ascending=False)
         
-        # Reorder columns to match the image
+        # Reorder columns
         columns = [
-            'Case Report Title', 'Age', 'Sex', 'Oral Dose (mg)',
-            'theoretical max concentration (μM)', '40% bioavailability',
-            'Theoretical HERG IC50 / Concentration μM', '40% Plasma concentration',
-            'Uncorrected QT (ms)', 'QTc', 'QTR', 'QTF', 'Heart Rate (bpm)',
-            'Torsades de Pointes?', 'Blood Pressure (mmHg)',
-            'Medical History', 'Medication History', 'Course of Treatment'
+            'Title', 'Abstract', 'PMID', 'DOI', 'PubMed URL', 'Year',
+            'Age', 'Sex', 'Oral Dose (mg)', 'QT (ms)', 'QTc (ms)',
+            'Heart Rate (bpm)', 'Blood Pressure (mmHg)', 'TdP'
         ]
-        
-        # Make sure all columns exist
-        for col in columns:
-            if col not in df.columns:
-                df[col] = ''
-                
         df = df[columns]
-        logger.info(f"Final dataframe has {len(df)} rows and columns: {df.columns.tolist()}")
+        
         return df
         
     except Exception as e:
