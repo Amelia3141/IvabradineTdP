@@ -1,69 +1,70 @@
-import os
 import sys
-import time
-import json
+import os
 import logging
-import pandas as pd
-import requests
-import io
-import csv
+import time
 import random
+from typing import List, Dict, Any, Optional, Tuple
+from concurrent.futures import ThreadPoolExecutor
+import pandas as pd
+from Bio import Entrez
+import requests
 from bs4 import BeautifulSoup
 import PyPDF2
-from concurrent.futures import ThreadPoolExecutor
-from urllib.parse import urljoin
-from typing import List, Dict, Any, Optional, Tuple
-from .case_report_analyzer import CaseReportAnalyzer
-from Bio import Entrez
+import io
+import csv
+import json
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from ivablib.case_report_analyzer import CaseReportAnalyzer
 
 # Suppress SSL warnings
 requests.packages.urllib3.disable_warnings()
 
 # Configure logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
-# Set your email and API key for NCBI from environment variables
-logger.info("Setting up NCBI credentials")
+# Set up NCBI credentials
 Entrez.email = os.environ.get('NCBI_EMAIL', 'your@email.com')
 Entrez.api_key = os.environ.get('NCBI_API_KEY')
 logger.info(f"Using email: {Entrez.email}")
 logger.info("NCBI credentials set up")
 
-def get_full_text(pmid: str) -> Optional[str]:
+def get_full_text(pmid: str, doi: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
     """Get full text for a paper using multiple methods."""
     try:
         # Try PMC first
         pmc_id = get_pmcid_from_pmid(pmid)
         if pmc_id:
-            logger.info(f"Found PMC ID for {pmid}: {pmc_id}")
+            logger.info(f"Got PMC ID for {pmid}: {pmc_id}")
             text = get_pmc_text(pmc_id)
-            if text and len(text) > 500:
-                logger.info(f"Got {len(text)} chars from PMC for {pmid}")
-                return text
+            if text and len(text) > 100:  # Ensure we have substantial text
+                logger.info(f"Got PMC text for {pmid}: {len(text)} chars")
+                return text, 'PMC'
         
-        # Try Crossref next
-        doi = get_doi_from_crossref(pmid)
+        # Try Crossref next if we have a DOI
+        if not doi:
+            doi = get_doi_from_crossref(pmid)
         if doi:
-            logger.info(f"Found DOI for {pmid}: {doi}")
+            logger.info(f"Got DOI for {pmid}: {doi}")
             text = get_crossref_text(doi)
-            if text and len(text) > 500:
-                logger.info(f"Got {len(text)} chars from Crossref for {pmid}")
-                return text
+            if text and len(text) > 100:  # Ensure we have substantial text
+                logger.info(f"Got Crossref text for {pmid}: {len(text)} chars")
+                return text, 'Crossref'
         
         # Try Sci-Hub as last resort
         logger.info(f"Trying Sci-Hub for {pmid}")
-        text = get_scihub_text(pmid)
-        if text and len(text) > 500:
-            logger.info(f"Got {len(text)} chars from Sci-Hub for {pmid}")
-            return text
-            
+        text = get_scihub_text(pmid, doi)
+        if text and len(text) > 100:  # Ensure we have substantial text
+            logger.info(f"Got Sci-Hub text for {pmid}: {len(text)} chars")
+            return text, 'Sci-Hub'
+        
         logger.warning(f"Could not get full text for {pmid} from any source")
-        return None
+        return None, None
         
     except Exception as e:
         logger.error(f"Error getting full text for {pmid}: {e}")
-        return None
+        return None, None
 
 def get_pmcid_from_pmid(pmid):
     """Convert PMID to PMCID using NCBI's ID converter."""
@@ -80,9 +81,7 @@ def get_pmcid_from_pmid(pmid):
 def get_pmc_text(pmcid: str) -> Optional[str]:
     """Get full text from PMC."""
     try:
-        # Construct PMC URL
         url = f"https://www.ncbi.nlm.nih.gov/pmc/articles/{pmcid}/"
-        
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
@@ -94,47 +93,42 @@ def get_pmc_text(pmcid: str) -> Optional[str]:
             
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # Find the main article content
-        article = soup.find('div', {'class': 'jig-ncbiinpagenav'})
-        if not article:
-            article = soup.find('article')
-        if not article:
-            article = soup.find('div', {'class': 'article'})
-        
-        if not article:
-            logger.warning("Could not find article content in PMC")
-            return None
-            
-        # Extract text, preserving some structure
+        # Get all text content
         text_parts = []
         
         # Get title
         title = soup.find('h1', {'class': 'content-title'})
         if title:
-            text_parts.append(title.get_text())
-            
+            text_parts.append(title.get_text(strip=True))
+        
         # Get abstract
         abstract = soup.find('div', {'class': 'abstract'})
         if abstract:
-            text_parts.append(abstract.get_text())
+            text_parts.append(abstract.get_text(strip=True))
+        
+        # Get main content
+        article = soup.find('div', {'class': 'jig-ncbiinpagenav'})
+        if not article:
+            article = soup.find('article')
+        if not article:
+            article = soup.find('div', {'class': 'article'})
             
-        # Get main content sections
-        sections = article.find_all(['div', 'section'], {'class': ['section', 'sec']})
-        for section in sections:
-            # Get section title
-            section_title = section.find(['h2', 'h3', 'h4'])
-            if section_title:
-                text_parts.append(section_title.get_text())
+        if article:
+            # Get all paragraphs
+            for p in article.find_all(['p', 'h2', 'h3', 'h4']):
+                text = p.get_text(strip=True)
+                if text:  # Only add non-empty paragraphs
+                    text_parts.append(text)
+        
+        if not text_parts:
+            logger.warning("No text content found in PMC article")
+            return None
             
-            # Get paragraphs
-            paragraphs = section.find_all('p')
-            for p in paragraphs:
-                text_parts.append(p.get_text())
-                
+        # Join all text parts with newlines
         text = '\n\n'.join(text_parts)
         text = ' '.join(text.split())  # Normalize whitespace
         
-        if len(text) > 500:
+        if len(text) > 100:  # Only return if we got substantial text
             logger.info(f"Successfully extracted {len(text)} characters from PMC")
             return text
         else:
@@ -203,6 +197,7 @@ def get_crossref_text(doi: str) -> Optional[str]:
         for url in urls:
             try:
                 logger.info(f"Trying URL: {url}")
+                
                 response = requests.get(url, headers=headers, timeout=30, verify=True)
                 
                 if response.status_code == 200:
@@ -250,70 +245,71 @@ def get_crossref_text(doi: str) -> Optional[str]:
         logger.error(f"Error in get_crossref_text: {e}")
         return None
 
-def get_scihub_text(pmid: str) -> Optional[str]:
+def get_scihub_text(pmid: str, doi: Optional[str] = None) -> Optional[str]:
     """Get full text from Sci-Hub."""
     try:
-        # Only use .se domain
-        domain = 'https://sci-hub.se'
+        wait_time = random.uniform(5, 10)
+        logger.info(f"Waiting {wait_time:.1f}s before starting Sci-Hub request")
+        time.sleep(wait_time)
         
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5'
         }
         
-        # Add initial delay
-        delay = random.uniform(5, 10)
-        logger.info(f"Waiting {delay:.1f}s before Sci-Hub request")
-        time.sleep(delay)
-        
-        url = f"{domain}/pubmed/{pmid}"
-        logger.info(f"Trying Sci-Hub URL: {url}")
-        
-        response = requests.get(url, headers=headers, timeout=30, verify=False)
-        if response.status_code != 200:
-            logger.warning(f"Got status code {response.status_code} from Sci-Hub")
-            return None
-            
-        soup = BeautifulSoup(response.text, 'html.parser')
-        iframe = soup.find('iframe', {'id': 'pdf'})
-        
-        if not iframe:
-            logger.warning("No PDF iframe found on Sci-Hub")
-            return None
-            
-        pdf_url = iframe.get('src', '')
-        if not pdf_url:
-            logger.warning("No PDF URL found in iframe")
-            return None
-            
-        if not pdf_url.startswith('http'):
-            pdf_url = urljoin(domain, pdf_url)
-        
-        # Add delay before PDF request
-        delay = random.uniform(5, 10)
-        logger.info(f"Waiting {delay:.1f}s before PDF request")
-        time.sleep(delay)
-        
-        logger.info(f"Downloading PDF from: {pdf_url}")
-        pdf_response = requests.get(pdf_url, headers=headers, timeout=30, verify=False)
-        
-        if pdf_response.status_code == 200:
-            try:
-                pdf_file = io.BytesIO(pdf_response.content)
-                pdf_reader = PyPDF2.PdfReader(pdf_file)
-                text = ""
-                for page in pdf_reader.pages:
-                    text += page.extract_text()
-                text = text.strip()
-                if len(text) > 500:
-                    logger.info(f"Got {len(text)} chars from PDF")
-                    return text
-                else:
-                    logger.warning(f"PDF text too short: {len(text)} chars")
-            except Exception as e:
-                logger.error(f"Error extracting PDF text: {e}")
+        # Try different URL patterns
+        if doi:
+            url = f"https://sci-hub.se/https://doi.org/{doi}"
         else:
-            logger.warning(f"Got status code {pdf_response.status_code} for PDF")
+            url = f"https://sci-hub.se/pmid/{pmid}"
+            
+        logger.info(f"Trying Sci-Hub URL: {url}")
+        response = requests.get(url, headers=headers, verify=False, timeout=30)
+        
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            pdf_element = soup.find('iframe', id='pdf') or soup.find('embed', id='pdf')
+            
+            if pdf_element and pdf_element.get('src'):
+                pdf_url = pdf_element['src']
+                if not pdf_url.startswith('http'):
+                    pdf_url = f"https:{pdf_url}" if pdf_url.startswith('//') else f"https://sci-hub.se{pdf_url}"
+                    
+                logger.info(f"Found PDF at {pdf_url}")
+                
+                # Add delay before PDF request
+                wait_time = random.uniform(3, 7)
+                time.sleep(wait_time)
+                
+                pdf_response = requests.get(pdf_url, headers=headers, verify=False, timeout=30)
+                if pdf_response.status_code == 200:
+                    try:
+                        pdf_file = io.BytesIO(pdf_response.content)
+                        pdf_reader = PyPDF2.PdfReader(pdf_file)
+                        
+                        text_parts = []
+                        for page in pdf_reader.pages:
+                            text = page.extract_text()
+                            if text:
+                                text_parts.append(text)
+                                
+                        if text_parts:
+                            text = '\n\n'.join(text_parts)
+                            if len(text) > 100:
+                                logger.info(f"Successfully extracted {len(text)} chars from Sci-Hub PDF")
+                                return text
+                    except Exception as e:
+                        logger.error(f"Error extracting PDF text: {e}")
+                        return None
+                else:
+                    logger.warning(f"Got status code {pdf_response.status_code} for PDF")
+        elif response.status_code == 404:
+            logger.warning("Paper not found on Sci-Hub")
+        elif response.status_code == 400:
+            logger.warning("Bad request - might be rate limited or detected as bot")
+        else:
+            logger.warning(f"Got status code {response.status_code} from Sci-Hub")
             
         return None
         
@@ -511,7 +507,9 @@ def format_pubmed_results(records: List[Dict]) -> pd.DataFrame:
                 'QTc (ms)': '',
                 'Heart Rate (bpm)': '',
                 'Blood Pressure (mmHg)': '',
-                'TdP': 'No'
+                'TdP': 'No',
+                'Source': '',
+                'Text Length': ''
             }
             results.append(paper_dict)
         except Exception as e:
@@ -520,43 +518,41 @@ def format_pubmed_results(records: List[Dict]) -> pd.DataFrame:
             
     return pd.DataFrame(results)
 
-def process_papers(pmids: List[str]) -> List[Dict]:
-    """Process a list of papers in parallel."""
+def get_texts_parallel(pmids: List[str]) -> List[Dict[str, Any]]:
+    """Get full texts for multiple PMIDs in parallel using ThreadPoolExecutor."""
     try:
         with ThreadPoolExecutor(max_workers=4) as executor:
             futures = []
             for pmid in pmids:
                 future = executor.submit(get_full_text, pmid)
                 futures.append((pmid, future))
-                
+            
             texts = []
             for pmid, future in futures:
                 try:
-                    text = future.result(timeout=300)  # 5 minute timeout per paper
-                    if text and len(text) > 500:
+                    text, source = future.result(timeout=300)  # 5 minute timeout per paper
+                    if text:
                         logger.info(f"Got {len(text)} chars for {pmid}")
-                        texts.append({
-                            'pmid': pmid,
-                            'full_text': text
-                        })
-                    else:
-                        logger.warning(f"No substantial text for {pmid}")
-                        texts.append({
-                            'pmid': pmid,
-                            'full_text': None
-                        })
-                except Exception as e:
-                    logger.error(f"Error processing {pmid}: {e}")
                     texts.append({
                         'pmid': pmid,
-                        'full_text': None
+                        'full_text': text,
+                        'source': source,
+                        'abstract': ''  # Initialize abstract field
+                    })
+                except Exception as e:
+                    logger.error(f"Error getting text for {pmid}: {e}")
+                    texts.append({
+                        'pmid': pmid,
+                        'full_text': None,
+                        'source': None,
+                        'abstract': ''
                     })
             
-        logger.info(f"Retrieved {len(texts)} full texts")
+        logger.info(f"Got {len(texts)} full texts out of {len(pmids)} papers")
         return texts
         
     except Exception as e:
-        logger.error(f"Error in process_papers: {e}")
+        logger.error(f"Error in get_texts_parallel: {e}")
         return []
 
 def analyze_literature(drug_name: str) -> pd.DataFrame:
@@ -570,21 +566,41 @@ def analyze_literature(drug_name: str) -> pd.DataFrame:
             
         # Initialize all required columns
         required_columns = [
-            'Title', 'Abstract', 'PMID', 'DOI', 'PubMed URL', 'Year',
-            'Age', 'Sex', 'Oral Dose (mg)', 'QT (ms)', 'QTc (ms)',
-            'Heart Rate (bpm)', 'Blood Pressure (mmHg)', 'TdP'
+            'Case Report Title',  
+            'Abstract', 
+            'PMID', 
+            'DOI', 
+            'PubMed URL', 
+            'Year',
+            'Age',
+            'Sex',
+            'Oral Dose (mg)',
+            'Uncorrected QT (ms)',  
+            'QTc',  
+            'Heart Rate (bpm)',
+            'Blood Pressure (mmHg)',
+            'Torsades de Pointes?',  
+            'Medical History',  
+            'Medication History',  
+            'Course of Treatment',  
+            'Source',
+            'Text Length'
         ]
         
         for col in required_columns:
             if col not in df.columns:
                 df[col] = ''
+                
+        # Rename Title to Case Report Title if it exists
+        if 'Title' in df.columns:
+            df = df.rename(columns={'Title': 'Case Report Title'})
         
         # Get PMIDs
         pmids = df['PMID'].tolist()
         logger.info(f"Found {len(pmids)} papers to analyze")
         
-        # Process papers in parallel
-        case_reports = process_papers(pmids)
+        # Get texts in parallel
+        case_reports = get_texts_parallel(pmids)
         logger.info(f"Retrieved {len(case_reports)} full texts")
         
         # Analyze each case report
@@ -592,9 +608,11 @@ def analyze_literature(drug_name: str) -> pd.DataFrame:
             try:
                 pmid = report['pmid']
                 text = report.get('full_text', '')
+                source = report.get('source', '')
                 
-                if text and len(text) > 100:  # Ensure substantial text
-                    logger.info(f"Text length for {pmid}: {len(text)} characters")
+                if text:
+                    text_length = len(text)
+                    logger.info(f"Processing text for {pmid} from {source} ({text_length} chars)")
                     
                     analyzer = CaseReportAnalyzer()
                     analyzed = analyzer.analyze(text)
@@ -603,14 +621,33 @@ def analyze_literature(drug_name: str) -> pd.DataFrame:
                     idx = df.index[df['PMID'] == pmid].tolist()
                     if idx:
                         idx = idx[0]
-                        df.loc[idx, 'Age'] = analyzed.get('age', '')
-                        df.loc[idx, 'Sex'] = analyzed.get('sex', '')
-                        df.loc[idx, 'Oral Dose (mg)'] = analyzed.get('oral_dose_value', '')
-                        df.loc[idx, 'QT (ms)'] = analyzed.get('qt_value', '')
-                        df.loc[idx, 'QTc (ms)'] = analyzed.get('qtc_value', '')
-                        df.loc[idx, 'Heart Rate (bpm)'] = analyzed.get('heart_rate_value', '')
-                        df.loc[idx, 'Blood Pressure (mmHg)'] = analyzed.get('blood_pressure_value', '')
-                        df.loc[idx, 'TdP'] = 'Yes' if analyzed.get('tdp_present', False) else 'No'
+                        # Store the source and text length
+                        df.loc[idx, 'Source'] = source
+                        df.loc[idx, 'Text Length'] = text_length
+                        
+                        # Store analyzed fields
+                        if analyzed.get('age'):
+                            df.loc[idx, 'Age'] = analyzed['age']
+                        if analyzed.get('sex'):
+                            df.loc[idx, 'Sex'] = analyzed['sex']
+                        if analyzed.get('oral_dose_value'):
+                            df.loc[idx, 'Oral Dose (mg)'] = analyzed['oral_dose_value']
+                        if analyzed.get('qt_value'):
+                            df.loc[idx, 'Uncorrected QT (ms)'] = analyzed['qt_value']
+                        if analyzed.get('qtc_value'):
+                            df.loc[idx, 'QTc'] = analyzed['qtc_value']
+                        if analyzed.get('heart_rate_value'):
+                            df.loc[idx, 'Heart Rate (bpm)'] = analyzed['heart_rate_value']
+                        if analyzed.get('blood_pressure_value'):
+                            df.loc[idx, 'Blood Pressure (mmHg)'] = analyzed['blood_pressure_value']
+                        if analyzed.get('tdp_present') is not None:
+                            df.loc[idx, 'Torsades de Pointes?'] = 'Yes' if analyzed['tdp_present'] else 'No'
+                        if analyzed.get('medical_history'):
+                            df.loc[idx, 'Medical History'] = analyzed['medical_history']
+                        if analyzed.get('medication_history'):
+                            df.loc[idx, 'Medication History'] = analyzed['medication_history']
+                        if analyzed.get('treatment_course'):
+                            df.loc[idx, 'Course of Treatment'] = analyzed['treatment_course']
                         
                         # Log what was found
                         found_fields = {k: v for k, v in analyzed.items() if v}
@@ -618,7 +655,7 @@ def analyze_literature(drug_name: str) -> pd.DataFrame:
                     else:
                         logger.warning(f"Could not find PMID {pmid} in DataFrame")
                 else:
-                    logger.warning(f"No substantial text available for {pmid}")
+                    logger.warning(f"No text available for {pmid}")
                     
             except Exception as e:
                 logger.error(f"Error analyzing paper {pmid}: {e}")
@@ -628,22 +665,43 @@ def analyze_literature(drug_name: str) -> pd.DataFrame:
         if 'Year' in df.columns:
             df = df.sort_values('Year', ascending=False)
         
-        # Reorder columns, keeping only those that exist
+        # Log summary of papers with data
+        data_columns = ['Age', 'Sex', 'Uncorrected QT (ms)', 'QTc', 'Heart Rate (bpm)', 'Torsades de Pointes?']
+        papers_with_data = df[df[data_columns].notna().any(axis=1)]
+        logger.info(f"Found data in {len(papers_with_data)} out of {len(df)} papers")
+        
+        # Log what was found in each paper
+        for _, row in papers_with_data.iterrows():
+            found_data = {col: row[col] for col in data_columns if pd.notna(row[col]) and row[col] != ''}
+            logger.info(f"Paper {row['PMID']} ({row['Source']}, {row['Text Length']} chars) found: {found_data}")
+        
+        # Reorder columns to ensure consistent display
         columns = [col for col in required_columns if col in df.columns]
         df = df[columns]
-        
-        # Log summary of papers with data
-        data_columns = ['Age', 'Sex', 'QT (ms)', 'QTc (ms)', 'Heart Rate (bpm)']
-        data_columns = [col for col in data_columns if col in df.columns]
-        if data_columns:
-            found_data = df[df[data_columns].notna().any(axis=1)]
-            logger.info(f"Found data in {len(found_data)} out of {len(df)} papers")
         
         return df
         
     except Exception as e:
         logger.error(f"Error in analyze_literature: {e}")
         return pd.DataFrame()
+
+def get_doi_from_crossref(pmid: str) -> Optional[str]:
+    """Get DOI for a PMID using Crossref API."""
+    try:
+        # First try to get DOI from PubMed
+        handle = Entrez.efetch(db="pubmed", id=pmid, rettype="xml")
+        records = Entrez.read(handle)
+        if records['PubmedArticle']:
+            article = records['PubmedArticle'][0]['MedlineCitation']['Article']
+            if 'ELocationID' in article:
+                for eloc in article['ELocationID']:
+                    if eloc.attributes['EIdType'] == 'doi':
+                        return str(eloc)
+        
+        return None
+    except Exception as e:
+        logger.error(f"Error getting DOI from Crossref for {pmid}: {e}")
+        return None
 
 def main():
     if len(sys.argv) != 2:
