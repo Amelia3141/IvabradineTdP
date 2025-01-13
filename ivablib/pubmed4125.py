@@ -411,25 +411,27 @@ def search_pubmed_case_reports(drug_name: str) -> pd.DataFrame:
             try:
                 # Get basic paper info
                 paper_dict = {
-                    'Case Report Title': record.get('TI', ''),
-                    'Abstract': record.get('AB', ''),
-                    'PMID': record.get('PMID', ''),
-                    'DOI': '',  # Will be filled by get_doi_from_crossref
-                    'PubMed URL': f"https://pubmed.ncbi.nlm.nih.gov/{record.get('PMID', '')}/",
-                    'Year': record.get('DP', '').split()[0] if record.get('DP') else '',
-                    'Age': '',
-                    'Sex': '',
-                    'Oral Dose (mg)': '',
-                    'Uncorrected QT (ms)': '',
-                    'QTc': '',
-                    'Heart Rate (bpm)': '',
-                    'Blood Pressure (mmHg)': '',
-                    'Torsades de Pointes?': 'No',
-                    'Medical History': '',
-                    'Medication History': '',
-                    'Course of Treatment': '',
-                    'Source': '',
-                    'Text Length': ''
+                    'title': record.get('TI', ''),
+                    'abstract': record.get('AB', ''),
+                    'pmid': record.get('PMID', ''),
+                    'doi': '',  # Will be filled by get_doi_from_crossref
+                    'pubmed_url': f"https://pubmed.ncbi.nlm.nih.gov/{record.get('PMID', '')}/",
+                    'year': record.get('DP', '').split()[0] if record.get('DP') else '',
+                    'age': '',
+                    'sex': '',
+                    'oral_dose_value': '',
+                    'oral_dose_unit': '',
+                    'oral_dose_freq': '',
+                    'qt_value': '',
+                    'qtc_value': '',
+                    'heart_rate_value': '',
+                    'blood_pressure_value': '',
+                    'tdp_present': False,
+                    'medical_history': '',
+                    'medication_history': '',
+                    'treatment_course': '',
+                    'source': '',
+                    'text_length': ''
                 }
                 papers.append(paper_dict)
             except Exception as e:
@@ -444,12 +446,12 @@ def search_pubmed_case_reports(drug_name: str) -> pd.DataFrame:
         # Get DOIs using Crossref
         for idx, row in df.iterrows():
             try:
-                if row['PMID']:
-                    doi = get_doi_from_crossref(row['PMID'])
+                if row['pmid']:
+                    doi = get_doi_from_crossref(row['pmid'])
                     if doi:
-                        df.at[idx, 'DOI'] = doi
+                        df.at[idx, 'doi'] = doi
             except Exception as e:
-                logger.error(f"Error getting DOI for {row['PMID']}: {e}")
+                logger.error(f"Error getting DOI for {row['pmid']}: {e}")
                 continue
         
         return df
@@ -509,22 +511,27 @@ def format_pubmed_results(records: List[Dict]) -> pd.DataFrame:
             
             # Create result dict with key fields
             paper_dict = {
-                'Title': record['MedlineCitation']['Article']['ArticleTitle'],
-                'Abstract': record['MedlineCitation']['Article'].get('Abstract', {}).get('AbstractText', [''])[0],
-                'PMID': pmid,
-                'DOI': doi or '',
-                'PubMed URL': f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
-                'Year': record['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate'].get('Year', ''),
-                'Age': '',
-                'Sex': '',
-                'Oral Dose (mg)': '',
-                'QT (ms)': '',
-                'QTc (ms)': '',
-                'Heart Rate (bpm)': '',
-                'Blood Pressure (mmHg)': '',
-                'TdP': 'No',
-                'Source': '',
-                'Text Length': ''
+                'title': record['MedlineCitation']['Article']['ArticleTitle'],
+                'abstract': record['MedlineCitation']['Article'].get('Abstract', {}).get('AbstractText', [''])[0],
+                'pmid': pmid,
+                'doi': doi or '',
+                'pubmed_url': f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
+                'year': record['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate'].get('Year', ''),
+                'age': '',
+                'sex': '',
+                'oral_dose_value': '',
+                'oral_dose_unit': '',
+                'oral_dose_freq': '',
+                'qt_value': '',
+                'qtc_value': '',
+                'heart_rate_value': '',
+                'blood_pressure_value': '',
+                'tdp_present': False,
+                'medical_history': '',
+                'medication_history': '',
+                'treatment_course': '',
+                'source': '',
+                'text_length': ''
             }
             results.append(paper_dict)
         except Exception as e:
@@ -581,25 +588,27 @@ def analyze_literature(drug_name: str) -> Dict[str, Any]:
             
         # Initialize all required columns
         required_columns = [
-            'Case Report Title',  
-            'Abstract', 
-            'PMID', 
-            'DOI', 
-            'PubMed URL', 
-            'Year',
-            'Age',
-            'Sex',
-            'Oral Dose (mg)',
-            'Uncorrected QT (ms)',  
-            'QTc',  
-            'Heart Rate (bpm)',
-            'Blood Pressure (mmHg)',
-            'Torsades de Pointes?',  
-            'Medical History',  
-            'Medication History',  
-            'Course of Treatment',  
-            'Source',
-            'Text Length'
+            'title',  
+            'abstract', 
+            'pmid', 
+            'doi', 
+            'pubmed_url', 
+            'year',
+            'age',
+            'sex',
+            'oral_dose_value',
+            'oral_dose_unit',
+            'oral_dose_freq',
+            'qt_value',  
+            'qtc_value',  
+            'heart_rate_value',
+            'blood_pressure_value',
+            'tdp_present',  
+            'medical_history',  
+            'medication_history',  
+            'treatment_course',  
+            'source',
+            'text_length'
         ]
         
         for col in required_columns:
@@ -608,10 +617,10 @@ def analyze_literature(drug_name: str) -> Dict[str, Any]:
                 
         # Rename Title to Case Report Title if it exists
         if 'Title' in df.columns:
-            df = df.rename(columns={'Title': 'Case Report Title'})
+            df = df.rename(columns={'Title': 'title'})
         
         # Get PMIDs
-        pmids = df['PMID'].tolist()
+        pmids = df['pmid'].tolist()
         logger.info(f"Found {len(pmids)} papers to analyze")
         
         # Get texts in parallel
@@ -633,36 +642,36 @@ def analyze_literature(drug_name: str) -> Dict[str, Any]:
                     analyzed = analyzer.analyze(text)
                     
                     # Update DataFrame with analyzed fields
-                    idx = df.index[df['PMID'] == pmid].tolist()
+                    idx = df.index[df['pmid'] == pmid].tolist()
                     if idx:
                         idx = idx[0]
                         # Store the source and text length
-                        df.loc[idx, 'Source'] = source
-                        df.loc[idx, 'Text Length'] = text_length
+                        df.loc[idx, 'source'] = source
+                        df.loc[idx, 'text_length'] = text_length
                         
                         # Store analyzed fields
                         if analyzed.get('age'):
-                            df.loc[idx, 'Age'] = analyzed['age']
+                            df.loc[idx, 'age'] = analyzed['age']
                         if analyzed.get('sex'):
-                            df.loc[idx, 'Sex'] = analyzed['sex']
+                            df.loc[idx, 'sex'] = analyzed['sex']
                         if analyzed.get('oral_dose_value'):
-                            df.loc[idx, 'Oral Dose (mg)'] = analyzed['oral_dose_value']
+                            df.loc[idx, 'oral_dose_value'] = analyzed['oral_dose_value']
                         if analyzed.get('qt_value'):
-                            df.loc[idx, 'Uncorrected QT (ms)'] = analyzed['qt_value']
+                            df.loc[idx, 'qt_value'] = analyzed['qt_value']
                         if analyzed.get('qtc_value'):
-                            df.loc[idx, 'QTc'] = analyzed['qtc_value']
+                            df.loc[idx, 'qtc_value'] = analyzed['qtc_value']
                         if analyzed.get('heart_rate_value'):
-                            df.loc[idx, 'Heart Rate (bpm)'] = analyzed['heart_rate_value']
+                            df.loc[idx, 'heart_rate_value'] = analyzed['heart_rate_value']
                         if analyzed.get('blood_pressure_value'):
-                            df.loc[idx, 'Blood Pressure (mmHg)'] = analyzed['blood_pressure_value']
+                            df.loc[idx, 'blood_pressure_value'] = analyzed['blood_pressure_value']
                         if analyzed.get('tdp_present') is not None:
-                            df.loc[idx, 'Torsades de Pointes?'] = 'Yes' if analyzed['tdp_present'] else 'No'
+                            df.loc[idx, 'tdp_present'] = analyzed['tdp_present']
                         if analyzed.get('medical_history'):
-                            df.loc[idx, 'Medical History'] = analyzed['medical_history']
+                            df.loc[idx, 'medical_history'] = analyzed['medical_history']
                         if analyzed.get('medication_history'):
-                            df.loc[idx, 'Medication History'] = analyzed['medication_history']
+                            df.loc[idx, 'medication_history'] = analyzed['medication_history']
                         if analyzed.get('treatment_course'):
-                            df.loc[idx, 'Course of Treatment'] = analyzed['treatment_course']
+                            df.loc[idx, 'treatment_course'] = analyzed['treatment_course']
                         
                         # Log what was found
                         found_fields = {k: v for k, v in analyzed.items() if v}
@@ -677,18 +686,18 @@ def analyze_literature(drug_name: str) -> Dict[str, Any]:
                 continue
         
         # Sort by year descending
-        if 'Year' in df.columns:
-            df = df.sort_values('Year', ascending=False)
+        if 'year' in df.columns:
+            df = df.sort_values('year', ascending=False)
         
         # Log summary of papers with data
-        data_columns = ['Age', 'Sex', 'Uncorrected QT (ms)', 'QTc', 'Heart Rate (bpm)', 'Torsades de Pointes?']
+        data_columns = ['age', 'sex', 'qt_value', 'qtc_value', 'heart_rate_value', 'tdp_present']
         papers_with_data = df[df[data_columns].notna().any(axis=1)]
         logger.info(f"Found data in {len(papers_with_data)} out of {len(df)} papers")
         
         # Log what was found in each paper
         for _, row in papers_with_data.iterrows():
             found_data = {col: row[col] for col in data_columns if pd.notna(row[col]) and row[col] != ''}
-            logger.info(f"Paper {row['PMID']} ({row['Source']}, {row['Text Length']} chars) found: {found_data}")
+            logger.info(f"Paper {row['pmid']} ({row['source']}, {row['text_length']} chars) found: {found_data}")
         
         # Reorder columns to ensure consistent display
         columns = [col for col in required_columns if col in df.columns]

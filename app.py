@@ -181,8 +181,6 @@ if analyze_button:
                                         
                                         if paper.get('tdp_present'):
                                             st.error("⚠️ Torsades de Pointes reported")
-                                            if paper.get('tdp_context'):
-                                                st.write(paper['tdp_context'])
                                     
                                     if paper.get('treatment_course'):
                                         st.markdown("**Treatment Course**")
