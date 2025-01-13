@@ -349,10 +349,13 @@ class CaseReportAnalyzer:
                     values = []
                     for match in matches:
                         try:
-                            value = float(match.group(1))
-                            if 100 <= value <= 700:  # Reasonable QT range in ms
-                                context = self.get_smart_context(text, match.start(), match.end())
-                                values.append((value, context))
+                            # Look for the numeric value in all groups
+                            numeric_groups = [g for g in match.groups() if g and re.match(r'^\d+(?:\.\d+)?$', g)]
+                            if numeric_groups:
+                                value = float(numeric_groups[0])
+                                if 100 <= value <= 700:  # Reasonable QT range in ms
+                                    context = self.get_smart_context(text, match.start(), match.end())
+                                    values.append((value, context))
                         except (ValueError, IndexError):
                             continue
                     
@@ -361,12 +364,34 @@ class CaseReportAnalyzer:
                         # For QT, also prefer larger values
                         value, context = max(values, key=lambda x: x[0])
                         results[f'{field}_value'] = str(value)
-                else:
-                    # For other fields, get the first capture group or full match
+                elif field in ['heart_rate', 'blood_pressure']:
+                    # For numeric fields, get the first numeric value
                     match = matches[0]
-                    value = next((g for g in match.groups() if g is not None), match.group(0))
-                    context = self.get_smart_context(text, match.start(), match.end())
-                    results[field] = value.strip()
+                    for group in match.groups():
+                        if group and re.match(r'^\d+(?:/\d+)?$', group):  # Allow for BP format (e.g., 120/80)
+                            results[f'{field}_value'] = group.strip()
+                            break
+                elif field in ['medical_history', 'medication_history', 'treatment_course']:
+                    # For history fields, get the content after the pattern
+                    match = matches[0]
+                    if match.groups():
+                        content = next((g for g in match.groups() if g), '').strip()
+                        results[field] = content
+                elif field == 'sex':
+                    # Clean up sex field
+                    match = matches[0]
+                    sex_text = match.group(0).lower()
+                    if any(term in sex_text for term in ['male', 'man', 'boy', 'm/']):
+                        results['sex'] = 'Male'
+                    elif any(term in sex_text for term in ['female', 'woman', 'girl', 'f/']):
+                        results['sex'] = 'Female'
+                elif field == 'age':
+                    # Get the first numeric age value
+                    match = matches[0]
+                    for group in match.groups():
+                        if group and group.isdigit():
+                            results['age'] = group
+                            break
     
         return results
 
@@ -615,9 +640,9 @@ class CaseReportAnalyzer:
             
         text = text.lower()
         if any(m in text for m in ['male', 'man', 'm/', 'boy']):
-            return 'male'
+            return 'Male'
         elif any(f in text for f in ['female', 'woman', 'f/', 'girl']):
-            return 'female'
+            return 'Female'
         return None
 
     def extract_value(self, text: str, pattern: re.Pattern) -> Optional[str]:
