@@ -51,28 +51,32 @@ class CaseReportAnalyzer:
                 [\s:]*
                 (?:interval|duration|measurement|prolongation|value)?
                 \s*
-                (?:of|was|is|=|:|measured|found|documented|recorded|increased\s+to)?
+                (?:of|was|is|=|:|measured|found|documented|recorded|increased\s+to|prolonged\s+to)?
                 \s*
-                (\d+\.?\d*)
-                \s*
+                (\d+(?:\.\d+)?)\s*
                 (?:ms(?:ec)?|milliseconds?|s(?:ec)?|seconds?)?
             """, re.VERBOSE | re.IGNORECASE),
 
             'qt': re.compile(r"""
-                \b(?:
-                    QT|
-                    uncorrected\s+QT|
-                    QT\s*interval|
-                    interval\s*QT|
-                    baseline\s*QT
+                (?:
+                    QT\s+interval|
+                    QT\s+duration|
+                    QT\s+measurement|
+                    QT\s+prolongation|
+                    QT\s+value|
+                    QT\s*=|
+                    QT\s*:|
+                    QT\s+was|
+                    QT\s+is|
+                    QT\s+of|
+                    \bQT\b
                 )
-                [\s:]*
+                \s*
                 (?:interval|duration|measurement|value)?
                 \s*
-                (?:of|was|is|=|:|measured|found|documented|recorded|increased\s+to)?
+                (?:of|was|is|=|:|measured|found|documented|recorded|increased\s+to|prolonged\s+to)?
                 \s*
-                (\d+\.?\d*)
-                \s*
+                (\d+(?:\.\d+)?)\s*
                 (?:ms(?:ec)?|milliseconds?|s(?:ec)?|seconds?)?
             """, re.VERBOSE | re.IGNORECASE),
             
@@ -246,23 +250,44 @@ class CaseReportAnalyzer:
         
         # Extract each field
         for field, pattern in self.patterns.items():
-            match = pattern.search(text)
-            if match:
+            matches = list(pattern.finditer(text))
+            if matches:
                 if field == 'tdp':
                     results['tdp_present'] = True
+                    # Get context for the first match
+                    match = matches[0]
                     results['tdp_context'] = self.get_smart_context(text, match.start(), match.end())
                 elif field == 'oral_dose':
-                    # Parse dose into value, unit, and frequency
+                    # Use the first match for dosing info
+                    match = matches[0]
                     dose_text = match.group(0)
-                    value_match = re.search(r'(\d+\.?\d*)', dose_text)
+                    value_match = re.search(r'(\d+(?:\.\d+)?)', dose_text)
                     unit_match = re.search(r'(mg|milligrams?|g|grams?|mcg|micrograms?|µg)', dose_text, re.IGNORECASE)
                     freq_match = re.search(r'(daily|once|twice|thrice|[1-4]x|q\.?d|bid|tid|qid|per\s+day|/day)', dose_text, re.IGNORECASE)
                     
                     results['oral_dose_value'] = value_match.group(1) if value_match else ''
                     results['oral_dose_unit'] = unit_match.group(1) if unit_match else ''
                     results['oral_dose_freq'] = freq_match.group(1) if freq_match else ''
+                elif field in ['qt', 'qtc']:
+                    # For QT measurements, try to find the most relevant value
+                    # Sort matches by the numeric value to find the most concerning one
+                    values = []
+                    for match in matches:
+                        try:
+                            value = float(match.group(1))
+                            if 100 <= value <= 700:  # Reasonable QT range in ms
+                                values.append(value)
+                        except (ValueError, IndexError):
+                            continue
+                    
+                    if values:
+                        # For QTc, prefer larger values as they're more concerning
+                        # For QT, also prefer larger values
+                        value = max(values)
+                        results[f'{field}_value'] = str(value)
                 else:
                     # For other fields, get the first capture group or full match
+                    match = matches[0]
                     value = next((g for g in match.groups() if g is not None), match.group(0))
                     results[field] = value.strip()
         

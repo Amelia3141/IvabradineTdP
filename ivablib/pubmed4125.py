@@ -647,10 +647,16 @@ def analyze_literature(drug_name: str) -> Dict:
                 # Extract fields using regex patterns
                 if text:
                     combined_text = report['full_text'] + ' ' + report['abstract']
+                    logger.info(f"Text length for {pmid}: {len(combined_text)} characters")
+                    logger.info(f"Sample text: {combined_text[:500]}...")  # Log first 500 chars
+                    
                     analyzer = CaseReportAnalyzer()  # Initialize with no args
                     analyzed = analyzer.analyze(combined_text)
                     report.update(analyzed)
-                    logger.info(f"Analyzed text for {pmid}: found {sum(1 for v in analyzed.values() if v)} fields")
+                    
+                    # Log what was found
+                    found_fields = {k: v for k, v in analyzed.items() if v}
+                    logger.info(f"Found fields for {pmid}: {found_fields}")
                 
                 case_reports.append(report)
             
