@@ -128,7 +128,8 @@ if analyze_button:
                 
                 with tab2:
                     st.subheader("Literature Review")
-                    literature = analyze_literature(drug_name)
+                    pmids = st.session_state.analyzer.get_relevant_pmids(drug_name)
+                    literature = analyze_literature(pmids, drug_name)
                     logger.info(f"Literature data: {literature}")
                     
                     if not literature.empty:
@@ -148,15 +149,17 @@ if analyze_button:
                                         st.write(f"Sex: {paper['Sex']}")
                                     if paper['Oral Dose (mg)']:
                                         st.write(f"Dose: {paper['Oral Dose (mg)']} mg")
-                                        
-                                    st.markdown("**ECG Parameters**")
+                                    
+                                    # Display ECG values without the header
                                     if paper['QTc']:
                                         st.write(f"QTc: {paper['QTc']} ms")
+                                    if paper['Uncorrected QT (ms)']:
+                                        st.write(f"QT: {paper['Uncorrected QT (ms)']} ms")
                                     if paper['Heart Rate (bpm)']:
                                         st.write(f"Heart Rate: {paper['Heart Rate (bpm)']} bpm")
                                     if paper['Torsades de Pointes?']:
                                         st.write(f"TdP: {paper['Torsades de Pointes?']}")
-                                
+
                                 with col2:
                                     if paper['Medical History']:
                                         st.markdown("**Medical History**")
