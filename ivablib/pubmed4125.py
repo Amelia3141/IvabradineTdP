@@ -3,19 +3,23 @@ import logging
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
-from Bio import Entrez
-import time
 import re
-import io
-import PyPDF2
+import json
+import time
 import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor
+from Bio import Entrez
+import PyPDF2
+from io import BytesIO
+import csv
+from typing import List, Dict, Tuple, Any, Optional
 from urllib.parse import urljoin
-from typing import List, Dict, Any, Optional, Tuple
 from .case_report_analyzer import CaseReportAnalyzer
+import urllib3
+import sys
 
 # Suppress SSL warnings
-requests.packages.urllib3.disable_warnings()
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -67,7 +71,7 @@ def get_full_text(pmid, doi=None):
     # Finally try Sci-Hub
     try:
         logger.info(f"Trying Sci-Hub for {pmid}")
-        scihub_text = get_scihub_text(pmid, doi)
+        scihub_text = _get_text_from_scihub(pmid, doi)
         if scihub_text:
             text = scihub_text
             source = 'Sci-Hub'
@@ -236,114 +240,72 @@ def get_crossref_text(doi):
         
     return None
 
-def get_scihub_text(pmid, doi=None):
-    """Get full text from Sci-Hub."""
+def _get_text_from_scihub(pmid, doi=None):
+    """Try to get full text from Sci-Hub"""
     try:
+        if not doi:
+            logger.warning(f"No DOI available for PMID {pmid}")
+            return None
+            
         # Try multiple Sci-Hub domains
-        domains = [
-            'https://sci-hub.se',
-            'https://sci-hub.wf',
-            'https://sci-hub.ren'
-        ]
-        
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1'
-        }
-        
-        session = requests.Session()
-        session.headers.update(headers)
+        domains = ['https://sci-hub.se', 'https://sci-hub.st', 'https://sci-hub.ru']
         
         for domain in domains:
             try:
                 logger.info(f"Trying Sci-Hub domain: {domain}")
                 
-                # Try DOI first if available, then PMID
-                if doi:
-                    url = f"{domain}/{doi}"
-                else:
-                    url = f"{domain}/pubmed/{pmid}"
+                # Create session with longer timeout and retries
+                session = requests.Session()
+                session.mount('https://', requests.adapters.HTTPAdapter(max_retries=3))
                 
-                response = session.get(url, timeout=30, verify=False)
-                if response.status_code != 200:
-                    logger.warning(f"Got status code {response.status_code} from {domain}")
-                    continue
+                # First get the PDF URL
+                scihub_url = f"{domain}/{doi}"
+                response = session.get(scihub_url, timeout=30, verify=False)
+                response.raise_for_status()
                 
-                if 'location not found' in response.text.lower() or 'article not found' in response.text.lower():
-                    logger.info(f"Paper not found on {domain}")
-                    continue
-                    
                 soup = BeautifulSoup(response.text, 'html.parser')
+                pdf_iframe = soup.find('iframe', id='pdf')
                 
-                # First try to get text directly from the page
-                article_text = soup.find('div', {'id': 'pdf'}) or soup.find('embed', {'id': 'pdf'})
-                if article_text:
-                    text = article_text.get_text(separator=' ', strip=True)
-                    if len(text) > 500:
-                        logger.info(f"Got {len(text)} chars directly from page")
-                        return text
-                
-                # Look for embedded PDF
-                pdf_iframe = soup.find('iframe', {'id': 'pdf'}) or soup.find('embed', {'id': 'pdf'})
-                if pdf_iframe and 'src' in pdf_iframe.attrs:
-                    pdf_url = pdf_iframe['src']
-                    if not pdf_url.startswith('http'):
-                        pdf_url = urljoin(domain, pdf_url) if pdf_url.startswith('/') else f"https:{pdf_url}"
+                if not pdf_iframe:
+                    logger.warning(f"No PDF iframe found on {domain} for DOI {doi}")
+                    continue
                     
-                    logger.info(f"Found PDF at {pdf_url}")
+                pdf_url = pdf_iframe.get('src', '')
+                if not pdf_url.startswith('http'):
+                    pdf_url = 'https:' + pdf_url
                     
-                    # Download PDF
-                    pdf_response = session.get(pdf_url, timeout=30, verify=False)
-                    if pdf_response.headers.get('content-type', '').lower() == 'application/pdf':
-                        pdf_file = io.BytesIO(pdf_response.content)
-                        pdf_reader = PyPDF2.PdfReader(pdf_file)
-                        text = ""
-                        for page in pdf_reader.pages:
-                            text += page.extract_text()
-                        text = text.strip()
-                        if len(text) > 500:
-                            logger.info(f"Got {len(text)} chars from PDF")
-                            return text
-                        else:
-                            logger.warning(f"PDF text too short ({len(text)} chars)")
+                logger.info(f"Found PDF at {pdf_url}")
                 
-                # Also try to find direct download links
-                for link in soup.find_all('a', href=True):
-                    href = link['href']
-                    if href.lower().endswith('.pdf'):
-                        try:
-                            pdf_url = urljoin(domain, href)
-                            logger.info(f"Found direct PDF link: {pdf_url}")
-                            
-                            pdf_response = session.get(pdf_url, timeout=30, verify=False)
-                            if pdf_response.headers.get('content-type', '').lower() == 'application/pdf':
-                                pdf_file = io.BytesIO(pdf_response.content)
-                                pdf_reader = PyPDF2.PdfReader(pdf_file)
-                                text = ""
-                                for page in pdf_reader.pages:
-                                    text += page.extract_text()
-                                text = text.strip()
-                                if len(text) > 500:
-                                    logger.info(f"Got {len(text)} chars from direct PDF")
-                                    return text
-                                else:
-                                    logger.warning(f"Direct PDF text too short ({len(text)} chars)")
-                        except Exception as e:
-                            logger.error(f"Error with direct PDF link: {e}")
-                            continue
-                
-            except Exception as e:
-                logger.error(f"Error with domain {domain}: {e}")
+                # Download PDF with retry
+                max_retries = 3
+                for attempt in range(max_retries):
+                    try:
+                        pdf_response = session.get(pdf_url, timeout=30, verify=False)
+                        if pdf_response.headers.get('content-type', '').lower() == 'application/pdf':
+                            pdf_file = BytesIO(pdf_response.content)
+                            pdf_reader = PyPDF2.PdfReader(pdf_file)
+                            text = ""
+                            for page in pdf_reader.pages:
+                                text += page.extract_text()
+                                
+                            if len(text) > 1000:  # Sanity check for extracted text
+                                logger.info(f"Got {len(text)} chars from PDF")
+                                return text
+                                
+                    except Exception as e:
+                        if attempt == max_retries - 1:
+                            logger.error(f"Failed to get PDF after {max_retries} attempts: {str(e)}")
+                            break
+                        time.sleep(2)  # Wait before retry
+                        
+            except requests.exceptions.RequestException as e:
+                logger.warning(f"Failed to access {domain}: {str(e)}")
                 continue
-        
-        logger.warning(f"Could not get text from any Sci-Hub domain for {pmid}")
+                
         return None
         
     except Exception as e:
-        logger.error(f"Error in Sci-Hub retrieval: {e}")
+        logger.error(f"Error in Sci-Hub retrieval for PMID {pmid}: {str(e)}")
         return None
 
 def get_drug_names(drug_name: str) -> List[str]:
