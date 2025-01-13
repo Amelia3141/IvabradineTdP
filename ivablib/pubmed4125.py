@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 import PyPDF2
 from typing import List, Dict, Optional, Any
 from concurrent.futures import ThreadPoolExecutor
+import concurrent.futures
 import time
 from io import BytesIO
 import urllib3
