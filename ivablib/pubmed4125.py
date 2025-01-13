@@ -186,26 +186,35 @@ def get_crossref_text(doi: str) -> Optional[str]:
             return None
             
         data = response.json()
-        if 'message' not in data:
-            logger.warning("No message in Crossref response")
+        if not isinstance(data, dict) or 'message' not in data:
+            logger.warning("Invalid response from Crossref API")
+            return None
+            
+        message = data['message']
+        if not isinstance(message, dict):
+            logger.warning("Invalid message format in Crossref response")
             return None
             
         # Try to get the paper URL
         urls = []
         
         # Check for free PDF URL
-        if 'link' in data['message']:
-            for link in data['message']['link']:
-                if link.get('content-type', '').lower() == 'application/pdf':
-                    urls.append(link['URL'])
+        if 'link' in message and isinstance(message['link'], list):
+            for link in message['link']:
+                if isinstance(link, dict) and 'URL' in link:
+                    content_type = link.get('content-type', '').lower()
+                    if 'pdf' in content_type:
+                        urls.append(link['URL'])
         
         # Check for alternative URLs
-        if 'resource' in data['message']:
-            urls.extend([r['URL'] for r in data['message']['resource']])
+        if 'resource' in message and isinstance(message['resource'], dict):
+            primary_url = message['resource'].get('primaryURL')
+            if primary_url:
+                urls.append(primary_url)
             
         # Add the main URL if available
-        if 'url' in data['message']:
-            urls.append(data['message']['url'])
+        if 'URL' in message:
+            urls.append(message['URL'])
             
         logger.info(f"Found {len(urls)} URLs from Crossref")
         
@@ -253,7 +262,7 @@ def get_crossref_text(doi: str) -> Optional[str]:
                 logger.error(f"Error processing URL {url}: {e}")
                 continue
                 
-        logger.warning(f"Could not extract text from any Crossref URLs for DOI {doi}")
+        logger.info(f"No text found in Crossref for {doi}")
         return None
         
     except Exception as e:
@@ -555,77 +564,36 @@ def format_pubmed_results(records: List[Dict]) -> pd.DataFrame:
             
     return pd.DataFrame(results)
 
-def get_texts_parallel(pmids):
-    """Get full texts for multiple PMIDs in parallel using ThreadPoolExecutor"""
-    texts = {}
-    logger.info(f"Getting full texts for {len(pmids)} papers")
-    
-    # First get DOIs for all papers
-    dois = {}
-    for pmid in pmids:
-        try:
-            # Query NCBI for DOI
-            handle = Entrez.efetch(db="pubmed", id=pmid, rettype="xml", retmode="text")
-            records = Entrez.read(handle)
-            handle.close()
+def get_texts_parallel(pmids: List[str]) -> List[Dict[str, Any]]:
+    """Get full texts for multiple PMIDs in parallel using ThreadPoolExecutor."""
+    try:
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            futures = []
+            for pmid in pmids:
+                future = executor.submit(get_full_text, pmid)
+                futures.append((pmid, future))
             
-            article = records['PubmedArticle'][0]['MedlineCitation']['Article']
-            # Try both ELocationID and ArticleId for DOI
-            doi = None
+            texts = []
+            for pmid, future in futures:
+                try:
+                    text = future.result(timeout=300)  # 5 minute timeout per paper
+                    texts.append({
+                        'pmid': pmid,
+                        'full_text': text
+                    })
+                except Exception as e:
+                    logger.error(f"Error getting text for {pmid}: {e}")
+                    texts.append({
+                        'pmid': pmid,
+                        'full_text': None
+                    })
             
-            # Check ELocationID
-            if 'ELocationID' in article:
-                for id in article['ELocationID']:
-                    if id.attributes['EIdType'] == 'doi':
-                        doi = str(id)
-                        break
-            
-            # If not found, check ArticleIdList
-            if not doi and 'ArticleIdList' in records['PubmedArticle'][0]['PubmedData']:
-                for id in records['PubmedArticle'][0]['PubmedData']['ArticleIdList']:
-                    if id.attributes['IdType'] == 'doi':
-                        doi = str(id)
-                        break
-            
-            if doi:
-                dois[pmid] = doi
-                logger.info(f"Found DOI for {pmid}: {doi}")
-            
-            # Add a small delay between requests
-            time.sleep(1)
-            
-        except Exception as e:
-            logger.error(f"Error getting DOI for {pmid}: {e}")
-    
-    def get_text_with_delay(pmid):
-        """Wrapper to add delay between requests"""
-        text, source = get_full_text(pmid, dois.get(pmid))
-        time.sleep(2)  # Add delay between full text requests
-        return text, source
-    
-    # Use ThreadPoolExecutor to run requests in parallel
-    with ThreadPoolExecutor(max_workers=3) as executor:  # Reduced max_workers to avoid overwhelming servers
-        future_to_pmid = {
-            executor.submit(get_text_with_delay, pmid): pmid 
-            for pmid in pmids
-        }
+        logger.info(f"Got {len(texts)} full texts out of {len(pmids)} papers")
+        return texts
         
-        for future in concurrent.futures.as_completed(future_to_pmid):
-            pmid = future_to_pmid[future]
-            try:
-                result = future.result()
-                if result:
-                    text, source = result
-                    if text:
-                        texts[pmid] = text
-                        logger.info(f"Successfully got text for {pmid} from {source}")
-                    else:
-                        logger.warning(f"No text returned for {pmid}")
-            except Exception as e:
-                logger.error(f"Error processing {pmid}: {e}")
-                
-    logger.info(f"Got {len(texts)} full texts out of {len(pmids)} papers")
-    return texts
+    except Exception as e:
+        logger.error(f"Error in get_texts_parallel: {e}")
+        return []
 
 def analyze_literature(drug_name: str) -> pd.DataFrame:
     """Analyze literature for a given drug."""
@@ -649,10 +617,9 @@ def analyze_literature(drug_name: str) -> pd.DataFrame:
             try:
                 pmid = report['pmid']
                 text = report.get('full_text', '')
-                abstract = report.get('abstract', '')
                 
-                if text or abstract:
-                    combined_text = (text + ' ' + abstract).strip()
+                if text:
+                    combined_text = text
                     logger.info(f"Text length for {pmid}: {len(combined_text)} characters")
                     
                     analyzer = CaseReportAnalyzer()
