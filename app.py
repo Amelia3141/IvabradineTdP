@@ -128,77 +128,42 @@ if analyze_button:
                 
                 with tab2:
                     st.subheader("Literature Review")
-                    literature = analysis.get('literature', {})
+                    literature = analyze_literature(drug_name)
                     logger.info(f"Literature data: {literature}")
                     
-                    if 'error' in literature:
-                        st.error(literature['error'])
-                    elif 'case_reports' in literature:
-                        papers = literature['case_reports']
-                        if isinstance(papers, list) and len(papers) > 0:
-                            st.write(f"Found {len(papers)} relevant papers")
-                            
-                            # Create expandable sections for each paper
-                            for i, paper in enumerate(papers, 1):
-                                with st.expander(f"Case Report {i}: {paper.get('title', 'Untitled Paper')}", expanded=False):
-                                    col1, col2 = st.columns(2)
-                                    
-                                    with col1:
-                                        st.markdown("**Patient Information**")
-                                        st.write(f"Age: {paper.get('age', 'N/A')}")
-                                        st.write(f"Sex: {paper.get('sex', 'N/A')}")
+                    if not literature.empty:
+                        # Convert DataFrame to records for display
+                        records = literature.to_dict('records')
+                        
+                        # Create expandable sections for each paper
+                        for i, paper in enumerate(records):
+                            with st.expander(f"📄 {paper['Case Report Title']}", expanded=i==0):
+                                col1, col2 = st.columns(2)
+                                
+                                with col1:
+                                    st.markdown("**Patient Details**")
+                                    if paper['Age']:
+                                        st.write(f"Age: {paper['Age']}")
+                                    if paper['Sex']:
+                                        st.write(f"Sex: {paper['Sex']}")
+                                    if paper['Oral Dose (mg)']:
+                                        st.write(f"Dose: {paper['Oral Dose (mg)']} mg")
                                         
-                                        if paper.get('medical_history'):
-                                            st.markdown("**Medical History**")
-                                            st.write(paper['medical_history'])
-                                        
-                                        if paper.get('medication_history'):
-                                            st.markdown("**Medication History**")
-                                            st.write(paper['medication_history'])
-                                    
-                                    with col2:
-                                        st.markdown("**Medication Details**")
-                                        if paper.get('oral_dose_value'):
-                                            dose_str = f"{paper['oral_dose_value']} {paper.get('oral_dose_unit', '')}"
-                                            if paper.get('oral_dose_freq'):
-                                                dose_str += f" {paper['oral_dose_freq']}"
-                                            st.write(f"Dose: {dose_str}")
-                                        else:
-                                            st.write("No dosing information available")
-                                        
-                                        st.markdown("**ECG Measurements**")
-                                        if paper.get('qt_value'):
-                                            st.write(f"QT: {paper['qt_value']} ms")
-                                        if paper.get('qtc_value'):
-                                            st.write(f"QTc: {paper['qtc_value']} ms")
-                                        if paper.get('heart_rate_value'):
-                                            st.write(f"Heart Rate: {paper['heart_rate_value']} bpm")
-                                        if not any([paper.get('qt_value'), paper.get('qtc_value')]):
-                                            st.write("No ECG measurements available")
-                                        
-                                        if paper.get('blood_pressure_value'):
-                                            st.write(f"Blood Pressure: {paper['blood_pressure_value']} mmHg")
-                                        
-                                        if paper.get('tdp_present'):
-                                            st.error("⚠️ Torsades de Pointes reported")
-                                            if paper.get('tdp_context'):
-                                                st.write(paper['tdp_context'])
-                                    
-                                    if paper.get('treatment_course'):
+                                    st.markdown("**ECG Parameters**")
+                                    if paper['QTc']:
+                                        st.write(f"QTc: {paper['QTc']} ms")
+                                    if paper['Heart Rate (bpm)']:
+                                        st.write(f"Heart Rate: {paper['Heart Rate (bpm)']} bpm")
+                                    if paper['Torsades de Pointes?']:
+                                        st.write(f"TdP: {paper['Torsades de Pointes?']}")
+                                
+                                with col2:
+                                    if paper['Medical History']:
+                                        st.markdown("**Medical History**")
+                                        st.write(paper['Medical History'])
+                                    if paper['Course of Treatment']:
                                         st.markdown("**Treatment Course**")
-                                        st.write(paper['treatment_course'])
-                                    
-                                    # Add source information
-                                    st.markdown("---")
-                                    source_text = []
-                                    if paper.get('pmid'):
-                                        source_text.append(f"PMID: {paper['pmid']}")
-                                    if paper.get('doi'):
-                                        source_text.append(f"DOI: {paper['doi']}")
-                                    if source_text:
-                                        st.caption(" | ".join(source_text))
-                        else:
-                            st.info("No case reports found matching the search criteria.")
+                                        st.write(paper['Course of Treatment'])
                     else:
                         st.info("No literature data available.")
 
