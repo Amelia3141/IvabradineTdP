@@ -6,7 +6,6 @@ from bs4 import BeautifulSoup
 import PyPDF2
 from typing import List, Dict, Optional, Any
 from concurrent.futures import ThreadPoolExecutor
-import concurrent.futures
 import time
 from io import BytesIO
 import urllib3
@@ -14,8 +13,6 @@ import random
 import re
 import csv
 import sys
-import json
-from .case_report_analyzer import CaseReportAnalyzer
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -234,6 +231,8 @@ def get_text_from_scihub(pmid: str, doi: str) -> Optional[str]:
     if not doi:
         return None
         
+    url = f"https://sci-hub.se/{doi}"
+    
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
@@ -243,13 +242,13 @@ def get_text_from_scihub(pmid: str, doi: str) -> Optional[str]:
         'Cache-Control': 'max-age=0'
     }
     
-    session = requests.Session()
-    
     try:
-        # First get the main Sci-Hub page
-        url = f"https://sci-hub.se/{doi}"
-        response = session.get(url, headers=headers, verify=False)
+        # Create a session to handle cookies and redirects
+        session = requests.Session()
+        session.verify = False  # Bypass SSL verification
         
+        # First request to get the page and handle any redirects
+        response = session.get(url, headers=headers, timeout=30, allow_redirects=True)
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
             
@@ -260,45 +259,58 @@ def get_text_from_scihub(pmid: str, doi: str) -> Optional[str]:
             iframe = soup.find('iframe', id='pdf')
             if iframe and iframe.get('src'):
                 pdf_url = iframe['src']
+                logger.info(f"Found PDF URL in iframe: {pdf_url}")
             
             # Method 2: Check embed
             if not pdf_url:
                 embed = soup.find('embed')
                 if embed and embed.get('src'):
                     pdf_url = embed['src']
+                    logger.info(f"Found PDF URL in embed: {pdf_url}")
             
             # Method 3: Look for direct PDF link
             if not pdf_url:
                 pdf_link = soup.find('a', href=re.compile(r'.*\.pdf$'))
                 if pdf_link:
                     pdf_url = pdf_link['href']
+                    logger.info(f"Found PDF URL in link: {pdf_url}")
             
             if pdf_url:
                 if not pdf_url.startswith('http'):
                     pdf_url = f"https:{pdf_url}" if pdf_url.startswith('//') else f"https://sci-hub.se{pdf_url}"
                 
-                # Get PDF content with same session
-                pdf_response = session.get(pdf_url, headers=headers, verify=False)
+                logger.info(f"Attempting to download PDF from: {pdf_url}")
+                
+                # Get PDF content using the same session
+                pdf_response = session.get(pdf_url, headers=headers, timeout=30, verify=False)
                 if pdf_response.status_code == 200:
-                    # Extract text from PDF
-                    pdf_file = BytesIO(pdf_response.content)
-                    try:
-                        reader = PyPDF2.PdfReader(pdf_file)
-                        text = ""
-                        for page in reader.pages:
-                            text += page.extract_text() + "\n"
-                        if len(text.strip()) > 100:  # Basic sanity check
-                            return text
-                    except Exception as e:
-                        logger.warning(f"Error extracting text from PDF for {pmid}: {e}")
-                        
-        elif response.status_code == 403:
-            logger.error(f"Access forbidden (403) for {url}. This might be due to rate limiting or IP blocking.")
+                    # Verify it's actually a PDF
+                    if pdf_response.headers.get('content-type', '').lower() == 'application/pdf':
+                        # Extract text from PDF
+                        pdf_file = BytesIO(pdf_response.content)
+                        try:
+                            reader = PyPDF2.PdfReader(pdf_file)
+                            text = ""
+                            for page in reader.pages:
+                                text += page.extract_text() + "\n"
+                            if len(text.strip()) > 100:  # Basic sanity check
+                                logger.info(f"Successfully extracted text from PDF for {pmid}")
+                                return text
+                            else:
+                                logger.warning(f"Extracted text too short for {pmid}")
+                        except Exception as e:
+                            logger.warning(f"Error extracting text from PDF for {pmid}: {e}")
+                    else:
+                        logger.warning(f"Response not PDF for {pmid}: {pdf_response.headers.get('content-type')}")
+                else:
+                    logger.warning(f"Failed to get PDF for {pmid}: Status {pdf_response.status_code}")
+            else:
+                logger.warning(f"No PDF URL found for {pmid}")
         else:
-            logger.error(f"Failed to access {url}: Status code {response.status_code}")
+            logger.warning(f"Failed to access Sci-Hub for {pmid}: Status {response.status_code}")
             
     except Exception as e:
-        logger.error(f"Error accessing Sci-Hub for {pmid}: {e}")
+        logger.warning(f"Failed to access Sci-Hub: {str(e)}")
         
     return None
 
@@ -605,42 +617,84 @@ def get_texts_parallel(pmids):
     logger.info(f"Got {len(texts)} full texts out of {len(pmids)} papers")
     return texts
 
-def analyze_literature(pmids: List[str], drug_name: str) -> pd.DataFrame:
-    """Analyze literature for case reports."""
+def analyze_literature(drug_name: str) -> pd.DataFrame:
+    """Analyze literature for a given drug."""
     try:
-        # Initialize analyzer
-        analyzer = CaseReportAnalyzer()
+        # Get drug names (including synonyms)
+        drug_names = get_drug_names(drug_name)
+        logger.info(f"Searching for drug names: {drug_names}")
         
-        # Get full texts
-        papers = get_texts_parallel(pmids)
-        logger.info(f"Retrieved {len(papers)} full texts")
-        
-        # Analyze each paper
-        results = []
-        for pmid, text in papers.items():
-            try:
-                if text:
-                    logger.info(f"Text length for {pmid}: {len(text)} characters")
-                result = analyzer.analyze_paper({'PMID': pmid, 'FullText': text})
-                if result:
-                    results.append(result)
-                else:
-                    logger.warning(f"No results for paper {pmid}")
-            except Exception as e:
-                logger.error(f"Error analyzing paper {pmid}: {str(e)}")
-                continue
-        
-        # Create DataFrame
-        if results:
-            df = pd.DataFrame(results)
-            logger.info(f"Final dataframe has {len(df)} rows and columns: {list(df.columns)}")
-            return df
-        else:
-            logger.warning("No results to create DataFrame")
+        # Search PubMed
+        df = search_pubmed_case_reports(drug_name)
+        if df.empty:
+            logger.warning("No results found in PubMed")
             return pd.DataFrame()
             
+        # Get PMIDs
+        pmids = df['PMID'].tolist()
+        logger.info(f"Found {len(pmids)} papers to analyze")
+        
+        # Get texts in parallel
+        texts = get_texts_parallel(pmids)
+        logger.info(f"Retrieved {len(texts)} full texts")
+        
+        # Analyze each case report
+        for pmid, text in texts.items():
+            try:
+                if text:
+                    # Get abstract from DataFrame
+                    abstract = df.loc[df['PMID'] == pmid, 'Abstract'].iloc[0]
+                    combined_text = text + ' ' + (abstract if abstract else '')
+                    logger.info(f"Text length for {pmid}: {len(combined_text)} characters")
+                    
+                    analyzer = CaseReportAnalyzer()
+                    analyzed = analyzer.analyze(combined_text)
+                    
+                    # Update DataFrame with analyzed fields
+                    idx = df.index[df['PMID'] == pmid][0]
+                    df.loc[idx, 'Age'] = analyzed.get('age', '')
+                    df.loc[idx, 'Sex'] = analyzed.get('sex', '')
+                    df.loc[idx, 'Oral Dose (mg)'] = analyzed.get('oral_dose_value', '')
+                    df.loc[idx, 'Uncorrected QT (ms)'] = analyzed.get('qt_value', '')
+                    df.loc[idx, 'QTc'] = analyzed.get('qtc_value', '')
+                    df.loc[idx, 'Heart Rate (bpm)'] = analyzed.get('heart_rate_value', '')
+                    df.loc[idx, 'Blood Pressure (mmHg)'] = analyzed.get('blood_pressure_value', '')
+                    df.loc[idx, 'Torsades de Pointes?'] = 'Yes' if analyzed.get('tdp_present', False) else 'No'
+                    df.loc[idx, 'Medical History'] = analyzed.get('medical_history', '')
+                    df.loc[idx, 'Medication History'] = analyzed.get('medication_history', '')
+                    df.loc[idx, 'Course of Treatment'] = analyzed.get('treatment_course', '')
+                    
+                    # Log what was found
+                    found_fields = {k: v for k, v in analyzed.items() if v}
+                    logger.info(f"Found fields for {pmid}: {found_fields}")
+            except Exception as e:
+                logger.error(f"Error analyzing paper {pmid}: {e}")
+                continue
+        
+        # Sort by year descending
+        df = df.sort_values('Year', ascending=False)
+        
+        # Reorder columns to match the image
+        columns = [
+            'Case Report Title', 'Age', 'Sex', 'Oral Dose (mg)',
+            'theoretical max concentration (μM)', '40% bioavailability',
+            'Theoretical HERG IC50 / Concentration μM', '40% Plasma concentration',
+            'Uncorrected QT (ms)', 'QTc', 'QTR', 'QTF', 'Heart Rate (bpm)',
+            'Torsades de Pointes?', 'Blood Pressure (mmHg)',
+            'Medical History', 'Medication History', 'Course of Treatment'
+        ]
+        
+        # Make sure all columns exist
+        for col in columns:
+            if col not in df.columns:
+                df[col] = ''
+                
+        df = df[columns]
+        logger.info(f"Final dataframe has {len(df)} rows and columns: {df.columns.tolist()}")
+        return df
+        
     except Exception as e:
-        logger.error(f"Error in analyze_literature: {str(e)}")
+        logger.error(f"Error in analyze_literature: {e}")
         return pd.DataFrame()
 
 def main():
@@ -649,14 +703,8 @@ def main():
         sys.exit(1)
         
     drug_name = sys.argv[1].upper()
-    # Search PubMed for case reports
-    df = search_pubmed_case_reports(drug_name)
-    if not df.empty:
-        pmids = df['PMID'].tolist()
-        papers = analyze_literature(pmids, drug_name)
-        print(f"\nFound {len(papers)} papers")
-    else:
-        print("No papers found")
+    papers = analyze_literature(drug_name)
+    print(f"\nFound {len(papers)} papers")
 
 if __name__ == "__main__":
     main()
