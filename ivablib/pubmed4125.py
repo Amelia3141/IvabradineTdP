@@ -17,11 +17,9 @@ import difflib
 import csv
 import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor
-import urllib3
 
 # Suppress SSL warnings
 requests.packages.urllib3.disable_warnings()
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -38,114 +36,54 @@ def get_full_text(pmid, doi=None):
     """Get full text from PMC, Crossref, or Sci-Hub in that order."""
     text = None
     source = None
-    
+    logger.info(f"Attempting to get full text for PMID {pmid}, DOI {doi}")
+
     # Try PMC first
     try:
-        logger.info(f"Attempting PMC retrieval for PMID {pmid}")
         pmc_id = get_pmcid_from_pmid(pmid)
+        logger.info(f"PMC ID for {pmid}: {pmc_id}")
         if pmc_id:
             text = get_pmc_text(pmc_id)
             if text:
                 source = 'PMC'
-                logger.info("Successfully retrieved from PMC")
+                logger.info(f"Successfully got text from PMC for {pmid}")
                 return text, source
             else:
-                logger.info("No text found in PMC")
+                logger.info(f"No text found in PMC for {pmid}")
     except Exception as e:
-        logger.error(f"Error retrieving from PMC: {e}")
+        logger.error(f"Error getting PMC text for {pmid}: {e}")
 
-    # Try Crossref if we have a DOI
+    # Try Crossref next if we have a DOI
     if doi:
         try:
-            logger.info(f"Attempting Crossref retrieval for DOI {doi}")
-            text = get_crossref_text(doi)
-            if text:
+            logger.info(f"Trying Crossref for {pmid} with DOI {doi}")
+            crossref_text = get_crossref_text(doi)
+            if crossref_text:
+                text = crossref_text
                 source = 'Crossref'
-                logger.info("Successfully retrieved from Crossref")
+                logger.info(f"Successfully got text from Crossref for {pmid}")
                 return text, source
             else:
-                logger.info("No text found in Crossref or hit paywall")
+                logger.info(f"No text found in Crossref for {pmid}")
         except Exception as e:
-            logger.error(f"Error retrieving from Crossref: {e}")
+            logger.error(f"Error getting Crossref text for {doi}: {e}")
 
-    # Finally try Sci-Hub with retries
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            logger.info(f"Attempting Sci-Hub retrieval (attempt {attempt + 1}/{max_retries})")
-            text = get_scihub_text(pmid, doi)
-            if text:
-                source = 'Sci-Hub'
-                logger.info("Successfully retrieved from Sci-Hub")
-                return text, source
-            else:
-                logger.info(f"No text found in Sci-Hub on attempt {attempt + 1}")
-            
-            if attempt < max_retries - 1:
-                delay = 2 * (attempt + 1)  # Exponential backoff
-                logger.info(f"Waiting {delay} seconds before next attempt...")
-                time.sleep(delay)
-        except Exception as e:
-            logger.error(f"Error retrieving from Sci-Hub on attempt {attempt + 1}: {e}")
-            if attempt < max_retries - 1:
-                delay = 2 * (attempt + 1)
-                logger.info(f"Waiting {delay} seconds before next attempt...")
-                time.sleep(delay)
-
-    logger.warning(f"Failed to retrieve text from any source for PMID {pmid}")
-    return text, source
-
-def get_full_texts(papers):
-    """Get full texts for papers"""
-    papers_with_text = []
-    total_papers = len(papers)
-    texts_found = 0
-    retrieval_stats = {
-        'PMC': 0,
-        'Crossref': 0,
-        'Sci-Hub': 0,
-        'Failed': 0
-    }
-    
-    for paper in papers:
-        pmid = str(paper.get('PMID', ''))
-        doi = paper.get('DOI', '')
-        
-        logger.info(f"\nAttempting to retrieve text for paper {pmid}")
-        logger.info(f"Title: {paper.get('Title', 'No title')}")
-        if doi:
-            logger.info(f"DOI: {doi}")
-        
-        # Get text from various sources
-        text, source = get_full_text(pmid, doi)
-        
-        if text:
-            texts_found += 1
-            retrieval_stats[source] += 1
-            paper_with_text = paper.copy()  # Keep all original paper data
-            paper_with_text.update({
-                'FullText': text,
-                'TextSource': source
-            })
-            papers_with_text.append(paper_with_text)
-            logger.info(f"Successfully retrieved text from {source}")
+    # Finally try Sci-Hub
+    try:
+        logger.info(f"Trying Sci-Hub for {pmid}")
+        scihub_text = get_scihub_text(pmid, doi)
+        if scihub_text:
+            text = scihub_text
+            source = 'Sci-Hub'
+            logger.info(f"Successfully got text from Sci-Hub for {pmid}")
+            return text, source
         else:
-            retrieval_stats['Failed'] += 1
-            logger.warning(f"Failed to retrieve text for paper {pmid}")
-            logger.warning("Attempted sources: PMC, Crossref, and Sci-Hub")
-            
-    # Log detailed statistics
-    logger.info("\nText Retrieval Statistics:")
-    logger.info(f"Total papers processed: {total_papers}")
-    logger.info(f"Successful retrievals: {texts_found}")
-    logger.info(f"Success rate: {(texts_found/total_papers*100):.1f}%")
-    logger.info("\nSource breakdown:")
-    logger.info(f"- PMC: {retrieval_stats['PMC']} papers")
-    logger.info(f"- Crossref: {retrieval_stats['Crossref']} papers")
-    logger.info(f"- Sci-Hub: {retrieval_stats['Sci-Hub']} papers")
-    logger.info(f"- Failed: {retrieval_stats['Failed']} papers")
-    
-    return papers_with_text
+            logger.info(f"No text found in Sci-Hub for {pmid}")
+    except Exception as e:
+        logger.error(f"Error getting Sci-Hub text for {pmid}: {e}")
+
+    logger.warning(f"Could not get full text for {pmid} from any source")
+    return text, source
 
 def get_pmcid_from_pmid(pmid):
     """Convert PMID to PMCID using NCBI's ID converter."""
@@ -207,99 +145,47 @@ def get_crossref_text(doi):
     try:
         # First get the redirect URL
         headers = {
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1',
-            'Cache-Control': 'max-age=0',
-            'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-            'Sec-Ch-Ua-Mobile': '?0',
-            'Sec-Ch-Ua-Platform': '"macOS"',
-            'Sec-Fetch-Dest': 'document',
-            'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'none',
-            'Sec-Fetch-User': '?1'
+            'Accept': 'text/html',
+            'User-Agent': 'TdPAnalyzer/1.0 (mailto:your@email.com)'
         }
-        
-        session = requests.Session()
-        session.headers.update(headers)
-        
-        # Try to get the article page
-        response = session.get(f"https://doi.org/{doi}", allow_redirects=True, verify=False, timeout=30)
+        response = requests.get(f"https://doi.org/{doi}", headers=headers, allow_redirects=True)
         final_url = response.url
         
         logger.info(f"Redirected to: {final_url}")
         
-        # Get the content from the final URL
-        response = session.get(final_url, verify=False, timeout=30)
+        # Now get the content from the final URL
+        response = requests.get(final_url, headers=headers)
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # Check for common paywall indicators
-        paywall_indicators = [
-            'div[class*="paywall"]',
-            'div[id*="paywall"]',
-            'div[class*="access-denied"]',
-            'div[class*="access-restricted"]',
-            'div[class*="subscription-required"]',
-            'div[class*="purchase-options"]',
-            'div[class*="login-required"]',
-            'div[class*="sign-in"]',
-            'div[class*="purchase-access"]',
-            'div[class*="subscribe"]',
-            'div[class*="membership"]'
-        ]
-        
-        for indicator in paywall_indicators:
-            if soup.select(indicator):
-                logger.info(f"Paywall detected at {final_url}")
-                return None
-        
         # Try different possible content containers
-        selectors = [
-            # Common article containers
-            ('div', {'class': ['article-body', 'article-text', 'article-content', 'full-text', 'article__body', 'content-main']}),
-            ('div', {'class': ['c-article-body', 'c-article-section', 'main-content', 'content-container']}),
-            ('div', {'class': ['content-block', 'article-content', 'NLM__article-body', 'main-article']}),
-            ('div', {'id': ['body', 'main-content', 'content-main', 'article-content', 'article-body', 'main']}),
-            ('article', {}),
-            # Publisher-specific containers
-            ('div', {'class': ['article-body', 'article__body', 'fulltext', 'content-container']}),  # Wiley, Nature
-            ('div', {'class': ['article-body', 'content-block', 'article-content']}),  # BMJ
-            ('div', {'class': ['article-body', 'article-text', 'NLM__article-body']}),  # Taylor & Francis
-            ('div', {'class': ['article-body', 'article-text', 'article-content', 'full-text']}),  # Elsevier
-            ('div', {'class': ['c-article-body', 'c-article-section']}),  # Springer
-            # Generic containers
-            ('div', {'class': ['content', 'main', 'article', 'paper', 'manuscript']}),
-            ('main', {}),
-            ('div', {'role': 'main'}),
-            ('div', {'id': ['content', 'main', 'article', 'paper']}),
-        ]
+        article_text = (
+            # Elsevier specific selectors
+            soup.find('div', {'class': 'article-body'}) or
+            soup.find('div', {'id': 'body'}) or
+            soup.find('div', {'class': 'article-text'}) or
+            soup.find('div', {'class': 'article-content'}) or
+            soup.find('div', {'class': 'main-content'}) or
+            # ScienceDirect specific
+            soup.find('div', {'id': 'centerInner'}) or
+            soup.find('div', {'class': 'article'}) or
+            # Generic article containers
+            soup.find('div', {'class': 'fulltext-view'}) or
+            soup.find('article') or
+            # Abstract as fallback
+            soup.find('div', {'class': 'abstract'}) or
+            soup.find('abstract')
+        )
         
-        # Try to find content in any of the selectors
-        for tag, attrs in selectors:
-            contents = soup.find_all(tag, attrs)
-            for content in contents:
-                if content:
-                    # Remove unwanted elements
-                    for unwanted in content.find_all(['div', 'section'], {'class': [
-                        'ref-list', 'supplementary-material', 'copyright', 'author-notes',
-                        'references', 'footnotes', 'article-footer', 'metrics', 'figure',
-                        'acknowledgments', 'peer-review', 'related-content', 'article-comments',
-                        'article-tools', 'social-share', 'citation'
-                    ]}):
-                        unwanted.decompose()
-                        
-                    # Get text and clean it
-                    text = content.get_text(separator=' ', strip=True)
-                    text = ' '.join(text.split())  # Normalize whitespace
-                    
-                    if len(text) > 500:  # Only return if we got substantial text
-                        logger.info(f"Successfully extracted {len(text)} characters of text from {final_url}")
-                        return text
-        
-        logger.warning(f"No article text found at {final_url}")
-        
+        if article_text:
+            # Clean the text
+            text = article_text.get_text(separator=' ', strip=True)
+            # Remove excessive whitespace
+            text = ' '.join(text.split())
+            logger.info(f"Successfully extracted {len(text)} characters of text from {final_url}")
+            return text
+        else:
+            logger.warning(f"No article text found at {final_url}")
+            
     except Exception as e:
         logger.error(f"Error getting Crossref text: {e}")
     return None
@@ -309,47 +195,27 @@ def get_scihub_text(pmid, doi=None):
     try:
         # Try multiple Sci-Hub domains
         domains = [
-            'https://sci-hub.yt',
-            'https://sci-hub.is',
-            'https://sci-hub.ren',
+            'https://sci-hub.se',
+            'https://sci-hub.st',
+            'https://sci-hub.ee',
             'https://sci-hub.wf',
-            'https://sci-hub.et',
-            'https://sci-hub.st'
+            'https://sci-hub.ren'
         ]
         
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1'
+            'User-Agent': 'Mozilla/5.0 TdPAnalyzer/1.0',
+            'Accept': 'text/html,application/xhtml+xml'
         }
-        
-        session = requests.Session()
-        session.headers.update(headers)
         
         for domain in domains:
             try:
-                logger.info(f"Trying Sci-Hub domain: {domain}")
-                
-                # Try DOI first if available, then PMID
+                # Try DOI first if available
                 if doi:
                     url = f"{domain}/{doi}"
                 else:
                     url = f"{domain}/pubmed/{pmid}"
                 
-                logger.info(f"Trying URL: {url}")
-                response = session.get(url, timeout=30, verify=False, allow_redirects=True)
-                
-                # Check if we got redirected to the main page (paper not found)
-                if response.url.rstrip('/') == domain.rstrip('/'):
-                    logger.info(f"Redirected to main page, paper not found on {domain}")
-                    continue
-                    
-                if 'location not found' in response.text.lower() or 'article not found' in response.text.lower():
-                    logger.info(f"Paper not found on {domain}")
-                    continue
-                    
+                response = requests.get(url, headers=headers, timeout=10)
                 soup = BeautifulSoup(response.text, 'html.parser')
                 
                 # Look for embedded PDF
@@ -357,81 +223,23 @@ def get_scihub_text(pmid, doi=None):
                 if pdf_iframe and 'src' in pdf_iframe.attrs:
                     pdf_url = pdf_iframe['src']
                     if not pdf_url.startswith('http'):
-                        pdf_url = urljoin(domain, pdf_url) if pdf_url.startswith('/') else f"https:{pdf_url}"
+                        pdf_url = f"https:{pdf_url}"
                     
-                    logger.info(f"Found PDF iframe at {pdf_url}")
-                    
-                    # Download PDF with retry and exponential backoff
-                    for attempt in range(3):
-                        try:
-                            delay = 2 ** attempt
-                            time.sleep(delay)
-                            
-                            logger.info(f"Downloading PDF from {pdf_url} (attempt {attempt + 1})")
-                            pdf_response = session.get(pdf_url, timeout=30, verify=False, allow_redirects=True)
-                            
-                            # Check content type and size
-                            content_type = pdf_response.headers.get('content-type', '').lower()
-                            content_length = int(pdf_response.headers.get('content-length', 0))
-                            
-                            if content_type == 'application/pdf' and content_length > 1000:
-                                pdf_file = io.BytesIO(pdf_response.content)
-                                try:
-                                    pdf_reader = PyPDF2.PdfReader(pdf_file)
-                                    text = ""
-                                    for page in pdf_reader.pages:
-                                        text += page.extract_text()
-                                    text = text.strip()
-                                    if len(text) > 500:  # Only return if we got substantial text
-                                        logger.info(f"Successfully extracted {len(text)} characters from PDF")
-                                        return text
-                                    else:
-                                        logger.warning(f"PDF text too short ({len(text)} chars), might be corrupted")
-                                except Exception as e:
-                                    logger.error(f"Error reading PDF: {e}")
-                            else:
-                                logger.warning(f"Invalid PDF response: type={content_type}, size={content_length}")
-                        except Exception as e:
-                            logger.error(f"Error downloading PDF from {pdf_url} (attempt {attempt + 1}): {e}")
-                            if attempt < 2:  # Don't sleep after last attempt
-                                continue
-                
-                # Also try to find direct download links
-                download_links = soup.find_all('a', href=True)
-                for link in download_links:
-                    href = link['href']
-                    if href.lower().endswith('.pdf'):
-                        try:
-                            pdf_url = urljoin(domain, href)
-                            logger.info(f"Found direct PDF link: {pdf_url}")
-                            
-                            pdf_response = session.get(pdf_url, timeout=30, verify=False)
-                            if pdf_response.headers.get('content-type', '').lower() == 'application/pdf':
-                                pdf_file = io.BytesIO(pdf_response.content)
-                                pdf_reader = PyPDF2.PdfReader(pdf_file)
-                                text = ""
-                                for page in pdf_reader.pages:
-                                    text += page.extract_text()
-                                text = text.strip()
-                                if len(text) > 500:
-                                    logger.info(f"Successfully extracted {len(text)} characters from PDF")
-                                    return text
-                                else:
-                                    logger.warning(f"PDF text too short ({len(text)} chars), might be corrupted")
-                        except Exception as e:
-                            logger.error(f"Error downloading PDF from link {pdf_url}: {e}")
-                            continue
-                
+                    # Download PDF
+                    pdf_response = requests.get(pdf_url, headers=headers, timeout=10)
+                    if pdf_response.headers.get('content-type', '').lower() == 'application/pdf':
+                        pdf_file = io.BytesIO(pdf_response.content)
+                        pdf_reader = PyPDF2.PdfReader(pdf_file)
+                        text = ""
+                        for page in pdf_reader.pages:
+                            text += page.extract_text()
+                        return text
             except Exception as e:
-                logger.error(f"Error accessing {domain}: {e}")
                 continue
-        
-        logger.warning(f"Could not retrieve text from any Sci-Hub domain for PMID {pmid}")
-        return None
-        
+                
     except Exception as e:
-        logger.error(f"Error in get_scihub_text: {e}")
-        return None
+        logger.error(f"Error getting Sci-Hub text: {e}")
+    return None
 
 def get_drug_names(drug_name: str) -> List[str]:
     """Get all related drug names from the drugnames.csv file"""
@@ -537,34 +345,12 @@ def search_pubmed_case_reports(drug_name: str) -> pd.DataFrame:
             results = []
             for paper in records['PubmedArticle']:
                 try:
-                    article = paper['MedlineCitation']['Article']
-                    
-                    # Extract DOI - check multiple possible locations
-                    doi = None
-                    if 'ELocationID' in article:
-                        for eloc in article['ELocationID']:
-                            if eloc.attributes.get('EIdType', '') == 'doi':
-                                doi = str(eloc)
-                                break
-                    if not doi and 'ArticleIdList' in paper['PubmedData']:
-                        for article_id in paper['PubmedData']['ArticleIdList']:
-                            if article_id.attributes.get('IdType', '') == 'doi':
-                                doi = str(article_id)
-                                break
-                    
                     paper_dict = {
                         'PMID': paper['MedlineCitation']['PMID'],
-                        'Title': article['ArticleTitle'],
-                        'Abstract': article.get('Abstract', {}).get('AbstractText', [''])[0],
-                        'Year': article['Journal']['JournalIssue']['PubDate'].get('Year', ''),
-                        'DOI': doi
+                        'Title': paper['MedlineCitation']['Article']['ArticleTitle'],
+                        'Abstract': paper['MedlineCitation']['Article'].get('Abstract', {}).get('AbstractText', [''])[0],
+                        'Year': paper['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate'].get('Year', '')
                     }
-                    
-                    if doi:
-                        logger.info(f"Found DOI for paper {paper_dict['PMID']}: {doi}")
-                    else:
-                        logger.warning(f"No DOI found for paper {paper_dict['PMID']}")
-                        
                     results.append(paper_dict)
                 except Exception as e:
                     logger.error(f"Error processing paper: {e}")
@@ -619,26 +405,11 @@ def format_pubmed_results(records: List[Dict]) -> pd.DataFrame:
     results = []
     for record in records:
         try:
-            # Get DOI from either ELocationID or ArticleIdList
-            doi = None
-            if 'ELocationID' in record['MedlineCitation']['Article']:
-                for id in record['MedlineCitation']['Article']['ELocationID']:
-                    if id.attributes.get('EIdType') == 'doi':
-                        doi = str(id)
-                        break
-            
-            if not doi and 'ArticleIdList' in record['PubmedData']:
-                for id in record['PubmedData']['ArticleIdList']:
-                    if id.attributes.get('IdType') == 'doi':
-                        doi = str(id)
-                        break
-
             paper_dict = {
                 'PMID': record['MedlineCitation']['PMID'],
-                'Title': record['MedlineCitation']['Article']['ArticleTitle'],
+                'Case Report Title': record['MedlineCitation']['Article']['ArticleTitle'],
                 'Abstract': record['MedlineCitation']['Article'].get('Abstract', {}).get('AbstractText', [''])[0],
                 'Year': record['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate'].get('Year', ''),
-                'DOI': doi,
                 'Age': '',  # Will be extracted by regex
                 'Sex': '',  # Will be extracted by regex
                 'Oral Dose (mg)': '',  # Will be extracted by regex
@@ -813,7 +584,7 @@ def analyze_literature(drug_name: str) -> Dict:
                 "case_reports": case_reports,
                 "total_cases": len(case_reports)
             }
-        
+
     except Exception as e:
         logger.error(f"Error analyzing literature: {e}")
         return {"error": str(e)}
@@ -825,7 +596,7 @@ def main():
         
     drug_name = sys.argv[1].upper()
     papers = analyze_literature(drug_name)
-    print(f"\nFound {len(papers.get('case_reports', []))} papers")
+    print(f"\nFound {len(papers['case_reports'])} papers")
 
 if __name__ == "__main__":
     main()
