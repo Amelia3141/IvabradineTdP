@@ -302,6 +302,10 @@ class CaseReportAnalyzer:
         Returns:
             Dict containing extracted information
         """
+        # Clean text
+        text = self._clean_text(text)
+        
+        # Initialize results
         results = {
             'age': '',
             'sex': '',
@@ -319,10 +323,7 @@ class CaseReportAnalyzer:
             'treatment_course': ''
         }
         
-        # Clean text
-        text = self._clean_text(text)
-        
-        # Extract each field
+        # Extract each field with context
         for field, pattern in self.patterns.items():
             matches = list(pattern.finditer(text))
             if matches:
@@ -350,21 +351,23 @@ class CaseReportAnalyzer:
                         try:
                             value = float(match.group(1))
                             if 100 <= value <= 700:  # Reasonable QT range in ms
-                                values.append(value)
+                                context = self.get_smart_context(text, match.start(), match.end())
+                                values.append((value, context))
                         except (ValueError, IndexError):
                             continue
                     
                     if values:
                         # For QTc, prefer larger values as they're more concerning
                         # For QT, also prefer larger values
-                        value = max(values)
+                        value, context = max(values, key=lambda x: x[0])
                         results[f'{field}_value'] = str(value)
                 else:
                     # For other fields, get the first capture group or full match
                     match = matches[0]
                     value = next((g for g in match.groups() if g is not None), match.group(0))
+                    context = self.get_smart_context(text, match.start(), match.end())
                     results[field] = value.strip()
-        
+    
         return results
 
     def analyze_papers(self, papers: List[Dict[str, Any]], drug_name: str) -> pd.DataFrame:

@@ -548,6 +548,14 @@ def format_pubmed_results(records: List[Dict]) -> pd.DataFrame:
 def get_texts_parallel(pmids: List[str]) -> List[Dict[str, Any]]:
     """Get full texts for multiple PMIDs in parallel using ThreadPoolExecutor."""
     try:
+        # First get abstracts from PubMed for all papers
+        handle = Entrez.efetch(db="pubmed", id=pmids, rettype="medline", retmode="text")
+        records = list(Medline.parse(handle))
+        handle.close()
+        
+        # Create a map of PMID to abstract
+        abstracts = {record.get('PMID', ''): record.get('AB', '') for record in records}
+        
         with ThreadPoolExecutor(max_workers=4) as executor:
             futures = []
             for pmid in pmids:
@@ -560,22 +568,29 @@ def get_texts_parallel(pmids: List[str]) -> List[Dict[str, Any]]:
                     text, source = future.result(timeout=300)  # 5 minute timeout per paper
                     if text:
                         logger.info(f"Got {len(text)} chars for {pmid}")
+                        full_text = text
+                    else:
+                        # If no full text, use abstract
+                        full_text = abstracts.get(pmid, '')
+                        source = 'PubMed Abstract'
+                        
                     texts.append({
                         'pmid': pmid,
-                        'full_text': text,
+                        'full_text': full_text,
                         'source': source,
-                        'abstract': ''  # Initialize abstract field
+                        'abstract': abstracts.get(pmid, '')
                     })
                 except Exception as e:
                     logger.error(f"Error getting text for {pmid}: {e}")
+                    # Still include the abstract if available
                     texts.append({
                         'pmid': pmid,
-                        'full_text': None,
-                        'source': None,
-                        'abstract': ''
+                        'full_text': abstracts.get(pmid, ''),
+                        'source': 'PubMed Abstract',
+                        'abstract': abstracts.get(pmid, '')
                     })
             
-        logger.info(f"Got {len(texts)} full texts out of {len(pmids)} papers")
+        logger.info(f"Got {len(texts)} texts out of {len(pmids)} papers")
         return texts
         
     except Exception as e:
