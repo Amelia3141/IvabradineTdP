@@ -155,9 +155,9 @@ def get_pmc_text(pmcid):
                 return text
             else:
                 logger.warning("PMC text too short, might be incomplete")
-        else:
-            logger.warning("No article text found in PMC")
             
+        logger.warning("No article text found in PMC")
+        
     except Exception as e:
         logger.error(f"Error getting PMC text: {e}")
     return None
@@ -511,19 +511,45 @@ def format_pubmed_results(records: List[Dict]) -> pd.DataFrame:
     for record in records:
         try:
             # Get PMID
-            pmid = record['MedlineCitation']['PMID']
+            pmid = str(record['MedlineCitation']['PMID'])
+            
+            # Get title and abstract
+            article = record['MedlineCitation']['Article']
+            title = article['ArticleTitle']
+            if isinstance(title, (list, str)):
+                title = ' '.join(str(t) for t in title) if isinstance(title, list) else str(title)
+            
+            # Handle abstract text which can be a string or list
+            abstract = ''
+            if 'Abstract' in article:
+                abstract_text = article['Abstract'].get('AbstractText', [])
+                if isinstance(abstract_text, (list, str)):
+                    abstract = ' '.join(str(t) for t in abstract_text) if isinstance(abstract_text, list) else str(abstract_text)
             
             # Get DOI
             doi = None
             if 'ArticleIdList' in record['PubmedData']:
-                for id in record['PubmedData']['ArticleIdList']:
-                    if id.attributes['IdType'] == 'doi':
-                        doi = str(id)
+                for id_obj in record['PubmedData']['ArticleIdList']:
+                    if str(id_obj.attributes.get('IdType', '')).lower() == 'doi':
+                        doi = str(id_obj)
                         break
             
-            # Create result dict with key fields exactly matching the image
+            # Get year from PubDate
+            year = ''
+            pub_date = article['Journal']['JournalIssue']['PubDate']
+            if isinstance(pub_date, dict):
+                if 'Year' in pub_date:
+                    year = str(pub_date['Year'])
+                elif 'MedlineDate' in pub_date:
+                    # Try to extract year from MedlineDate
+                    medline_date = str(pub_date['MedlineDate'])
+                    year_match = re.search(r'\d{4}', medline_date)
+                    if year_match:
+                        year = year_match.group(0)
+            
+            # Create result dict with key fields
             paper_dict = {
-                'Case Report Title': record['MedlineCitation']['Article']['ArticleTitle'],
+                'Case Report Title': title,
                 'Age': '',
                 'Sex': '',
                 'Oral Dose (mg)': '',
@@ -545,12 +571,12 @@ def format_pubmed_results(records: List[Dict]) -> pd.DataFrame:
                 'PMID': pmid,
                 'DOI': doi or '',
                 'PubMed URL': f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
-                'Year': record['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate'].get('Year', ''),
-                'Abstract': record['MedlineCitation']['Article'].get('Abstract', {}).get('AbstractText', [''])[0]
+                'Year': year,
+                'Abstract': abstract
             }
             results.append(paper_dict)
         except Exception as e:
-            logger.error(f"Error processing record: {str(e)}")
+            logger.error(f"Error processing record {record.get('MedlineCitation', {}).get('PMID', 'unknown')}: {str(e)}")
             continue
             
     return pd.DataFrame(results)
@@ -650,31 +676,35 @@ def analyze_literature(drug_name: str) -> pd.DataFrame:
         
         # Analyze each case report
         for report in case_reports:
-            text = report.get('full_text', '')
-            if text:
-                combined_text = text + ' ' + report['abstract']
-                logger.info(f"Text length for {report['pmid']}: {len(combined_text)} characters")
-                
-                analyzer = CaseReportAnalyzer()
-                analyzed = analyzer.analyze(combined_text)
-                
-                # Update DataFrame with analyzed fields
-                idx = df[df['PMID'] == report['pmid']].index[0]
-                df.loc[idx, 'Age'] = analyzed.get('age', '')
-                df.loc[idx, 'Sex'] = analyzed.get('sex', '')
-                df.loc[idx, 'Oral Dose (mg)'] = analyzed.get('oral_dose_value', '')
-                df.loc[idx, 'Uncorrected QT (ms)'] = analyzed.get('qt_value', '')
-                df.loc[idx, 'QTc'] = analyzed.get('qtc_value', '')
-                df.loc[idx, 'Heart Rate (bpm)'] = analyzed.get('heart_rate_value', '')
-                df.loc[idx, 'Blood Pressure (mmHg)'] = analyzed.get('blood_pressure_value', '')
-                df.loc[idx, 'Torsades de Pointes?'] = 'Yes' if analyzed.get('tdp_present', False) else 'No'
-                df.loc[idx, 'Medical History'] = analyzed.get('medical_history', '')
-                df.loc[idx, 'Medication History'] = analyzed.get('medication_history', '')
-                df.loc[idx, 'Course of Treatment'] = analyzed.get('treatment_course', '')
-                
-                # Log what was found
-                found_fields = {k: v for k, v in analyzed.items() if v}
-                logger.info(f"Found fields for {report['pmid']}: {found_fields}")
+            try:
+                text = report.get('full_text', '')
+                if text:
+                    combined_text = text + ' ' + report['abstract']
+                    logger.info(f"Text length for {report['pmid']}: {len(combined_text)} characters")
+                    
+                    analyzer = CaseReportAnalyzer()
+                    analyzed = analyzer.analyze(combined_text)
+                    
+                    # Update DataFrame with analyzed fields
+                    idx = df.index[df['PMID'] == report['pmid']][0]
+                    df.loc[idx, 'Age'] = analyzed.get('age', '')
+                    df.loc[idx, 'Sex'] = analyzed.get('sex', '')
+                    df.loc[idx, 'Oral Dose (mg)'] = analyzed.get('oral_dose_value', '')
+                    df.loc[idx, 'Uncorrected QT (ms)'] = analyzed.get('qt_value', '')
+                    df.loc[idx, 'QTc'] = analyzed.get('qtc_value', '')
+                    df.loc[idx, 'Heart Rate (bpm)'] = analyzed.get('heart_rate_value', '')
+                    df.loc[idx, 'Blood Pressure (mmHg)'] = analyzed.get('blood_pressure_value', '')
+                    df.loc[idx, 'Torsades de Pointes?'] = 'Yes' if analyzed.get('tdp_present', False) else 'No'
+                    df.loc[idx, 'Medical History'] = analyzed.get('medical_history', '')
+                    df.loc[idx, 'Medication History'] = analyzed.get('medication_history', '')
+                    df.loc[idx, 'Course of Treatment'] = analyzed.get('treatment_course', '')
+                    
+                    # Log what was found
+                    found_fields = {k: v for k, v in analyzed.items() if v}
+                    logger.info(f"Found fields for {report['pmid']}: {found_fields}")
+            except Exception as e:
+                logger.error(f"Error analyzing report {report.get('pmid', 'unknown')}: {e}")
+                continue
         
         # Sort by year descending
         df = df.sort_values('Year', ascending=False)
@@ -688,8 +718,14 @@ def analyze_literature(drug_name: str) -> pd.DataFrame:
             'Torsades de Pointes?', 'Blood Pressure (mmHg)',
             'Medical History', 'Medication History', 'Course of Treatment'
         ]
-        df = df[columns]
         
+        # Make sure all columns exist
+        for col in columns:
+            if col not in df.columns:
+                df[col] = ''
+                
+        df = df[columns]
+        logger.info(f"Final dataframe has {len(df)} rows and columns: {df.columns.tolist()}")
         return df
         
     except Exception as e:

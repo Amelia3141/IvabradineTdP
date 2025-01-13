@@ -228,6 +228,9 @@ class CaseReportAnalyzer:
         Returns:
             Dict containing extracted information
         """
+        if not text:
+            return {}
+            
         results = {
             'age': '',
             'sex': '',
@@ -245,53 +248,57 @@ class CaseReportAnalyzer:
             'treatment_course': ''
         }
         
-        # Clean text
-        text = self._clean_text(text)
-        
-        # Extract each field
-        for field, pattern in self.patterns.items():
-            matches = list(pattern.finditer(text))
-            if matches:
-                if field == 'tdp':
-                    results['tdp_present'] = True
-                    # Get context for the first match
-                    match = matches[0]
-                    results['tdp_context'] = self.get_smart_context(text, match.start(), match.end())
-                elif field == 'oral_dose':
-                    # Use the first match for dosing info
-                    match = matches[0]
-                    dose_text = match.group(0)
-                    value_match = re.search(r'(\d+(?:\.\d+)?)', dose_text)
-                    unit_match = re.search(r'(mg|milligrams?|g|grams?|mcg|micrograms?|µg)', dose_text, re.IGNORECASE)
-                    freq_match = re.search(r'(daily|once|twice|thrice|[1-4]x|q\.?d|bid|tid|qid|per\s+day|/day)', dose_text, re.IGNORECASE)
-                    
-                    results['oral_dose_value'] = value_match.group(1) if value_match else ''
-                    results['oral_dose_unit'] = unit_match.group(1) if unit_match else ''
-                    results['oral_dose_freq'] = freq_match.group(1) if freq_match else ''
-                elif field in ['qt', 'qtc']:
-                    # For QT measurements, try to find the most relevant value
-                    # Sort matches by the numeric value to find the most concerning one
-                    values = []
-                    for match in matches:
-                        try:
-                            value = float(match.group(1))
-                            if 100 <= value <= 700:  # Reasonable QT range in ms
-                                values.append(value)
-                        except (ValueError, IndexError):
-                            continue
-                    
-                    if values:
-                        # For QTc, prefer larger values as they're more concerning
-                        # For QT, also prefer larger values
-                        value = max(values)
-                        results[f'{field}_value'] = str(value)
-                else:
-                    # For other fields, get the first capture group or full match
-                    match = matches[0]
-                    value = next((g for g in match.groups() if g is not None), match.group(0))
-                    results[field] = value.strip()
-        
-        return results
+        try:
+            # Clean text
+            cleaned_text = self._clean_text(text)
+            
+            # Extract each field
+            for field, pattern in self.patterns.items():
+                matches = list(pattern.finditer(cleaned_text))
+                if matches:
+                    if field == 'tdp':
+                        results['tdp_present'] = True
+                        # Get context for the first match
+                        match = matches[0]
+                        results['tdp_context'] = self.get_smart_context(cleaned_text, match.start(), match.end())
+                    elif field == 'oral_dose':
+                        # Use the first match for dosing info
+                        match = matches[0]
+                        dose_text = match.group(0)
+                        value_match = re.search(r'(\d+(?:\.\d+)?)', dose_text)
+                        unit_match = re.search(r'(mg|milligrams?|g|grams?|mcg|micrograms?|µg)', dose_text, re.IGNORECASE)
+                        freq_match = re.search(r'(daily|once|twice|thrice|[1-4]x|q\.?d|bid|tid|qid|per\s+day|/day)', dose_text, re.IGNORECASE)
+                        
+                        results['oral_dose_value'] = value_match.group(1) if value_match else ''
+                        results['oral_dose_unit'] = unit_match.group(1) if unit_match else ''
+                        results['oral_dose_freq'] = freq_match.group(1) if freq_match else ''
+                    elif field in ['qt', 'qtc']:
+                        # For QT measurements, try to find the most relevant value
+                        values = []
+                        for match in matches:
+                            try:
+                                value = float(match.group(1))
+                                if 100 <= value <= 700:  # Reasonable QT range in ms
+                                    values.append(value)
+                            except (ValueError, IndexError, TypeError):
+                                continue
+                        
+                        if values:
+                            # For QTc, prefer larger values as they're more concerning
+                            value = max(values)
+                            results[f'{field}_value'] = str(value)
+                    else:
+                        # For other fields, get the first capture group or full match
+                        match = matches[0]
+                        groups = [g for g in match.groups() if g is not None]
+                        value = groups[0] if groups else match.group(0)
+                        results[field] = str(value).strip()
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error in analyze: {e}")
+            return results
 
     def analyze_papers(self, papers: List[Dict[str, Any]], drug_name: str) -> pd.DataFrame:
         """Analyze a list of papers and create a case report table."""
@@ -579,41 +586,18 @@ class CaseReportAnalyzer:
 
     def _clean_text(self, text: str) -> str:
         """Clean and normalize text for analysis."""
-        if not text:
-            return ""
+        if not isinstance(text, str):
+            text = str(text)
             
-        # Convert to lowercase
+        # Convert to lowercase for case-insensitive matching
         text = text.lower()
         
-        # Replace common abbreviations
-        replacements = {
-            'yo ': ' year old ',
-            'y/o': ' year old ',
-            'yr ': ' year ',
-            'yrs': ' years ',
-            'yo,': ' year old,',
-            'y/o,': ' year old,',
-            'yr,': ' year,',
-            'yrs,': ' years,',
-            'hr ': ' heart rate ',
-            'bp ': ' blood pressure ',
-            'qt ': ' QT ',
-            'qtc': ' QTc ',
-            'tdp': ' torsade de pointes ',
-            'pvt': ' polymorphic ventricular tachycardia ',
-            'bid': ' twice daily ',
-            'tid': ' three times daily ',
-            'qid': ' four times daily ',
-            'qd': ' once daily ',
-            'od': ' once daily ',
-            'po': ' orally ',
-            'p.o.': ' orally ',
-        }
+        # Replace unicode quotes and dashes
+        text = text.replace('"', '"').replace('"', '"')
+        text = text.replace(''', "'").replace(''', "'")
+        text = text.replace('–', '-').replace('—', '-')
         
-        for old, new in replacements.items():
-            text = text.replace(old, new)
-            
-        # Remove extra whitespace
+        # Remove excessive whitespace
         text = ' '.join(text.split())
         
         return text
