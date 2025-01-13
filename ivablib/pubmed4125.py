@@ -229,26 +229,37 @@ def get_crossref_text(doi):
 def get_text_from_scihub(pmid: str, doi: str) -> Optional[str]:
     """Get full text from Sci-Hub."""
     if not doi:
+        logger.warning(f"No DOI available for PMID {pmid}")
         return None
-        
-    url = f"https://sci-hub.se/{doi}"
+
+    # Create a session with SSL verification disabled
+    session = requests.Session()
+    session.verify = False
     
+    # Configure retry strategy
+    retry_strategy = urllib3.Retry(
+        total=3,
+        backoff_factor=1,
+        status_forcelist=[403, 429, 500, 502, 503, 504]
+    )
+    adapter = requests.adapters.HTTPAdapter(max_retries=retry_strategy)
+    session.mount("https://", adapter)
+    
+    # Headers to mimic a real browser
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.5',
         'Connection': 'keep-alive',
         'Upgrade-Insecure-Requests': '1',
-        'Cache-Control': 'max-age=0'
+        'Cache-Control': 'max-age=0',
     }
     
     try:
-        # Create a session to handle cookies and redirects
-        session = requests.Session()
-        session.verify = False  # Bypass SSL verification
+        # Try to access Sci-Hub
+        url = f"https://sci-hub.se/{doi}"
+        response = session.get(url, headers=headers, timeout=30)
         
-        # First request to get the page and handle any redirects
-        response = session.get(url, headers=headers, timeout=30, allow_redirects=True)
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
             
@@ -259,59 +270,40 @@ def get_text_from_scihub(pmid: str, doi: str) -> Optional[str]:
             iframe = soup.find('iframe', id='pdf')
             if iframe and iframe.get('src'):
                 pdf_url = iframe['src']
-                logger.info(f"Found PDF URL in iframe: {pdf_url}")
             
             # Method 2: Check embed
             if not pdf_url:
                 embed = soup.find('embed')
                 if embed and embed.get('src'):
                     pdf_url = embed['src']
-                    logger.info(f"Found PDF URL in embed: {pdf_url}")
-            
-            # Method 3: Look for direct PDF link
-            if not pdf_url:
-                pdf_link = soup.find('a', href=re.compile(r'.*\.pdf$'))
-                if pdf_link:
-                    pdf_url = pdf_link['href']
-                    logger.info(f"Found PDF URL in link: {pdf_url}")
             
             if pdf_url:
                 if not pdf_url.startswith('http'):
                     pdf_url = f"https:{pdf_url}" if pdf_url.startswith('//') else f"https://sci-hub.se{pdf_url}"
                 
-                logger.info(f"Attempting to download PDF from: {pdf_url}")
-                
-                # Get PDF content using the same session
-                pdf_response = session.get(pdf_url, headers=headers, timeout=30, verify=False)
+                # Get PDF content with same session
+                pdf_response = session.get(pdf_url, headers=headers, timeout=30)
                 if pdf_response.status_code == 200:
-                    # Verify it's actually a PDF
-                    if pdf_response.headers.get('content-type', '').lower() == 'application/pdf':
-                        # Extract text from PDF
-                        pdf_file = BytesIO(pdf_response.content)
-                        try:
-                            reader = PyPDF2.PdfReader(pdf_file)
-                            text = ""
-                            for page in reader.pages:
-                                text += page.extract_text() + "\n"
-                            if len(text.strip()) > 100:  # Basic sanity check
-                                logger.info(f"Successfully extracted text from PDF for {pmid}")
-                                return text
-                            else:
-                                logger.warning(f"Extracted text too short for {pmid}")
-                        except Exception as e:
-                            logger.warning(f"Error extracting text from PDF for {pmid}: {e}")
-                    else:
-                        logger.warning(f"Response not PDF for {pmid}: {pdf_response.headers.get('content-type')}")
-                else:
-                    logger.warning(f"Failed to get PDF for {pmid}: Status {pdf_response.status_code}")
-            else:
-                logger.warning(f"No PDF URL found for {pmid}")
+                    # Extract text from PDF
+                    pdf_file = BytesIO(pdf_response.content)
+                    try:
+                        reader = PyPDF2.PdfReader(pdf_file)
+                        text = ""
+                        for page in reader.pages:
+                            text += page.extract_text() + "\n"
+                        if len(text.strip()) > 100:  # Basic sanity check
+                            return text
+                    except Exception as e:
+                        logger.warning(f"Error extracting text from PDF for {pmid}: {e}")
+        
+        elif response.status_code == 403:
+            logger.warning(f"Access forbidden (403) for {pmid}. This might be due to anti-bot measures.")
         else:
-            logger.warning(f"Failed to access Sci-Hub for {pmid}: Status {response.status_code}")
+            logger.warning(f"Failed to access Sci-Hub for {pmid}. Status code: {response.status_code}")
             
     except Exception as e:
-        logger.warning(f"Failed to access Sci-Hub: {str(e)}")
-        
+        logger.error(f"Error accessing Sci-Hub for {pmid}: {str(e)}")
+    
     return None
 
 def get_drug_names(drug_name: str) -> List[str]:
