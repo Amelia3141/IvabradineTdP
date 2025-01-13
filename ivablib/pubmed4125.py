@@ -3,20 +3,18 @@ import logging
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
-import re
-import json
-import time
-import concurrent.futures
-from concurrent.futures import ThreadPoolExecutor
-from Bio import Entrez
 import PyPDF2
+from typing import List, Dict, Optional, Any
+from concurrent.futures import ThreadPoolExecutor
+import time
 from io import BytesIO
-import csv
-from typing import List, Dict, Tuple, Any, Optional
-from urllib.parse import urljoin
-from .case_report_analyzer import CaseReportAnalyzer
 import urllib3
+import random
+import re
+import csv
 import sys
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Suppress SSL warnings
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -27,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 # Set your email and API key for NCBI from environment variables
 logger.info("Setting up NCBI credentials")
+from Bio import Entrez
 Entrez.email = os.environ.get('NCBI_EMAIL', 'your@email.com')
 Entrez.api_key = os.environ.get('NCBI_API_KEY')
 logger.info(f"Using email: {Entrez.email}")
@@ -71,7 +70,7 @@ def get_full_text(pmid, doi=None):
     # Finally try Sci-Hub
     try:
         logger.info(f"Trying Sci-Hub for {pmid}")
-        scihub_text = _get_text_from_scihub(pmid, doi)
+        scihub_text = get_text_from_scihub(pmid, doi)
         if scihub_text:
             text = scihub_text
             source = 'Sci-Hub'
@@ -169,144 +168,136 @@ def get_pmc_text(pmcid):
 def get_crossref_text(doi):
     """Get full text using DOI from Crossref."""
     try:
-        # First try direct DOI resolution
+        # Add proper headers with email
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'User-Agent': 'TdPAnalyzer/1.0 (mailto:your.email@example.com)',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
         }
         
-        # Try resolving DOI
+        # Add delay before request
+        time.sleep(2)
+        
+        # Try resolving DOI with proper error handling
         doi_url = f"https://doi.org/{doi}"
-        response = requests.get(doi_url, headers=headers, allow_redirects=True, verify=False)
+        response = requests.get(doi_url, headers=headers, allow_redirects=True, verify=False, timeout=30)
+        
+        if response.status_code == 403:
+            logger.warning(f"Access forbidden (403) for DOI {doi}. Adding delay and retrying...")
+            time.sleep(5)  # Longer delay before retry
+            response = requests.get(doi_url, headers=headers, allow_redirects=True, verify=False, timeout=30)
         
         if response.status_code == 200:
             final_url = response.url
             logger.info(f"DOI resolved to: {final_url}")
             
-            # Handle different publisher sites
-            if 'sciencedirect.com' in final_url:
-                # For ScienceDirect
-                soup = BeautifulSoup(response.text, 'html.parser')
-                article = soup.find('div', {'id': 'centerInner'}) or soup.find('div', {'id': 'main-content'})
+            # Add delay before fetching content
+            time.sleep(2)
+            
+            # Get the actual content
+            content_response = requests.get(final_url, headers=headers, verify=False, timeout=30)
+            if content_response.status_code == 200:
+                soup = BeautifulSoup(content_response.text, 'html.parser')
+                
+                # Try multiple content selectors based on publisher
+                if 'sciencedirect.com' in final_url:
+                    article = (soup.find('div', {'id': 'centerInner'}) or 
+                             soup.find('div', {'id': 'main-content'}) or
+                             soup.find('div', {'class': 'article-content'}))
+                elif 'springer.com' in final_url:
+                    article = (soup.find('div', {'class': 'c-article-body'}) or 
+                             soup.find('div', {'id': 'body'}) or
+                             soup.find('main', {'class': 'main-content'}))
+                elif 'wiley.com' in final_url:
+                    article = (soup.find('div', {'class': 'article-content'}) or
+                             soup.find('div', {'class': 'main-content'}))
+                else:
+                    # Generic fallback
+                    article = (soup.find('article') or
+                             soup.find('div', {'class': ['article', 'content', 'main-content', 'paper']}))
+                
                 if article:
                     text = article.get_text(separator=' ', strip=True)
-                    return text
-                    
-            elif 'springer.com' in final_url:
-                # For Springer
-                soup = BeautifulSoup(response.text, 'html.parser')
-                article = soup.find('div', {'class': 'c-article-body'}) or soup.find('div', {'id': 'body'})
-                if article:
-                    text = article.get_text(separator=' ', strip=True)
-                    return text
-                    
-            elif 'wiley.com' in final_url:
-                # For Wiley
-                soup = BeautifulSoup(response.text, 'html.parser')
-                article = soup.find('div', {'class': 'article-body'}) or soup.find('div', {'class': 'main-content'})
-                if article:
-                    text = article.get_text(separator=' ', strip=True)
-                    return text
-                    
-            elif 'nature.com' in final_url:
-                # For Nature
-                soup = BeautifulSoup(response.text, 'html.parser')
-                article = soup.find('div', {'class': 'c-article-body'}) or soup.find('article')
-                if article:
-                    text = article.get_text(separator=' ', strip=True)
-                    return text
-                    
-            # Try generic article extraction
-            soup = BeautifulSoup(response.text, 'html.parser')
-            article = (
-                soup.find('article') or
-                soup.find('div', {'class': ['article', 'paper', 'content', 'main']}) or
-                soup.find('div', {'id': ['article', 'paper', 'content', 'main']})
-            )
-            
-            if article:
-                text = article.get_text(separator=' ', strip=True)
-                if len(text) > 500:  # Only return if we got substantial text
-                    logger.info(f"Successfully extracted {len(text)} characters from {final_url}")
-                    return text
-            
-            logger.warning(f"Could not extract article text from {final_url}")
-            
-        else:
-            logger.warning(f"Failed to resolve DOI {doi}: {response.status_code}")
-            
-    except Exception as e:
-        logger.error(f"Error in get_crossref_text: {e}")
+                    if len(text) > 1000:  # Sanity check
+                        return text
+                        
+        logger.warning(f"Failed to get text from Crossref for DOI {doi}")
         
+    except Exception as e:
+        logger.error(f"Error getting Crossref text: {e}")
     return None
 
-def _get_text_from_scihub(pmid, doi=None):
-    """Try to get full text from Sci-Hub"""
+def get_text_from_scihub(pmid: str, doi: str) -> Optional[str]:
+    """Get full text from Sci-Hub."""
+    if not doi:
+        return None
+        
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Cache-Control': 'max-age=0'
+    }
+    
+    session = requests.Session()
+    
     try:
-        if not doi:
-            logger.warning(f"No DOI available for PMID {pmid}")
-            return None
+        # First get the main Sci-Hub page
+        url = f"https://sci-hub.se/{doi}"
+        response = session.get(url, headers=headers, verify=False)
+        
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
             
-        # Try multiple Sci-Hub domains
-        domains = ['https://sci-hub.se', 'https://sci-hub.st', 'https://sci-hub.ru']
-        
-        for domain in domains:
-            try:
-                logger.info(f"Trying Sci-Hub domain: {domain}")
-                
-                # Create session with longer timeout and retries
-                session = requests.Session()
-                session.mount('https://', requests.adapters.HTTPAdapter(max_retries=3))
-                
-                # First get the PDF URL
-                scihub_url = f"{domain}/{doi}"
-                response = session.get(scihub_url, timeout=30, verify=False)
-                response.raise_for_status()
-                
-                soup = BeautifulSoup(response.text, 'html.parser')
-                pdf_iframe = soup.find('iframe', id='pdf')
-                
-                if not pdf_iframe:
-                    logger.warning(f"No PDF iframe found on {domain} for DOI {doi}")
-                    continue
-                    
-                pdf_url = pdf_iframe.get('src', '')
+            # Try to find PDF URL
+            pdf_url = None
+            
+            # Method 1: Check iframe
+            iframe = soup.find('iframe', id='pdf')
+            if iframe and iframe.get('src'):
+                pdf_url = iframe['src']
+            
+            # Method 2: Check embed
+            if not pdf_url:
+                embed = soup.find('embed')
+                if embed and embed.get('src'):
+                    pdf_url = embed['src']
+            
+            # Method 3: Look for direct PDF link
+            if not pdf_url:
+                pdf_link = soup.find('a', href=re.compile(r'.*\.pdf$'))
+                if pdf_link:
+                    pdf_url = pdf_link['href']
+            
+            if pdf_url:
                 if not pdf_url.startswith('http'):
-                    pdf_url = 'https:' + pdf_url
-                    
-                logger.info(f"Found PDF at {pdf_url}")
+                    pdf_url = f"https:{pdf_url}" if pdf_url.startswith('//') else f"https://sci-hub.se{pdf_url}"
                 
-                # Download PDF with retry
-                max_retries = 3
-                for attempt in range(max_retries):
+                # Get PDF content with same session
+                pdf_response = session.get(pdf_url, headers=headers, verify=False)
+                if pdf_response.status_code == 200:
+                    # Extract text from PDF
+                    pdf_file = BytesIO(pdf_response.content)
                     try:
-                        pdf_response = session.get(pdf_url, timeout=30, verify=False)
-                        if pdf_response.headers.get('content-type', '').lower() == 'application/pdf':
-                            pdf_file = BytesIO(pdf_response.content)
-                            pdf_reader = PyPDF2.PdfReader(pdf_file)
-                            text = ""
-                            for page in pdf_reader.pages:
-                                text += page.extract_text()
-                                
-                            if len(text) > 1000:  # Sanity check for extracted text
-                                logger.info(f"Got {len(text)} chars from PDF")
-                                return text
-                                
+                        reader = PyPDF2.PdfReader(pdf_file)
+                        text = ""
+                        for page in reader.pages:
+                            text += page.extract_text() + "\n"
+                        if len(text.strip()) > 100:  # Basic sanity check
+                            return text
                     except Exception as e:
-                        if attempt == max_retries - 1:
-                            logger.error(f"Failed to get PDF after {max_retries} attempts: {str(e)}")
-                            break
-                        time.sleep(2)  # Wait before retry
+                        logger.warning(f"Error extracting text from PDF for {pmid}: {e}")
                         
-            except requests.exceptions.RequestException as e:
-                logger.warning(f"Failed to access {domain}: {str(e)}")
-                continue
-                
-        return None
-        
+        elif response.status_code == 403:
+            logger.error(f"Access forbidden (403) for {url}. This might be due to rate limiting or IP blocking.")
+        else:
+            logger.error(f"Failed to access {url}: Status code {response.status_code}")
+            
     except Exception as e:
-        logger.error(f"Error in Sci-Hub retrieval for PMID {pmid}: {str(e)}")
-        return None
+        logger.error(f"Error accessing Sci-Hub for {pmid}: {e}")
+        
+    return None
 
 def get_drug_names(drug_name: str) -> List[str]:
     """Get all related drug names from the drugnames.csv file"""
