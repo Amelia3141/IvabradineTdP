@@ -648,8 +648,14 @@ def main():
         sys.exit(1)
         
     drug_name = sys.argv[1].upper()
-    papers = analyze_literature([], drug_name)
-    print(f"\nFound {len(papers)} papers")
+    # Search PubMed for case reports
+    df = search_pubmed_case_reports(drug_name)
+    if not df.empty:
+        pmids = df['PMID'].tolist()
+        papers = analyze_literature(pmids, drug_name)
+        print(f"\nFound {len(papers)} papers")
+    else:
+        print("No papers found")
 
 if __name__ == "__main__":
     main()

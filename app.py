@@ -128,47 +128,19 @@ if analyze_button:
                 
                 with tab2:
                     st.subheader("Literature Review")
-                    pmids = st.session_state.analyzer.get_relevant_pmids(drug_name)
-                    literature = analyze_literature(pmids, drug_name)
-                    logger.info(f"Literature data: {literature}")
-                    
-                    if not literature.empty:
-                        # Convert DataFrame to records for display
-                        records = literature.to_dict('records')
+                    # Search PubMed for case reports
+                    df = st.session_state.analyzer.search_pubmed_case_reports(drug_name)
+                    if not df.empty:
+                        pmids = df['PMID'].tolist()
+                        literature = analyze_literature(pmids, drug_name)
+                        logger.info(f"Literature data: {literature}")
                         
-                        # Create expandable sections for each paper
-                        for i, paper in enumerate(records):
-                            with st.expander(f"📄 {paper['Case Report Title']}", expanded=i==0):
-                                col1, col2 = st.columns(2)
-                                
-                                with col1:
-                                    st.markdown("**Patient Details**")
-                                    if paper['Age']:
-                                        st.write(f"Age: {paper['Age']}")
-                                    if paper['Sex']:
-                                        st.write(f"Sex: {paper['Sex']}")
-                                    if paper['Oral Dose (mg)']:
-                                        st.write(f"Dose: {paper['Oral Dose (mg)']} mg")
-                                    
-                                    # Display ECG values without the header
-                                    if paper['QTc']:
-                                        st.write(f"QTc: {paper['QTc']} ms")
-                                    if paper['Uncorrected QT (ms)']:
-                                        st.write(f"QT: {paper['Uncorrected QT (ms)']} ms")
-                                    if paper['Heart Rate (bpm)']:
-                                        st.write(f"Heart Rate: {paper['Heart Rate (bpm)']} bpm")
-                                    if paper['Torsades de Pointes?']:
-                                        st.write(f"TdP: {paper['Torsades de Pointes?']}")
-
-                                with col2:
-                                    if paper['Medical History']:
-                                        st.markdown("**Medical History**")
-                                        st.write(paper['Medical History'])
-                                    if paper['Course of Treatment']:
-                                        st.markdown("**Treatment Course**")
-                                        st.write(paper['Course of Treatment'])
+                        if not literature.empty:
+                            st.dataframe(literature)
+                        else:
+                            st.warning("No detailed analysis available for the found papers.")
                     else:
-                        st.info("No literature data available.")
+                        st.warning("No relevant papers found in PubMed.")
 
     except Exception as e:
         st.error(f"Error analyzing drug: {str(e)}")
