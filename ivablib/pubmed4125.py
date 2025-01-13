@@ -707,7 +707,7 @@ def get_texts_parallel(pmids):
             logger.error(f"Error getting DOI for {pmid}: {e}")
     
     def get_text_with_delay(pmid):
-        # Wrapper to add delay between requests
+        """Wrapper to add delay between requests"""
         text, source = get_full_text(pmid, dois.get(pmid))
         time.sleep(2)  # Add delay between full text requests
         return text, source
@@ -736,76 +736,87 @@ def get_texts_parallel(pmids):
     logger.info(f"Got {len(texts)} full texts out of {len(pmids)} papers")
     return texts
 
-def process_papers(papers, drug_name):
-    """Process papers using CaseReportAnalyzer"""
-    from .case_report_analyzer import CaseReportAnalyzer
-    
-    try:
-        analyzer = CaseReportAnalyzer()
-        results = analyzer.analyze_papers(papers, drug_name)
-        
-        if not results.empty:
-            return {
-                'case_reports': results.to_dict('records'),
-                'message': f"Found {len(results)} case reports"
-            }
-        else:
-            return {
-                'case_reports': [],
-                'message': "No relevant case reports found"
-            }
-            
-    except Exception as e:
-        logger.error(f"Error in process_papers: {str(e)}")
-        return {
-            'error': f"Error processing papers: {str(e)}"
-        }
-
-def analyze_literature(drug_name: str):
+def analyze_literature(drug_name: str) -> Dict:
     """Analyze literature for a given drug."""
     try:
-        logger.info(f"Starting literature analysis for {drug_name}")
-        
-        # Search for papers
-        papers_df = search_pubmed_case_reports(drug_name)
-        if papers_df.empty:
-            logger.info(f"No papers found for {drug_name}")
-            return {
-                'error': f"No papers found for {drug_name}"
-            }
+        papers = search_pubmed_case_reports(drug_name)
+        if not papers.empty:
+            # Get PMIDs
+            pmids = [p for p in papers['PMID'].tolist() if p != 'No PMID']
             
-        # Convert DataFrame to list of dictionaries
-        papers = papers_df.to_dict('records')
-        logger.info(f"Found {len(papers)} papers for {drug_name}")
-        
-        # Get full texts
-        papers_with_text = get_full_texts(papers)
-        if not papers_with_text:
-            return {
-                'error': f"No full texts available for {drug_name}. Found {len(papers)} papers but could not retrieve their full text content. This could be because the papers are not freely accessible or are behind a paywall."
-            }
+            # Get texts in parallel using ThreadPoolExecutor
+            texts = get_texts_parallel(pmids)
             
-        logger.info(f"Retrieved {len(papers_with_text)} full texts for {drug_name}")
-        
-        # Process papers
-        results = process_papers(papers_with_text, drug_name)  # Pass drug_name here
-        
-        # Add summary statistics
-        results.update({
-            'stats': {
-                'total_papers': len(papers),
-                'papers_with_text': len(papers_with_text),
-                'success_rate': f"{(len(papers_with_text) / len(papers) * 100):.1f}%"
+            # Create paper objects
+            case_reports = []
+            for _, paper in papers.iterrows():
+                pmid = paper['PMID']
+                text = texts.get(pmid, 'None')
+                
+                report = {
+                    'Title': paper.get('Title', ''),
+                    'Age': '',
+                    'Sex': '',
+                    'Oral Dose (mg)': '',
+                    'Theoretical Max Concentration (μM)': '',
+                    '40% Bioavailability': '',
+                    'Theoretical HERG IC50 / Concentration μM': '',
+                    '40% Plasma Concentration': '',
+                    'Uncorrected QT (ms)': '',
+                    'QTc': '',
+                    'QTR': '',
+                    'QTF': '',
+                    'Heart Rate (bpm)': '',
+                    'Torsades de Pointes?': 'No',
+                    'Blood Pressure (mmHg)': '',
+                    'Medical History': '',
+                    'Medication History': '',
+                    'Course of Treatment': '',
+                    'Year': paper.get('Year', ''),
+                    'Abstract': paper.get('Abstract', ''),
+                    'Full Text': text
+                }
+                
+                # Extract fields using regex patterns
+                if text:
+                    combined_text = text + ' ' + report['Abstract']
+                    patterns = {
+                        'Age': re.compile(r'(?:(?:aged?|age[d\s:]*|a|was)\s*)?(\d+)[\s-]*(?:year|yr|y|yo|years?)[s\s-]*(?:old|of\s+age)?|(?:age[d\s:]*|aged\s*)(\d+)', re.IGNORECASE),
+                        'Sex': re.compile(r'\b(?:male|female|man|woman|boy|girl|[MF]\s*/\s*(?:\d+|[MF])|gender[\s:]+(?:male|female)|(?:he|she|his|her)\s+was)\b', re.IGNORECASE),
+                        'Oral Dose (mg)': re.compile(r'(?:oral\s+dose|dose[d\s]*orally|given|administered|took|ingested|consumed|prescribed)\s*(?:with|at|of|a|total)?\s*(\d+\.?\d*)\s*(?:mg|milligrams?|g|grams?|mcg|micrograms?)', re.IGNORECASE),
+                        'Theoretical Max Concentration (μM)': re.compile(r'(?:maximum|max|peak|highest|cmax|c-?max)\s*(?:concentration|conc|level|exposure)\s*(?:of|was|is|reached|measured|observed|calculated)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*(?:μM|uM|micromolar|nmol/[lL]|μmol/[lL]|ng/m[lL])', re.IGNORECASE),
+                        '40% Bioavailability': re.compile(r'(?:bioavailability|F|absorption|systemic\s+availability)\s*(?:of|was|is|approximately|about|~)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*%?', re.IGNORECASE),
+                        'Theoretical HERG IC50 / Concentration μM': re.compile(r'(?:hERG\s+IC50|IC50\s+(?:value\s+)?(?:for|of)\s+hERG|half-?maximal\s+(?:inhibitory)?\s+concentration|IC50)\s*(?:of|was|is|=|:)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*(?:μM|uM|micromolar|nmol/[lL]|μmol/[lL])', re.IGNORECASE),
+                        '40% Plasma Concentration': re.compile(r'(?:plasma|blood|serum)\s*(?:concentration|level|exposure|Cmax|C-max)\s*(?:of|was|is|measured|found|detected|reached)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*(?:μM|uM|micromolar|ng/m[lL]|μg/m[lL]|mg/[lL]|g/[lL])', re.IGNORECASE),
+                        'Uncorrected QT (ms)': re.compile(r'\b(?:QT|uncorrected\s+QT|QT\s*interval|interval\s*QT|baseline\s*QT)[\s:]*(?:interval|duration|measurement|value)?\s*(?:of|was|is|=|:|measured|found|documented|recorded)?\s*(\d+\.?\d*)\s*(?:ms(?:ec)?|milliseconds?|s(?:ec)?|seconds?)?', re.IGNORECASE),
+                        'QTc': re.compile(r'(?:QTc[FBR]?|corrected\s+QT|QT\s*corrected|QT[c]?\s*interval\s*(?:corrected)?|corrected\s*QT\s*interval)[\s:]*(?:interval|duration|measurement|prolongation|value)?\s*(?:of|was|is|=|:|measured|found|documented|recorded)?\s*(\d+\.?\d*)\s*(?:ms(?:ec)?|milliseconds?|s(?:ec)?|seconds?)?', re.IGNORECASE),
+                        'Heart Rate (bpm)': re.compile(r'(?:heart\s+rate|HR|pulse|ventricular\s+rate|heart\s+rhythm|cardiac\s+rate)[\s:]*(?:of|was|is|=|:)?\s*(\d+)(?:\s*(?:beats?\s*per\s*min(?:ute)?|bpm|min-1|/min))?', re.IGNORECASE),
+                        'Blood Pressure (mmHg)': re.compile(r'(?:blood\s+pressure|BP|arterial\s+pressure)[\s:]*(?:of|was|is|=|:)?\s*([\d/]+)(?:\s*mm\s*Hg)?', re.IGNORECASE),
+                        'Torsades de Pointes?': re.compile(r'\b(?:torsade[s]?\s*(?:de)?\s*pointes?|TdP|torsades|polymorphic\s+[vV]entricular\s+[tT]achycardia|PVT\s+(?:with|showing)\s+[tT]dP)\b', re.IGNORECASE),
+                        'Medical History': re.compile(r'(?:medical|clinical|past|previous|documented|known|significant)\s*(?:history|condition|diagnosis|comorbidities)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE),
+                        'Medication History': re.compile(r'(?:medication|drug|prescription|current\s+medications?|concomitant\s+medications?)\s*(?:history|list|profile|regime)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE),
+                        'Course of Treatment': re.compile(r'(?:treatment|therapy|management|intervention|administered|given)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE)
+                    }
+                    
+                    for field, pattern in patterns.items():
+                        match = pattern.search(combined_text)
+                        if match:
+                            if field == 'Torsades de Pointes?':
+                                report[field] = 'Yes'
+                            else:
+                                groups = [g for g in match.groups() if g is not None]
+                                report[field] = groups[0] if groups else match.group(0)
+                
+                case_reports.append(report)
+                
+            return {
+                "case_reports": case_reports,
+                "total_cases": len(case_reports)
             }
-        })
-        
-        return results
         
     except Exception as e:
-        logger.error(f"Error in analyze_literature: {str(e)}")
-        return {
-            'error': f"Error analyzing literature: {str(e)}"
-        }
+        logger.error(f"Error analyzing literature: {e}")
+        return {"error": str(e)}
 
 def main():
     if len(sys.argv) != 2:
