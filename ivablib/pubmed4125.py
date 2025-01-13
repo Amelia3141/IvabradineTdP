@@ -414,11 +414,9 @@ def search_pubmed_case_reports(drug_name: str) -> pd.DataFrame:
                     'Case Report Title': record.get('TI', ''),
                     'Abstract': record.get('AB', ''),
                     'PMID': record.get('PMID', ''),
-                    'Year': record.get('DP', '').split()[0] if record.get('DP') else '',
-                    'Authors': '; '.join(record.get('AU', [])),  # Join author list
-                    'Journal': record.get('JT', ''),  # Full journal title
                     'DOI': '',  # Will be filled by get_doi_from_crossref
                     'PubMed URL': f"https://pubmed.ncbi.nlm.nih.gov/{record.get('PMID', '')}/",
+                    'Year': record.get('DP', '').split()[0] if record.get('DP') else '',
                     'Age': '',
                     'Sex': '',
                     'Oral Dose (mg)': '',
@@ -572,14 +570,14 @@ def get_texts_parallel(pmids: List[str]) -> List[Dict[str, Any]]:
         logger.error(f"Error in get_texts_parallel: {e}")
         return []
 
-def analyze_literature(drug_name: str) -> pd.DataFrame:
+def analyze_literature(drug_name: str) -> Dict[str, Any]:
     """Analyze literature for a given drug."""
     try:
         # Search PubMed
         df = search_pubmed_case_reports(drug_name)
         if df.empty:
             logger.warning("No results found in PubMed")
-            return pd.DataFrame()
+            return {'case_reports': []}
             
         # Initialize all required columns
         required_columns = [
@@ -696,11 +694,14 @@ def analyze_literature(drug_name: str) -> pd.DataFrame:
         columns = [col for col in required_columns if col in df.columns]
         df = df[columns]
         
-        return df
+        # Convert DataFrame to list of dictionaries
+        case_reports = df.to_dict('records')
+        
+        return {'case_reports': case_reports}
         
     except Exception as e:
         logger.error(f"Error in analyze_literature: {e}")
-        return pd.DataFrame()
+        return {'error': str(e)}
 
 def get_doi_from_crossref(pmid: str) -> Optional[str]:
     """Get DOI for a PMID using Crossref API."""
@@ -727,7 +728,7 @@ def main():
         
     drug_name = sys.argv[1].upper()
     papers = analyze_literature(drug_name)
-    print(f"\nFound {len(papers)} papers")
+    print(f"\nFound {len(papers['case_reports'])} papers")
 
 if __name__ == "__main__":
     main()

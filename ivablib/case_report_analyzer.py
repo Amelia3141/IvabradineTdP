@@ -88,15 +88,86 @@ class CaseReportAnalyzer:
             'tdp': re.compile(r'\b(?:torsade[s]?\s*(?:de)?\s*pointes?|TdP|torsades|polymorphic\s+[vV]entricular\s+[tT]achycardia|PVT\s+(?:with|showing)\s+[tT]dP)\b', re.IGNORECASE),
             
             # Enhanced history patterns with better context capture
-            'medical_history': re.compile(r'(?:medical|clinical|past|previous|documented|known|significant)\s*(?:history|condition|diagnosis|comorbidities)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE),
+            'medical_history': re.compile(r"""
+                (?:
+                    (?:medical|clinical|past|previous|documented|known|significant)\s*(?:history|condition|diagnosis|comorbidities)|
+                    (?:history\s+of|diagnosed\s+with|presented\s+with|admitted\s+with|suffering\s+from)|
+                    (?:comorbid\s+conditions?|underlying\s+conditions?|pre-existing\s+conditions?)
+                )
+                [:\.;\s]+
+                ([^\.]+?)
+                (?:\.(?:\s+[A-Z]|\n|$)|$)
+            """, re.VERBOSE | re.IGNORECASE),
             
-            'medication_history': re.compile(r'(?:medication|drug|prescription|current\s+medications?|concomitant\s+medications?)\s*(?:history|list|profile|regime)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE),
+            'medication_history': re.compile(r"""
+                (?:
+                    (?:medication|drug|prescription|current\s+medications?|concomitant\s+medications?)\s*(?:history|list|profile|regime)|
+                    (?:medications?\s+included|taking|receiving|treated\s+with|on\s+the\s+following\s+medications?)|
+                    (?:home\s+medications?|outpatient\s+medications?|chronic\s+medications?)
+                )
+                [:\.;\s]+
+                ([^\.]+?)
+                (?:\.(?:\s+[A-Z]|\n|$)|$)
+            """, re.VERBOSE | re.IGNORECASE),
+            
+            'treatment_course': re.compile(r"""
+                (?:
+                    (?:treatment|therapy|management|intervention|administered|given)|
+                    (?:treated|managed|received|started\s+on|initiated\s+on)|
+                    (?:course\s+of\s+treatment|therapeutic\s+approach|clinical\s+course)
+                )
+                [:\.;\s]+
+                ([^\.]+?)
+                (?:\.(?:\s+[A-Z]|\n|$)|$)
+            """, re.VERBOSE | re.IGNORECASE),
             
             # Enhanced treatment patterns
-            'treatment_course': re.compile(r'(?:treatment|therapy|management|intervention|administered|given)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE),
+            'drug_qt': re.compile(r"""
+                (?:
+                    (?:QT\s+prolongation|QT\s+interval\s+prolongation|QTc\s+prolongation)\s+
+                    (?:associated\s+with|due\s+to|caused\s+by|induced\s+by|related\s+to)\s+
+                    (?:the\s+use\s+of|the\s+administration\s+of|the\s+prescription\s+of)\s+
+                    ([\w\s,]+)
+                )
+            """, re.VERBOSE | re.IGNORECASE),
+            
+            'brady_qt': re.compile(r"""
+                (?:
+                    (?:bradycardia|bradyarrhythmia)\s+
+                    (?:associated\s+with|due\s+to|caused\s+by|induced\s+by|related\s+to)\s+
+                    (?:QT\s+prolongation|QT\s+interval\s+prolongation|QTc\s+prolongation)
+                )
+            """, re.VERBOSE | re.IGNORECASE),
+            
+            'figure_qt': re.compile(r"""
+                (?:
+                    (?:figure|fig\.?)\s+
+                    [\d\.]+\s*
+                    (?:shows|demonstrates|depicts|displays)\s+
+                    (?:QT\s+prolongation|QT\s+interval\s+prolongation|QTc\s+prolongation)
+                )
+            """, re.VERBOSE | re.IGNORECASE),
+            
+            'table_qt': re.compile(r"""
+                (?:
+                    (?:table|tab\.?)\s+
+                    [\d\.]+\s*
+                    (?:lists|summarizes|presents)\s+
+                    (?:QT\s+prolongation|QT\s+interval\s+prolongation|QTc\s+prolongation)
+                )
+            """, re.VERBOSE | re.IGNORECASE),
+            
+            'supp_qt': re.compile(r"""
+                (?:
+                    (?:supplementary|supplement)\s+
+                    (?:material|data|information)\s+
+                    (?:includes|contains|provides)\s+
+                    (?:QT\s+prolongation|QT\s+interval\s+prolongation|QTc\s+prolongation)
+                )
+            """, re.VERBOSE | re.IGNORECASE),
         }
 
-    def get_smart_context(self, text: str, match_start: int, match_end: int, min_chars: int = 50) -> str:
+    def get_smart_context(self, text: str, match_start: int, match_end: int, min_chars: int = 200) -> str:
         """
         Get context with a minimum of min_chars but expanded to complete sentences.
         
@@ -228,9 +299,6 @@ class CaseReportAnalyzer:
         Returns:
             Dict containing extracted information
         """
-        if not text:
-            return {}
-            
         results = {
             'age': '',
             'sex': '',
@@ -248,57 +316,53 @@ class CaseReportAnalyzer:
             'treatment_course': ''
         }
         
-        try:
-            # Clean text
-            cleaned_text = self._clean_text(text)
-            
-            # Extract each field
-            for field, pattern in self.patterns.items():
-                matches = list(pattern.finditer(cleaned_text))
-                if matches:
-                    if field == 'tdp':
-                        results['tdp_present'] = True
-                        # Get context for the first match
-                        match = matches[0]
-                        results['tdp_context'] = self.get_smart_context(cleaned_text, match.start(), match.end())
-                    elif field == 'oral_dose':
-                        # Use the first match for dosing info
-                        match = matches[0]
-                        dose_text = match.group(0)
-                        value_match = re.search(r'(\d+(?:\.\d+)?)', dose_text)
-                        unit_match = re.search(r'(mg|milligrams?|g|grams?|mcg|micrograms?|µg)', dose_text, re.IGNORECASE)
-                        freq_match = re.search(r'(daily|once|twice|thrice|[1-4]x|q\.?d|bid|tid|qid|per\s+day|/day)', dose_text, re.IGNORECASE)
-                        
-                        results['oral_dose_value'] = value_match.group(1) if value_match else ''
-                        results['oral_dose_unit'] = unit_match.group(1) if unit_match else ''
-                        results['oral_dose_freq'] = freq_match.group(1) if freq_match else ''
-                    elif field in ['qt', 'qtc']:
-                        # For QT measurements, try to find the most relevant value
-                        values = []
-                        for match in matches:
-                            try:
-                                value = float(match.group(1))
-                                if 100 <= value <= 700:  # Reasonable QT range in ms
-                                    values.append(value)
-                            except (ValueError, IndexError, TypeError):
-                                continue
-                        
-                        if values:
-                            # For QTc, prefer larger values as they're more concerning
-                            value = max(values)
-                            results[f'{field}_value'] = str(value)
-                    else:
-                        # For other fields, get the first capture group or full match
-                        match = matches[0]
-                        groups = [g for g in match.groups() if g is not None]
-                        value = groups[0] if groups else match.group(0)
-                        results[field] = str(value).strip()
-            
-            return results
-            
-        except Exception as e:
-            logger.error(f"Error in analyze: {e}")
-            return results
+        # Clean text
+        text = self._clean_text(text)
+        
+        # Extract each field
+        for field, pattern in self.patterns.items():
+            matches = list(pattern.finditer(text))
+            if matches:
+                if field == 'tdp':
+                    results['tdp_present'] = True
+                    # Get context for the first match
+                    match = matches[0]
+                    results['tdp_context'] = self.get_smart_context(text, match.start(), match.end())
+                elif field == 'oral_dose':
+                    # Use the first match for dosing info
+                    match = matches[0]
+                    dose_text = match.group(0)
+                    value_match = re.search(r'(\d+(?:\.\d+)?)', dose_text)
+                    unit_match = re.search(r'(mg|milligrams?|g|grams?|mcg|micrograms?|µg)', dose_text, re.IGNORECASE)
+                    freq_match = re.search(r'(daily|once|twice|thrice|[1-4]x|q\.?d|bid|tid|qid|per\s+day|/day)', dose_text, re.IGNORECASE)
+                    
+                    results['oral_dose_value'] = value_match.group(1) if value_match else ''
+                    results['oral_dose_unit'] = unit_match.group(1) if unit_match else ''
+                    results['oral_dose_freq'] = freq_match.group(1) if freq_match else ''
+                elif field in ['qt', 'qtc']:
+                    # For QT measurements, try to find the most relevant value
+                    # Sort matches by the numeric value to find the most concerning one
+                    values = []
+                    for match in matches:
+                        try:
+                            value = float(match.group(1))
+                            if 100 <= value <= 700:  # Reasonable QT range in ms
+                                values.append(value)
+                        except (ValueError, IndexError):
+                            continue
+                    
+                    if values:
+                        # For QTc, prefer larger values as they're more concerning
+                        # For QT, also prefer larger values
+                        value = max(values)
+                        results[f'{field}_value'] = str(value)
+                else:
+                    # For other fields, get the first capture group or full match
+                    match = matches[0]
+                    value = next((g for g in match.groups() if g is not None), match.group(0))
+                    results[field] = value.strip()
+        
+        return results
 
     def analyze_papers(self, papers: List[Dict[str, Any]], drug_name: str) -> pd.DataFrame:
         """Analyze a list of papers and create a case report table."""
@@ -586,21 +650,53 @@ class CaseReportAnalyzer:
 
     def _clean_text(self, text: str) -> str:
         """Clean and normalize text for analysis."""
-        if not isinstance(text, str):
-            text = str(text)
+        if not text:
+            return ""
             
-        # Convert to lowercase for case-insensitive matching
-        text = text.lower()
+        # Preserve case for important medical terms
+        text = re.sub(r'\bQT[cC]?\b', lambda m: m.group(0).upper(), text)
+        text = re.sub(r'\b[Tt]d[Pp]\b', 'TdP', text)
+        text = re.sub(r'\b[Ee][Cc][Gg]\b', 'ECG', text)
+        text = re.sub(r'\b[Ee][Kk][Gg]\b', 'ECG', text)
         
-        # Replace unicode quotes and dashes
-        text = text.replace('"', '"').replace('"', '"')
-        text = text.replace(''', "'").replace(''', "'")
-        text = text.replace('–', '-').replace('—', '-')
+        # Replace common medical abbreviations
+        replacements = {
+            'yo ': ' year old ',
+            'y/o': ' year old ',
+            'yr ': ' year ',
+            'yrs': ' years ',
+            'yo,': ' year old,',
+            'y/o,': ' year old,',
+            'yr,': ' year,',
+            'yrs,': ' years,',
+            'hr ': ' heart rate ',
+            'bp ': ' blood pressure ',
+            'hx': ' history ',
+            'dx': ' diagnosis ',
+            'tx': ' treatment ',
+            'pmh': ' past medical history ',
+            'psh': ' past surgical history ',
+            'meds': ' medications ',
+            'sig': ' significant ',
+            'w/': ' with ',
+            'w/o': ' without ',
+            's/p': ' status post ',
+            'c/o': ' complains of ',
+            'h/o': ' history of ',
+            'p/w': ' presented with ',
+        }
         
+        # Apply replacements
+        for old, new in replacements.items():
+            text = re.sub(r'\b' + re.escape(old) + r'\b', new, text, flags=re.IGNORECASE)
+            
         # Remove excessive whitespace
-        text = ' '.join(text.split())
+        text = re.sub(r'\s+', ' ', text)
         
-        return text
+        # Normalize sentence endings
+        text = re.sub(r'([.!?])\s*([A-Z])', r'\1 \2', text)
+        
+        return text.strip()
 
 def analyze_papers(papers: List[Dict[str, Any]], drug_name: str) -> pd.DataFrame:
     """Analyze a list of papers and create a case report table."""
