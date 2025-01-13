@@ -106,29 +106,50 @@ def get_pmc_text(pmcid):
         
         # Try multiple possible content containers in order
         article_text = None
-        selectors = [
-            ('div', {'class': 'jig-ncbiinpagenav'}),
-            ('div', {'id': 'mc'}),  # Main content div in PMC
-            ('div', {'class': 'article-body'}),
-            ('div', {'id': 'body'}),
-            ('div', {'class': 'content'}),
-            ('div', {'class': 'article'})
-        ]
         
-        for tag, attrs in selectors:
-            content = soup.find(tag, attrs)
-            if content:
-                # Remove references, supplementary material, etc.
-                for div in content.find_all(['div', 'section'], {'class': ['ref-list', 'supplementary-material', 'copyright']}):
-                    div.decompose()
-                article_text = content
-                break
+        # First try the main article content
+        content = soup.find('article')
+        if content:
+            # Only remove specific sections that aren't part of the main text
+            for div in content.find_all(['div', 'section'], {'class': ['ref-list', 'copyright']}):
+                div.decompose()
+            article_text = content
+        
+        # If no article tag, try other containers
+        if not article_text:
+            selectors = [
+                ('div', {'class': 'jig-ncbiinpagenav'}),
+                ('div', {'id': 'mc'}),
+                ('div', {'class': 'article-body'}),
+                ('div', {'id': 'body'}),
+                ('div', {'class': 'content'}),
+                ('div', {'class': 'article'})
+            ]
+            
+            for tag, attrs in selectors:
+                content = soup.find(tag, attrs)
+                if content:
+                    # Only remove specific sections
+                    for div in content.find_all(['div', 'section'], {'class': ['ref-list', 'copyright']}):
+                        div.decompose()
+                    article_text = content
+                    break
         
         if article_text:
-            # Clean the text
-            text = article_text.get_text(separator=' ', strip=True)
-            # Remove excessive whitespace
-            text = ' '.join(text.split())
+            # Extract text while preserving some structure
+            paragraphs = []
+            for p in article_text.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']):
+                text = p.get_text(strip=True)
+                if text:  # Only add non-empty paragraphs
+                    paragraphs.append(text)
+            
+            # Join paragraphs with newlines to preserve structure
+            text = '\n'.join(paragraphs)
+            
+            # Clean up the text
+            text = ' '.join(text.split())  # Remove excessive whitespace
+            text = text.replace('- ', '')  # Remove hyphenation
+            
             if len(text) > 500:  # Only return if we got substantial text
                 logger.info(f"Successfully extracted {len(text)} characters from PMC")
                 return text
@@ -625,9 +646,11 @@ def analyze_literature(drug_name: str) -> Dict:
                 
                 # Extract fields using regex patterns
                 if text:
-                    combined_text = text + ' ' + report['abstract']
+                    combined_text = report['full_text'] + ' ' + report['abstract']
                     analyzer = CaseReportAnalyzer()  # Initialize with no args
-                    report.update(analyzer.analyze(combined_text))
+                    analyzed = analyzer.analyze(combined_text)
+                    report.update(analyzed)
+                    logger.info(f"Analyzed text for {pmid}: found {sum(1 for v in analyzed.values() if v)} fields")
                 
                 case_reports.append(report)
             
