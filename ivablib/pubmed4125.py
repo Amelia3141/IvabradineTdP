@@ -219,28 +219,14 @@ def get_scihub_text(pmid, doi=None):
         domains = [
             'https://sci-hub.se',
             'https://sci-hub.st',
-            'https://sci-hub.ru',
-            'https://sci-hub.ee',
-            'https://sci-hub.wf',
-            'https://sci-hub.ren',
-            'https://sci-hub.cat',
-            'https://sci-hub.do'
+            'https://sci-hub.ru'
         ]
         
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             'Accept-Language': 'en-US,en;q=0.9',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1',
-            'Cache-Control': 'max-age=0',
-            'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-            'Sec-Ch-Ua-Mobile': '?0',
-            'Sec-Ch-Ua-Platform': '"macOS"',
-            'Sec-Fetch-Dest': 'document',
-            'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'none',
-            'Sec-Fetch-User': '?1'
+            'Connection': 'keep-alive'
         }
         
         session = requests.Session()
@@ -256,7 +242,11 @@ def get_scihub_text(pmid, doi=None):
                 else:
                     url = f"{domain}/pubmed/{pmid}"
                 
-                response = session.get(url, timeout=30, verify=False)
+                response = session.get(url, timeout=10, verify=False)
+                if response.status_code != 200:
+                    logger.warning(f"Got status code {response.status_code} from {domain}")
+                    continue
+                
                 if 'location not found' in response.text.lower():
                     logger.info(f"Paper not found on {domain}")
                     continue
@@ -268,64 +258,32 @@ def get_scihub_text(pmid, doi=None):
                 if pdf_iframe and 'src' in pdf_iframe.attrs:
                     pdf_url = pdf_iframe['src']
                     if not pdf_url.startswith('http'):
-                        pdf_url = urljoin(domain, pdf_url) if pdf_url.startswith('/') else f"https:{pdf_url}"
+                        pdf_url = 'https:' + pdf_url if pdf_url.startswith('//') else domain + pdf_url
                     
                     logger.info(f"Found PDF iframe at {pdf_url}")
                     
-                    # Download PDF with retry and exponential backoff
-                    for attempt in range(3):
-                        try:
-                            delay = 2 ** attempt
-                            time.sleep(delay)
-                            
-                            pdf_response = session.get(pdf_url, timeout=30, verify=False)
-                            if pdf_response.headers.get('content-type', '').lower() == 'application/pdf':
-                                pdf_file = io.BytesIO(pdf_response.content)
-                                pdf_reader = PyPDF2.PdfReader(pdf_file)
-                                text = ""
-                                for page in pdf_reader.pages:
-                                    text += page.extract_text()
-                                text = text.strip()
-                                if len(text) > 500:  # Only return if we got substantial text
-                                    logger.info(f"Successfully extracted {len(text)} characters from PDF")
-                                    return text
-                                else:
-                                    logger.warning(f"PDF text too short ({len(text)} chars), might be corrupted")
-                        except Exception as e:
-                            logger.error(f"Error downloading PDF from {pdf_url} (attempt {attempt + 1}): {e}")
-                            if attempt < 2:  # Don't sleep after last attempt
-                                continue
-                
-                # Also try to find direct download links
-                download_links = soup.find_all('a', href=True)
-                for link in download_links:
-                    href = link['href']
-                    if href.lower().endswith('.pdf'):
-                        try:
-                            pdf_url = urljoin(domain, href)
-                            logger.info(f"Found direct PDF link: {pdf_url}")
-                            
-                            pdf_response = session.get(pdf_url, timeout=30, verify=False)
-                            if pdf_response.headers.get('content-type', '').lower() == 'application/pdf':
-                                pdf_file = io.BytesIO(pdf_response.content)
-                                pdf_reader = PyPDF2.PdfReader(pdf_file)
-                                text = ""
-                                for page in pdf_reader.pages:
-                                    text += page.extract_text()
-                                text = text.strip()
-                                if len(text) > 500:
-                                    logger.info(f"Successfully extracted {len(text)} characters from PDF")
-                                    return text
-                                else:
-                                    logger.warning(f"PDF text too short ({len(text)} chars), might be corrupted")
-                        except Exception as e:
-                            logger.error(f"Error downloading PDF from link {pdf_url}: {e}")
-                            continue
+                    # Try to download PDF
+                    try:
+                        pdf_response = session.get(pdf_url, timeout=10, verify=False)
+                        if pdf_response.headers.get('content-type', '').lower() == 'application/pdf':
+                            pdf_file = io.BytesIO(pdf_response.content)
+                            pdf_reader = PyPDF2.PdfReader(pdf_file)
+                            text = ""
+                            for page in pdf_reader.pages:
+                                text += page.extract_text()
+                            text = text.strip()
+                            if len(text) > 500:  # Only return if we got substantial text
+                                logger.info(f"Successfully extracted {len(text)} characters from PDF")
+                                return text
+                            else:
+                                logger.warning(f"PDF text too short ({len(text)} chars), might be corrupted")
+                    except Exception as e:
+                        logger.error(f"Error downloading PDF from {pdf_url}: {e}")
                 
             except Exception as e:
-                logger.error(f"Error accessing {domain}: {e}")
+                logger.error(f"Error with domain {domain}: {e}")
                 continue
-        
+                
         logger.warning(f"Could not retrieve text from any Sci-Hub domain for PMID {pmid}")
         return None
         
@@ -494,38 +452,22 @@ def _search_pubmed(query: str) -> List[Dict]:
 
 def format_pubmed_results(records: List[Dict]) -> pd.DataFrame:
     """Format PubMed results into a DataFrame."""
-    results = []
+    formatted_records = []
     for record in records:
-        try:
-            paper_dict = {
-                'PMID': record['MedlineCitation']['PMID'],
-                'Case Report Title': record['MedlineCitation']['Article']['ArticleTitle'],
-                'Abstract': record['MedlineCitation']['Article'].get('Abstract', {}).get('AbstractText', [''])[0],
-                'Year': record['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate'].get('Year', ''),
-                'Age': '',  # Will be extracted by regex
-                'Sex': '',  # Will be extracted by regex
-                'Oral Dose (mg)': '',  # Will be extracted by regex
-                'Theoretical Max Concentration (μM)': '',  # Will be extracted by regex
-                '40% Bioavailability': '',  # Will be extracted by regex
-                'Theoretical HERG IC50 / Concentration μM': '',  # Will be extracted by regex
-                '40% Plasma Concentration': '',  # Will be extracted by regex
-                'Uncorrected QT (ms)': '',  # Will be extracted by regex
-                'QTc': '',  # Will be extracted by regex
-                'QTR': '',  # Will be calculated later
-                'QTF': '',  # Will be calculated later
-                'Heart Rate (bpm)': '',  # Will be extracted by regex
-                'Torsades de Pointes?': 'No',  # Will be updated by regex
-                'Blood Pressure (mmHg)': '',  # Will be extracted by regex
-                'Medical History': '',  # Will be extracted by regex
-                'Medication History': '',  # Will be extracted by regex
-                'Course of Treatment': ''  # Will be extracted by regex
-            }
-            results.append(paper_dict)
-        except Exception as e:
-            logger.error(f"Error processing record: {str(e)}")
-            continue
-            
-    return pd.DataFrame(results)
+        # Basic fields
+        formatted = {
+            'pmid': record.get('PMID', ''),
+            'title': record.get('Title', ''),
+            'abstract': record.get('Abstract', ''),
+            'doi': record.get('DOI', ''),
+            'pubmed_url': f"https://pubmed.ncbi.nlm.nih.gov/{record.get('PMID', '')}/",
+            'journal': record.get('Source', ''),
+            'publication_date': record.get('PubDate', ''),
+            'authors': '; '.join(record.get('Authors', [])),
+        }
+        formatted_records.append(formatted)
+    
+    return pd.DataFrame(formatted_records)
 
 def get_texts_parallel(pmids):
     """Get full texts for multiple PMIDs in parallel using ThreadPoolExecutor"""
@@ -599,83 +541,43 @@ def get_texts_parallel(pmids):
     logger.info(f"Got {len(texts)} full texts out of {len(pmids)} papers")
     return texts
 
-def analyze_literature(drug_name: str) -> Dict:
+def analyze_literature(drug_name: str) -> List[Dict]:
     """Analyze literature for a given drug."""
     try:
-        papers = search_pubmed_case_reports(drug_name)
-        if not papers.empty:
-            # Get PMIDs
-            pmids = [p for p in papers['PMID'].tolist() if p != 'No PMID']
-            
-            # Get texts in parallel using ThreadPoolExecutor
-            texts = get_texts_parallel(pmids)
-            
-            # Create paper objects
-            case_reports = []
-            texts_found = 0
-            for _, paper in papers.iterrows():
-                pmid = paper['PMID']
-                if pmid in texts:
-                    text = texts[pmid]
-                    texts_found += 1
-                else:
-                    text = None
-                
-                report = {
-                    'title': paper.get('Title', ''),
-                    'pmid': pmid,
-                    'doi': paper.get('DOI', ''),
-                    'age': '',
-                    'sex': '',
-                    'oral_dose_value': '',
-                    'oral_dose_unit': '',
-                    'oral_dose_freq': '',
-                    'qt_value': '',
-                    'qtc_value': '',
-                    'heart_rate_value': '',
-                    'blood_pressure_value': '',
-                    'tdp_present': False,
-                    'tdp_context': '',
-                    'medical_history': '',
-                    'medication_history': '',
-                    'treatment_course': '',
-                    'year': paper.get('Year', ''),
-                    'abstract': paper.get('Abstract', ''),
-                    'full_text': text
-                }
-                
-                # Extract fields using regex patterns
-                if text:
-                    combined_text = report['full_text'] + ' ' + report['abstract']
-                    logger.info(f"Text length for {pmid}: {len(combined_text)} characters")
-                    logger.info(f"Sample text: {combined_text[:500]}...")  # Log first 500 chars
-                    
-                    analyzer = CaseReportAnalyzer()  # Initialize with no args
-                    analyzed = analyzer.analyze(combined_text)
-                    report.update(analyzed)
-                    
-                    # Log what was found
-                    found_fields = {k: v for k, v in analyzed.items() if v}
-                    logger.info(f"Found fields for {pmid}: {found_fields}")
-                
-                case_reports.append(report)
-            
-            if texts_found == 0:
-                return {
-                    'error': f'No full texts available for {drug_name}. Found {len(papers)} papers but could not retrieve their full text content. This could be because the papers are not freely accessible or are behind a paywall.'
-                }
-            
-            return {
-                'case_reports': case_reports,
-                'stats': {
-                    'total_papers': len(papers),
-                    'texts_found': texts_found
-                }
+        # Get all related drug names
+        drug_names = get_drug_names(drug_name)
+        logger.info(f"Searching for drug names: {drug_names}")
+        
+        # Search PubMed
+        results = search_pubmed_case_reports(drug_name)
+        if not results:
+            logger.warning(f"No results found for {drug_name}")
+            return []
+        
+        # Format results
+        df = format_pubmed_results(results)
+        logger.info(f"Found {len(df)} papers")
+        
+        # Convert to list of dicts for output
+        case_reports = []
+        for _, row in df.iterrows():
+            report = {
+                'pmid': row['pmid'],
+                'title': row['title'],
+                'abstract': row['abstract'],
+                'doi': row['doi'],
+                'pubmed_url': row['pubmed_url'],
+                'journal': row['journal'],
+                'publication_date': row['publication_date'],
+                'authors': row['authors']
             }
-
+            case_reports.append(report)
+        
+        return case_reports
+        
     except Exception as e:
-        logger.error(f"Error analyzing literature: {e}")
-        return {"error": str(e)}
+        logger.error(f"Error in analyze_literature: {e}")
+        return []
 
 def main():
     if len(sys.argv) != 2:
@@ -684,7 +586,7 @@ def main():
         
     drug_name = sys.argv[1].upper()
     papers = analyze_literature(drug_name)
-    print(f"\nFound {len(papers['case_reports'])} papers")
+    print(f"\nFound {len(papers)} papers")
 
 if __name__ == "__main__":
     main()
