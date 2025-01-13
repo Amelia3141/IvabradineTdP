@@ -7,12 +7,10 @@ from typing import List, Dict, Any, Optional, Tuple
 import os
 import PyPDF2
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def clean_text(text: str) -> str:
-    """Clean and normalize text."""
     if not text:
         return ""
     text = ' '.join(text.split())
@@ -23,10 +21,7 @@ def clean_text(text: str) -> str:
     return text
 
 class CaseReportAnalyzer:
-    """Analyzes medical case reports for relevant information."""
-
     def __init__(self):
-        """Initialize the analyzer with regex patterns."""
         self.patterns = {
             'age': re.compile(r'(?:(?:aged?|age[d\s:]*|a|was)\s*)?(\d+)[\s-]*(?:year|yr|y|yo|years?)[s\s-]*(?:old|of\s+age)?|(?:age[d\s:]*|aged\s*)(\d+)', re.IGNORECASE),
             'sex': re.compile(r'\b(?:male|female|man|woman|boy|girl|[MF]\s*/\s*(?:\d+|[MF])|gender[\s:]+(?:male|female)|(?:he|she|his|her)\s+was)\b', re.IGNORECASE),
@@ -42,7 +37,6 @@ class CaseReportAnalyzer:
         }
 
     def analyze_papers(self, papers: List[Dict[str, Any]], columns: List[str]) -> pd.DataFrame:
-        """Analyze multiple papers and return results as DataFrame."""
         results = []
         for paper in papers:
             try:
@@ -79,7 +73,6 @@ class CaseReportAnalyzer:
         return df
 
     def analyze_paper(self, paper: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Analyze a single paper for case report information."""
         try:
             text = paper.get('FullText', '') + ' ' + paper.get('Abstract', '')
             if not text.strip():
@@ -108,7 +101,6 @@ class CaseReportAnalyzer:
             return None
 
     def _extract_numeric(self, text: str, pattern: re.Pattern) -> Optional[float]:
-        """Extract numeric value from text using pattern."""
         if not text:
             return None
         match = pattern.search(text)
@@ -122,7 +114,6 @@ class CaseReportAnalyzer:
         return None
 
     def _clean_sex(self, text: str, pattern: re.Pattern) -> str:
-        """Clean and standardize sex value."""
         if not text:
             return ""
         match = pattern.search(text)
@@ -135,7 +126,6 @@ class CaseReportAnalyzer:
         return ""
 
     def _extract_first_match(self, text: str, pattern: re.Pattern) -> str:
-        """Extract first match from text using pattern."""
         if not text:
             return ""
         match = pattern.search(text)
