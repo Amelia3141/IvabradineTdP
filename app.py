@@ -61,10 +61,13 @@ if analyze_button:
             analysis = st.session_state.analyzer.analyze_drug(drug_name, dose)
             logger.info(f"Drug analysis complete")
             
-            # Get literature analysis using pubmed4125 module
+            # Get literature analysis using pubmed4125 module directly
             try:
                 literature = analyze_literature(drug_name)
-                analysis['literature'] = literature
+                if isinstance(literature, pd.DataFrame):
+                    analysis['literature'] = literature.to_dict('records')
+                else:
+                    analysis['literature'] = literature
                 logger.info(f"Literature analysis complete")
             except Exception as e:
                 logger.error(f"Error in literature analysis: {e}")
@@ -100,78 +103,56 @@ if analyze_button:
                                 st.metric("IC50 Value", f"{herg.get('ic50', 'Unknown')} μM")
                             with col2:
                                 st.metric("Safety Ratio", f"{herg.get('safety_ratio', 'Unknown')}x")
-                                
+                            
                             if herg.get('notes'):
                                 st.write("**Notes:**")
                                 st.write(herg['notes'])
                         else:
                             st.write("No hERG binding data available")
                     
-                    # Drug Concentration Box
+                    # Drug Concentrations Box
                     with st.expander("Drug Concentrations", expanded=True):
                         conc = analysis.get('concentrations', {})
                         if conc:
                             col1, col2 = st.columns(2)
                             with col1:
-                                st.metric("Therapeutic Concentration", f"{conc.get('therapeutic', 'Unknown')} μM")
+                                st.metric("Theoretical Max", f"{conc.get('theoretical_max', 'Unknown')} μM")
+                                st.metric("Plasma Concentration", f"{conc.get('plasma_concentration', 'Unknown')} μM")
                             with col2:
-                                st.metric("Maximum Concentration", f"{conc.get('max', 'Unknown')} μM")
+                                st.metric("Theoretical/IC50 Ratio", conc.get('ratio_theoretical', 'Unknown'))
+                                st.metric("Plasma/IC50 Ratio", conc.get('ratio_plasma', 'Unknown'))
                         else:
                             st.write("No concentration data available")
-                    
-                    # Risk Assessment Box
-                    with st.expander("Risk Assessment", expanded=True):
-                        if analysis.get('crediblemeds_risk'):
-                            risk_text = analysis.get('risk_category', 'Known Risk')
-                            st.error(f"⚠️ {risk_text} (CredibleMeds)")
-                            st.markdown("[View on CredibleMeds](https://crediblemeds.org)")
-                        elif analysis.get('theoretical_binding'):
-                            st.warning("⚠️ Potential hERG binding detected")
-                        else:
-                            st.success("✅ No significant hERG binding predicted")
                 
                 with tab2:
                     st.subheader("Literature Review")
-                    literature = analysis.get('literature', {})
-                    logger.info(f"Literature data: {literature}")
+                    literature_data = analysis.get('literature', [])
                     
-                    if not literature.get('error') and not literature.empty:
-                        # Convert DataFrame to records for display
-                        records = literature.to_dict('records')
-                        
-                        # Create expandable sections for each paper
-                        for i, paper in enumerate(records):
-                            with st.expander(f"📄 {paper['Case Report Title']}", expanded=i==0):
-                                col1, col2 = st.columns(2)
+                    if isinstance(literature_data, list) and literature_data:
+                        for paper in literature_data:
+                            with st.expander(paper.get('Title', 'Untitled'), expanded=False):
+                                st.write(f"**Authors:** {paper.get('Authors', 'Unknown')}")
+                                st.write(f"**Journal:** {paper.get('Journal', 'Unknown')}")
+                                st.write(f"**Year:** {paper.get('Year', 'Unknown')}")
+                                st.write(f"**PMID:** {paper.get('PMID', 'Unknown')}")
                                 
-                                with col1:
-                                    st.markdown("**Patient Details**")
-                                    if paper['Age']:
-                                        st.write(f"Age: {paper['Age']}")
-                                    if paper['Sex']:
-                                        st.write(f"Sex: {paper['Sex']}")
-                                    if paper['Oral Dose (mg)']:
-                                        st.write(f"Dose: {paper['Oral Dose (mg)']} mg")
+                                if paper.get('QT_Values'):
+                                    st.markdown("**QT Values:**")
+                                    st.write(paper['QT_Values'])
+                                
+                                if paper.get('TdP_Present'):
+                                    st.markdown("**TdP Present:**")
+                                    st.write(paper['TdP_Present'])
                                     
-                                    # Display ECG values without the header
-                                    if paper['QTc']:
-                                        st.write(f"QTc: {paper['QTc']} ms")
-                                    if paper['Uncorrected QT (ms)']:
-                                        st.write(f"QT: {paper['Uncorrected QT (ms)']} ms")
-                                    if paper['Heart Rate (bpm)']:
-                                        st.write(f"Heart Rate: {paper['Heart Rate (bpm)']} bpm")
-                                    if paper['Torsades de Pointes?']:
-                                        st.write(f"TdP: {paper['Torsades de Pointes?']}")
-
-                                with col2:
-                                    if paper['Medical History']:
-                                        st.markdown("**Medical History**")
-                                        st.write(paper['Medical History'])
-                                    if paper['Course of Treatment']:
-                                        st.markdown("**Treatment Course**")
-                                        st.write(paper['Course of Treatment'])
-                    elif literature.get('error'):
-                        st.error(f"Error in literature analysis: {literature['error']}")
+                                if paper.get('Medical_History'):
+                                    st.markdown("**Medical History:**")
+                                    st.write(paper['Medical_History'])
+                                    
+                                if paper.get('Treatment_Course'):
+                                    st.markdown("**Treatment Course:**")
+                                    st.write(paper['Treatment_Course'])
+                    elif isinstance(literature_data, dict) and 'error' in literature_data:
+                        st.error(f"Error in literature analysis: {literature_data['error']}")
                     else:
                         st.info("No literature data available.")
 

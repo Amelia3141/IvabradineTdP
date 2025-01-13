@@ -255,78 +255,58 @@ class CaseReportAnalyzer:
     def analyze_qt_comprehensive(self, text: str) -> Dict[str, Any]:
         """Perform comprehensive QT analysis on text with smart context windows."""
         results = {
-            'numeric_values': {},
+            'qt_values': [],
+            'qt_contexts': [],
+            'qtc_values': [],
+            'qtc_contexts': [],
             'tdp_mentions': [],
             'drug_qt_interactions': [],
-            'brady_qt_relations': [],
-            'figure_qt': [],
-            'table_qt': [],
-            'supp_qt': []
+            'brady_qt_relations': []
         }
         
         # Find numeric values with units
         for pattern_name in ['qtc', 'qt']:
             matches = self.patterns[pattern_name].finditer(text)
             for match in matches:
-                if pattern_name not in results['numeric_values']:
-                    results['numeric_values'][pattern_name] = []
-                value = float(match.group(1))
-                # Convert seconds to milliseconds if needed
-                if any(unit in match.group(0).lower() for unit in ['sec', 's', 'seconds']):
-                    value *= 1000
-                results['numeric_values'][pattern_name].append({
-                    'value': value,
-                    'context': self.get_smart_context(text, match.start(), match.end())
-                })
+                try:
+                    # Get value from first or second group (if using alternate pattern)
+                    value = float(match.group(1) or match.group(2))
+                    if 'sec' in match.group(0).lower() or 's' in match.group(0).lower():
+                        value *= 1000  # Convert to ms
+                    
+                    # Only include reasonable values
+                    if 200 <= value <= 800:
+                        context = self.get_smart_context(text, match.start(), match.end())
+                        results[f'{pattern_name}_values'].append(f"{int(value)}ms")
+                        results[f'{pattern_name}_contexts'].append(context)
+                except (ValueError, IndexError, TypeError, AttributeError):
+                    continue
         
-        # Find Torsades mentions
+        # Find TdP mentions
         tdp_matches = self.patterns['tdp'].finditer(text)
         for match in tdp_matches:
-            results['tdp_mentions'].append({
-                'text': match.group(0).strip(),
-                'context': self.get_smart_context(text, match.start(), match.end())
-            })
+            context = self.get_smart_context(text, match.start(), match.end())
+            # Check if this mention is negated
+            if not any(neg in context.lower() for neg in ['no ', 'not ', 'without ', 'negative for ', 'absence of ']):
+                results['tdp_mentions'].append({
+                    'context': context,
+                    'negated': False
+                })
         
-        # Find drug-QT relationships
-        drug_matches = self.patterns['drug_qt'].finditer(text)
-        for match in drug_matches:
+        # Find drug-QT interactions
+        drug_qt_matches = self.patterns['drug_qt'].finditer(text)
+        for match in drug_qt_matches:
+            context = self.get_smart_context(text, match.start(), match.end())
             results['drug_qt_interactions'].append({
                 'drug': match.group('drug'),
-                'text': match.group(0).strip(),
-                'context': self.get_smart_context(text, match.start(), match.end())
+                'context': context
             })
         
         # Find bradycardia-QT relationships
-        brady_matches = self.patterns['brady_qt'].finditer(text)
-        for match in brady_matches:
-            results['brady_qt_relations'].append({
-                'text': match.group(0).strip(),
-                'context': self.get_smart_context(text, match.start(), match.end())
-            })
-        
-        # Find figure/table QT mentions
-        figure_matches = self.patterns['figure_qt'].finditer(text)
-        for match in figure_matches:
-            results['figure_qt'].append({
-                'text': match.group(0).strip(),
-                'context': self.get_smart_context(text, match.start(), match.end())
-            })
-        
-        # Find table cell QT values
-        table_matches = self.patterns['table_qt'].finditer(text)
-        for match in table_matches:
-            results['table_qt'].append({
-                'text': match.group(0).strip(),
-                'context': self.get_smart_context(text, match.start(), match.end())
-            })
-        
-        # Find supplementary material QT values
-        supp_matches = self.patterns['supp_qt'].finditer(text)
-        for match in supp_matches:
-            results['supp_qt'].append({
-                'text': match.group(0).strip(),
-                'context': self.get_smart_context(text, match.start(), match.end())
-            })
+        brady_qt_matches = self.patterns['brady_qt'].finditer(text)
+        for match in brady_qt_matches:
+            context = self.get_smart_context(text, match.start(), match.end())
+            results['brady_qt_relations'].append(context)
         
         return results
 
