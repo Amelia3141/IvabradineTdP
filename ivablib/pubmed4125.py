@@ -14,6 +14,7 @@ import random
 import re
 import csv
 import sys
+import json
 from .case_report_analyzer import CaseReportAnalyzer
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
