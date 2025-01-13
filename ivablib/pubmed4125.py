@@ -447,22 +447,10 @@ def search_pubmed_case_reports(drug_name: str) -> pd.DataFrame:
             logger.info(f"Got {len(records['PubmedArticle'])} paper details")
             handle.close()
 
-            results = []
-            for paper in records['PubmedArticle']:
-                try:
-                    paper_dict = {
-                        'PMID': paper['MedlineCitation']['PMID'],
-                        'Title': paper['MedlineCitation']['Article']['ArticleTitle'],
-                        'Abstract': paper['MedlineCitation']['Article'].get('Abstract', {}).get('AbstractText', [''])[0],
-                        'Year': paper['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate'].get('Year', '')
-                    }
-                    results.append(paper_dict)
-                except Exception as e:
-                    logger.error(f"Error processing paper: {e}")
-                    continue
-            
-            logger.info(f"Processed {len(results)} papers successfully")
-            return pd.DataFrame(results)
+            # Format results using the format_pubmed_results function
+            df = format_pubmed_results(records['PubmedArticle'])
+            logger.info(f"Processed {len(df)} papers successfully")
+            return df
             
         except Exception as e:
             logger.error(f"Error searching PubMed: {e}")
@@ -516,28 +504,36 @@ def format_pubmed_results(records: List[Dict]) -> pd.DataFrame:
             # Get title and abstract
             article = record['MedlineCitation']['Article']
             title = article['ArticleTitle']
-            if isinstance(title, (list, str)):
+            if hasattr(title, 'attributes'):  # Handle StringElement
+                title = str(title)
+            elif isinstance(title, (list, str)):
                 title = ' '.join(str(t) for t in title) if isinstance(title, list) else str(title)
             
             # Handle abstract text which can be a string or list
             abstract = ''
             if 'Abstract' in article:
                 abstract_text = article['Abstract'].get('AbstractText', [])
-                if isinstance(abstract_text, (list, str)):
+                if hasattr(abstract_text, 'attributes'):  # Handle StringElement
+                    abstract = str(abstract_text)
+                elif isinstance(abstract_text, (list, str)):
                     abstract = ' '.join(str(t) for t in abstract_text) if isinstance(abstract_text, list) else str(abstract_text)
             
             # Get DOI
             doi = None
             if 'ArticleIdList' in record['PubmedData']:
                 for id_obj in record['PubmedData']['ArticleIdList']:
-                    if str(id_obj.attributes.get('IdType', '')).lower() == 'doi':
-                        doi = str(id_obj)
-                        break
+                    if hasattr(id_obj, 'attributes'):
+                        id_type = str(getattr(id_obj.attributes, 'IdType', ''))
+                        if id_type.lower() == 'doi':
+                            doi = str(id_obj)
+                            break
             
             # Get year from PubDate
             year = ''
             pub_date = article['Journal']['JournalIssue']['PubDate']
-            if isinstance(pub_date, dict):
+            if hasattr(pub_date, 'Year'):  # Handle StringElement
+                year = str(pub_date.Year)
+            elif isinstance(pub_date, dict):
                 if 'Year' in pub_date:
                     year = str(pub_date['Year'])
                 elif 'MedlineDate' in pub_date:
@@ -671,22 +667,23 @@ def analyze_literature(drug_name: str) -> pd.DataFrame:
         logger.info(f"Found {len(pmids)} papers to analyze")
         
         # Get texts in parallel
-        case_reports = get_texts_parallel(pmids)
-        logger.info(f"Retrieved {len(case_reports)} full texts")
+        texts = get_texts_parallel(pmids)
+        logger.info(f"Retrieved {len(texts)} full texts")
         
         # Analyze each case report
-        for report in case_reports:
+        for pmid, text in texts.items():
             try:
-                text = report.get('full_text', '')
                 if text:
-                    combined_text = text + ' ' + report['abstract']
-                    logger.info(f"Text length for {report['pmid']}: {len(combined_text)} characters")
+                    # Get abstract from DataFrame
+                    abstract = df.loc[df['PMID'] == pmid, 'Abstract'].iloc[0]
+                    combined_text = text + ' ' + (abstract if abstract else '')
+                    logger.info(f"Text length for {pmid}: {len(combined_text)} characters")
                     
                     analyzer = CaseReportAnalyzer()
                     analyzed = analyzer.analyze(combined_text)
                     
                     # Update DataFrame with analyzed fields
-                    idx = df.index[df['PMID'] == report['pmid']][0]
+                    idx = df.index[df['PMID'] == pmid][0]
                     df.loc[idx, 'Age'] = analyzed.get('age', '')
                     df.loc[idx, 'Sex'] = analyzed.get('sex', '')
                     df.loc[idx, 'Oral Dose (mg)'] = analyzed.get('oral_dose_value', '')
@@ -701,9 +698,9 @@ def analyze_literature(drug_name: str) -> pd.DataFrame:
                     
                     # Log what was found
                     found_fields = {k: v for k, v in analyzed.items() if v}
-                    logger.info(f"Found fields for {report['pmid']}: {found_fields}")
+                    logger.info(f"Found fields for {pmid}: {found_fields}")
             except Exception as e:
-                logger.error(f"Error analyzing report {report.get('pmid', 'unknown')}: {e}")
+                logger.error(f"Error analyzing paper {pmid}: {e}")
                 continue
         
         # Sort by year descending
