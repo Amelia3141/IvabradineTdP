@@ -102,8 +102,8 @@ def get_pmc_text(pmcid):
     try:
         url = f"https://www.ncbi.nlm.nih.gov/pmc/articles/{pmcid}/"
         headers = {
-            'User-Agent': 'Mozilla/5.0 TdPAnalyzer/1.0',
-            'Accept': 'text/html,application/xhtml+xml'
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
         }
         response = requests.get(url, headers=headers)
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -115,9 +115,8 @@ def get_pmc_text(pmcid):
             ('div', {'id': 'mc'}),  # Main content div in PMC
             ('div', {'class': 'article-body'}),
             ('div', {'id': 'body'}),
-            ('article', {}),
             ('div', {'class': 'content'}),
-            ('div', {'class': 'article'}),
+            ('div', {'class': 'article'})
         ]
         
         for tag, attrs in selectors:
@@ -134,7 +133,13 @@ def get_pmc_text(pmcid):
             text = article_text.get_text(separator=' ', strip=True)
             # Remove excessive whitespace
             text = ' '.join(text.split())
-            return text
+            if len(text) > 500:  # Only return if we got substantial text
+                logger.info(f"Successfully extracted {len(text)} characters from PMC")
+                return text
+            else:
+                logger.warning("PMC text too short, might be incomplete")
+        else:
+            logger.warning("No article text found in PMC")
             
     except Exception as e:
         logger.error(f"Error getting PMC text: {e}")
@@ -197,25 +202,48 @@ def get_scihub_text(pmid, doi=None):
         domains = [
             'https://sci-hub.se',
             'https://sci-hub.st',
+            'https://sci-hub.ru',
             'https://sci-hub.ee',
             'https://sci-hub.wf',
-            'https://sci-hub.ren'
+            'https://sci-hub.ren',
+            'https://sci-hub.cat',
+            'https://sci-hub.do'
         ]
         
         headers = {
-            'User-Agent': 'Mozilla/5.0 TdPAnalyzer/1.0',
-            'Accept': 'text/html,application/xhtml+xml'
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Cache-Control': 'max-age=0',
+            'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': '"macOS"',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1'
         }
+        
+        session = requests.Session()
+        session.headers.update(headers)
         
         for domain in domains:
             try:
-                # Try DOI first if available
+                logger.info(f"Trying Sci-Hub domain: {domain}")
+                
+                # Try DOI first if available, then PMID
                 if doi:
                     url = f"{domain}/{doi}"
                 else:
                     url = f"{domain}/pubmed/{pmid}"
                 
-                response = requests.get(url, headers=headers, timeout=10)
+                response = session.get(url, timeout=30, verify=False)
+                if 'location not found' in response.text.lower():
+                    logger.info(f"Paper not found on {domain}")
+                    continue
+                    
                 soup = BeautifulSoup(response.text, 'html.parser')
                 
                 # Look for embedded PDF
@@ -223,23 +251,70 @@ def get_scihub_text(pmid, doi=None):
                 if pdf_iframe and 'src' in pdf_iframe.attrs:
                     pdf_url = pdf_iframe['src']
                     if not pdf_url.startswith('http'):
-                        pdf_url = f"https:{pdf_url}"
+                        pdf_url = urljoin(domain, pdf_url) if pdf_url.startswith('/') else f"https:{pdf_url}"
                     
-                    # Download PDF
-                    pdf_response = requests.get(pdf_url, headers=headers, timeout=10)
-                    if pdf_response.headers.get('content-type', '').lower() == 'application/pdf':
-                        pdf_file = io.BytesIO(pdf_response.content)
-                        pdf_reader = PyPDF2.PdfReader(pdf_file)
-                        text = ""
-                        for page in pdf_reader.pages:
-                            text += page.extract_text()
-                        return text
-            except Exception as e:
-                continue
+                    logger.info(f"Found PDF iframe at {pdf_url}")
+                    
+                    # Download PDF with retry and exponential backoff
+                    for attempt in range(3):
+                        try:
+                            delay = 2 ** attempt
+                            time.sleep(delay)
+                            
+                            pdf_response = session.get(pdf_url, timeout=30, verify=False)
+                            if pdf_response.headers.get('content-type', '').lower() == 'application/pdf':
+                                pdf_file = io.BytesIO(pdf_response.content)
+                                pdf_reader = PyPDF2.PdfReader(pdf_file)
+                                text = ""
+                                for page in pdf_reader.pages:
+                                    text += page.extract_text()
+                                text = text.strip()
+                                if len(text) > 500:  # Only return if we got substantial text
+                                    logger.info(f"Successfully extracted {len(text)} characters from PDF")
+                                    return text
+                                else:
+                                    logger.warning(f"PDF text too short ({len(text)} chars), might be corrupted")
+                        except Exception as e:
+                            logger.error(f"Error downloading PDF from {pdf_url} (attempt {attempt + 1}): {e}")
+                            if attempt < 2:  # Don't sleep after last attempt
+                                continue
                 
+                # Also try to find direct download links
+                download_links = soup.find_all('a', href=True)
+                for link in download_links:
+                    href = link['href']
+                    if href.lower().endswith('.pdf'):
+                        try:
+                            pdf_url = urljoin(domain, href)
+                            logger.info(f"Found direct PDF link: {pdf_url}")
+                            
+                            pdf_response = session.get(pdf_url, timeout=30, verify=False)
+                            if pdf_response.headers.get('content-type', '').lower() == 'application/pdf':
+                                pdf_file = io.BytesIO(pdf_response.content)
+                                pdf_reader = PyPDF2.PdfReader(pdf_file)
+                                text = ""
+                                for page in pdf_reader.pages:
+                                    text += page.extract_text()
+                                text = text.strip()
+                                if len(text) > 500:
+                                    logger.info(f"Successfully extracted {len(text)} characters from PDF")
+                                    return text
+                                else:
+                                    logger.warning(f"PDF text too short ({len(text)} chars), might be corrupted")
+                        except Exception as e:
+                            logger.error(f"Error downloading PDF from link {pdf_url}: {e}")
+                            continue
+                
+            except Exception as e:
+                logger.error(f"Error accessing {domain}: {e}")
+                continue
+        
+        logger.warning(f"Could not retrieve text from any Sci-Hub domain for PMID {pmid}")
+        return None
+        
     except Exception as e:
-        logger.error(f"Error getting Sci-Hub text: {e}")
-    return None
+        logger.error(f"Error in get_scihub_text: {e}")
+        return None
 
 def get_drug_names(drug_name: str) -> List[str]:
     """Get all related drug names from the drugnames.csv file"""
@@ -520,69 +595,57 @@ def analyze_literature(drug_name: str) -> Dict:
             
             # Create paper objects
             case_reports = []
+            texts_found = 0
             for _, paper in papers.iterrows():
                 pmid = paper['PMID']
-                text = texts.get(pmid, 'None')
+                if pmid in texts:
+                    text = texts[pmid]
+                    texts_found += 1
+                else:
+                    text = None
                 
                 report = {
-                    'Title': paper.get('Title', ''),
-                    'Age': '',
-                    'Sex': '',
-                    'Oral Dose (mg)': '',
-                    'Theoretical Max Concentration (μM)': '',
-                    '40% Bioavailability': '',
-                    'Theoretical HERG IC50 / Concentration μM': '',
-                    '40% Plasma Concentration': '',
-                    'Uncorrected QT (ms)': '',
-                    'QTc': '',
-                    'QTR': '',
-                    'QTF': '',
-                    'Heart Rate (bpm)': '',
-                    'Torsades de Pointes?': 'No',
-                    'Blood Pressure (mmHg)': '',
-                    'Medical History': '',
-                    'Medication History': '',
-                    'Course of Treatment': '',
-                    'Year': paper.get('Year', ''),
-                    'Abstract': paper.get('Abstract', ''),
-                    'Full Text': text
+                    'title': paper.get('Title', ''),
+                    'pmid': pmid,
+                    'doi': paper.get('DOI', ''),
+                    'age': '',
+                    'sex': '',
+                    'oral_dose_value': '',
+                    'oral_dose_unit': '',
+                    'oral_dose_freq': '',
+                    'qt_value': '',
+                    'qtc_value': '',
+                    'heart_rate_value': '',
+                    'blood_pressure_value': '',
+                    'tdp_present': False,
+                    'tdp_context': '',
+                    'medical_history': '',
+                    'medication_history': '',
+                    'treatment_course': '',
+                    'year': paper.get('Year', ''),
+                    'abstract': paper.get('Abstract', ''),
+                    'full_text': text
                 }
                 
                 # Extract fields using regex patterns
                 if text:
-                    combined_text = text + ' ' + report['Abstract']
-                    patterns = {
-                        'Age': re.compile(r'(?:(?:aged?|age[d\s:]*|a|was)\s*)?(\d+)[\s-]*(?:year|yr|y|yo|years?)[s\s-]*(?:old|of\s+age)?|(?:age[d\s:]*|aged\s*)(\d+)', re.IGNORECASE),
-                        'Sex': re.compile(r'\b(?:male|female|man|woman|boy|girl|[MF]\s*/\s*(?:\d+|[MF])|gender[\s:]+(?:male|female)|(?:he|she|his|her)\s+was)\b', re.IGNORECASE),
-                        'Oral Dose (mg)': re.compile(r'(?:oral\s+dose|dose[d\s]*orally|given|administered|took|ingested|consumed|prescribed)\s*(?:with|at|of|a|total)?\s*(\d+\.?\d*)\s*(?:mg|milligrams?|g|grams?|mcg|micrograms?)', re.IGNORECASE),
-                        'Theoretical Max Concentration (μM)': re.compile(r'(?:maximum|max|peak|highest|cmax|c-?max)\s*(?:concentration|conc|level|exposure)\s*(?:of|was|is|reached|measured|observed|calculated)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*(?:μM|uM|micromolar|nmol/[lL]|μmol/[lL]|ng/m[lL])', re.IGNORECASE),
-                        '40% Bioavailability': re.compile(r'(?:bioavailability|F|absorption|systemic\s+availability)\s*(?:of|was|is|approximately|about|~)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*%?', re.IGNORECASE),
-                        'Theoretical HERG IC50 / Concentration μM': re.compile(r'(?:hERG\s+IC50|IC50\s+(?:value\s+)?(?:for|of)\s+hERG|half-?maximal\s+(?:inhibitory)?\s+concentration|IC50)\s*(?:of|was|is|=|:)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*(?:μM|uM|micromolar|nmol/[lL]|μmol/[lL])', re.IGNORECASE),
-                        '40% Plasma Concentration': re.compile(r'(?:plasma|blood|serum)\s*(?:concentration|level|exposure|Cmax|C-max)\s*(?:of|was|is|measured|found|detected|reached)?\s*(?:approximately|about|~|≈)?\s*(\d+\.?\d*)\s*(?:μM|uM|micromolar|ng/m[lL]|μg/m[lL]|mg/[lL]|g/[lL])', re.IGNORECASE),
-                        'Uncorrected QT (ms)': re.compile(r'\b(?:QT|uncorrected\s+QT|QT\s*interval|interval\s*QT|baseline\s*QT)[\s:]*(?:interval|duration|measurement|value)?\s*(?:of|was|is|=|:|measured|found|documented|recorded)?\s*(\d+\.?\d*)\s*(?:ms(?:ec)?|milliseconds?|s(?:ec)?|seconds?)?', re.IGNORECASE),
-                        'QTc': re.compile(r'(?:QTc[FBR]?|corrected\s+QT|QT\s*corrected|QT[c]?\s*interval\s*(?:corrected)?|corrected\s*QT\s*interval)[\s:]*(?:interval|duration|measurement|prolongation|value)?\s*(?:of|was|is|=|:|measured|found|documented|recorded)?\s*(\d+\.?\d*)\s*(?:ms(?:ec)?|milliseconds?|s(?:ec)?|seconds?)?', re.IGNORECASE),
-                        'Heart Rate (bpm)': re.compile(r'(?:heart\s+rate|HR|pulse|ventricular\s+rate|heart\s+rhythm|cardiac\s+rate)[\s:]*(?:of|was|is|=|:)?\s*(\d+)(?:\s*(?:beats?\s*per\s*min(?:ute)?|bpm|min-1|/min))?', re.IGNORECASE),
-                        'Blood Pressure (mmHg)': re.compile(r'(?:blood\s+pressure|BP|arterial\s+pressure)[\s:]*(?:of|was|is|=|:)?\s*([\d/]+)(?:\s*mm\s*Hg)?', re.IGNORECASE),
-                        'Torsades de Pointes?': re.compile(r'\b(?:torsade[s]?\s*(?:de)?\s*pointes?|TdP|torsades|polymorphic\s+[vV]entricular\s+[tT]achycardia|PVT\s+(?:with|showing)\s+[tT]dP)\b', re.IGNORECASE),
-                        'Medical History': re.compile(r'(?:medical|clinical|past|previous|documented|known|significant)\s*(?:history|condition|diagnosis|comorbidities)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE),
-                        'Medication History': re.compile(r'(?:medication|drug|prescription|current\s+medications?|concomitant\s+medications?)\s*(?:history|list|profile|regime)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE),
-                        'Course of Treatment': re.compile(r'(?:treatment|therapy|management|intervention|administered|given)[:\.]\s*([^\.]+?)(?:\.|\n|$)', re.IGNORECASE)
-                    }
-                    
-                    for field, pattern in patterns.items():
-                        match = pattern.search(combined_text)
-                        if match:
-                            if field == 'Torsades de Pointes?':
-                                report[field] = 'Yes'
-                            else:
-                                groups = [g for g in match.groups() if g is not None]
-                                report[field] = groups[0] if groups else match.group(0)
+                    combined_text = text + ' ' + report['abstract']
+                    analyzer = CaseReportAnalyzer()  # Initialize with no args
+                    report.update(analyzer.analyze(combined_text))
                 
                 case_reports.append(report)
-                
+            
+            if texts_found == 0:
+                return {
+                    'error': f'No full texts available for {drug_name}. Found {len(papers)} papers but could not retrieve their full text content. This could be because the papers are not freely accessible or are behind a paywall.'
+                }
+            
             return {
-                "case_reports": case_reports,
-                "total_cases": len(case_reports)
+                'case_reports': case_reports,
+                'stats': {
+                    'total_papers': len(papers),
+                    'texts_found': texts_found
+                }
             }
 
     except Exception as e:

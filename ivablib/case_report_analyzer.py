@@ -214,6 +214,60 @@ class CaseReportAnalyzer:
         
         return results
 
+    def analyze(self, text: str) -> Dict[str, Any]:
+        """
+        Analyze text to extract relevant information.
+        
+        Args:
+            text: The text to analyze
+            
+        Returns:
+            Dict containing extracted information
+        """
+        results = {
+            'age': '',
+            'sex': '',
+            'oral_dose_value': '',
+            'oral_dose_unit': '',
+            'oral_dose_freq': '',
+            'qt_value': '',
+            'qtc_value': '',
+            'heart_rate_value': '',
+            'blood_pressure_value': '',
+            'tdp_present': False,
+            'tdp_context': '',
+            'medical_history': '',
+            'medication_history': '',
+            'treatment_course': ''
+        }
+        
+        # Clean text
+        text = self.clean_text(text)
+        
+        # Extract each field
+        for field, pattern in self.patterns.items():
+            match = pattern.search(text)
+            if match:
+                if field == 'tdp':
+                    results['tdp_present'] = True
+                    results['tdp_context'] = self.get_smart_context(text, match.start(), match.end())
+                elif field == 'oral_dose':
+                    # Parse dose into value, unit, and frequency
+                    dose_text = match.group(0)
+                    value_match = re.search(r'(\d+\.?\d*)', dose_text)
+                    unit_match = re.search(r'(mg|milligrams?|g|grams?|mcg|micrograms?|µg)', dose_text, re.IGNORECASE)
+                    freq_match = re.search(r'(daily|once|twice|thrice|[1-4]x|q\.?d|bid|tid|qid|per\s+day|/day)', dose_text, re.IGNORECASE)
+                    
+                    results['oral_dose_value'] = value_match.group(1) if value_match else ''
+                    results['oral_dose_unit'] = unit_match.group(1) if unit_match else ''
+                    results['oral_dose_freq'] = freq_match.group(1) if freq_match else ''
+                else:
+                    # For other fields, get the first capture group or full match
+                    value = next((g for g in match.groups() if g is not None), match.group(0))
+                    results[field] = value.strip()
+        
+        return results
+
     def analyze_papers(self, papers: List[Dict[str, Any]], drug_name: str) -> pd.DataFrame:
         """Analyze a list of papers and create a case report table."""
         # Define columns for the output DataFrame
@@ -242,38 +296,33 @@ class CaseReportAnalyzer:
         for paper in papers:
             try:
                 # Extract text from paper
-                text = paper.get('FullText', '') or paper.get('Abstract', '')
-                if not text or len(text.strip()) < 100:  # Skip if text is too short
-                    logger.warning(f"Skipping paper with insufficient text: {paper.get('Title', 'Untitled')}")
+                text = paper.get('FullText', '') + ' ' + paper.get('Abstract', '')
+                if not text.strip():
                     continue
-                
-                # Clean the text
-                text = self._clean_text(text)
-                
+                    
                 # Extract all values with context
                 result = {
-                    'title': paper.get('Title', 'Untitled Paper'),
-                    'pmid': paper.get('PMID', 'N/A'),
-                    'doi': paper.get('DOI', ''),
-                    'age': self._extract_with_context(text, self.patterns['age']),
-                    'sex': self._clean_sex(self._extract_with_context(text, self.patterns['sex'])),
-                    'oral_dose_value': self._extract_numeric(self._extract_with_context(text, self.patterns['oral_dose'])),
-                    'oral_dose_unit': self._extract_unit(self._extract_with_context(text, self.patterns['oral_dose'])),
-                    'oral_dose_freq': self._extract_frequency(self._extract_with_context(text, self.patterns['oral_dose'])),
-                    'qt_value': self._extract_numeric(self._extract_with_context(text, self.patterns['qt'])),
-                    'qtc_value': self._extract_numeric(self._extract_with_context(text, self.patterns['qtc'])),
-                    'heart_rate_value': self._extract_numeric(self._extract_with_context(text, self.patterns['heart_rate'])),
-                    'blood_pressure_value': self._extract_with_context(text, self.patterns['blood_pressure']),
-                    'tdp_present': bool(self.patterns['tdp'].search(text)),
-                    'tdp_context': self.get_smart_context(text, self.patterns['tdp'].search(text).start(), self.patterns['tdp'].search(text).end()) if self.patterns['tdp'].search(text) else None,
-                    'medical_history': self._extract_with_context(text, self.patterns['medical_history']),
-                    'medication_history': self._extract_with_context(text, self.patterns['medication_history']),
-                    'treatment_course': self._extract_with_context(text, self.patterns['treatment_course'])
+                    'title': paper.get('Title', ''),
+                    'age': self._extract_first_match(self.patterns['age'], text),
+                    'sex': self._extract_first_match(self.patterns['sex'], text),
+                    'oral_dose': self._extract_first_match(self.patterns['oral_dose'], text),
+                    'theoretical_max': self._extract_first_match(self.patterns['theoretical_max'], text),
+                    'bioavailability': self._extract_first_match(self.patterns['bioavailability'], text),
+                    'herg_ic50': self._extract_first_match(self.patterns['herg_ic50'], text),
+                    'plasma_concentration': self._extract_first_match(self.patterns['plasma_concentration'], text),
+                    'qt': self._extract_first_match(self.patterns['qt'], text),
+                    'qtc': self._extract_first_match(self.patterns['qtc'], text),
+                    'heart_rate': self._extract_first_match(self.patterns['heart_rate'], text),
+                    'tdp': 'Yes' if self.patterns['tdp'].search(text) else 'No',
+                    'blood_pressure': self._extract_first_match(self.patterns['blood_pressure'], text),
+                    'medical_history': self._extract_first_match(self.patterns['medical_history'], text),
+                    'medication_history': self._extract_first_match(self.patterns['medication_history'], text),
+                    'treatment_course': self._extract_first_match(self.patterns['treatment_course'], text)
                 }
                 
                 # Calculate QTR and QTF if possible
-                qt_val = self.extract_numeric(result['qt_value'])
-                hr_val = self.extract_numeric(result['heart_rate_value'])
+                qt_val = self.extract_numeric(result['qt'])
+                hr_val = self.extract_numeric(result['heart_rate'])
                 if qt_val and hr_val:
                     try:
                         # Calculate QTR using Rautaharju formula
@@ -296,18 +345,18 @@ class CaseReportAnalyzer:
                     'Case Report Title': result['title'],
                     'Age': result['age'] or '',
                     'Sex': result['sex'] or '',
-                    'Oral Dose (mg)': result['oral_dose_value'] or '',
+                    'Oral Dose (mg)': result['oral_dose'] or '',
                     'theoretical max concentration (μM)': result['theoretical_max'] or '',
                     '40% bioavailability': result['bioavailability'] or '',
                     'Theoretical HERG IC50 / Concentration μM': result['herg_ic50'] or '',
                     '40% Plasma concentration': result['plasma_concentration'] or '',
-                    'Uncorrected QT (ms)': result['qt_value'] or '',
-                    'QTc': result['qtc_value'] or '',
+                    'Uncorrected QT (ms)': result['qt'] or '',
+                    'QTc': result['qtc'] or '',
                     'QTR': result['qtr'] or '',
                     'QTF': result['qtf'] or '',
-                    'Heart Rate (bpm)': result['heart_rate_value'] or '',
-                    'Torsades de Pointes?': result['tdp_present'],
-                    'Blood Pressure (mmHg)': result['blood_pressure_value'] or '',
+                    'Heart Rate (bpm)': result['heart_rate'] or '',
+                    'Torsades de Pointes?': result['tdp'],
+                    'Blood Pressure (mmHg)': result['blood_pressure'] or '',
                     'Medical History': result['medical_history'] or '',
                     'Medication History': result['medication_history'] or '',
                     'Course of Treatment': result['treatment_course'] or ''
@@ -415,62 +464,59 @@ class CaseReportAnalyzer:
             logger.error(f"Error analyzing paper {paper.get('PMID', 'Unknown')}: {str(e)}")
             return {}
 
-    def _extract_with_context(self, text: str, pattern: re.Pattern) -> str:
+    def _extract_with_context(self, text: str, pattern: re.Pattern) -> Optional[Tuple[str, str]]:
         """Extract value and context using pattern."""
         if not text:
-            return ""
+            return None
             
         match = pattern.search(text)
         if not match:
-            return ""
+            return None
             
-        # Get context around the match
+        value = next((g for g in match.groups() if g is not None), None)
+        if not value:
+            return None
+            
         context = self.get_smart_context(text, match.start(), match.end())
-        return context
-        
+        return value, context
+
     def _extract_numeric(self, text: str) -> Optional[float]:
         """Extract numeric value from text."""
         if not text:
             return None
             
-        # Look for numbers in the text
-        numbers = re.findall(r'(\d+\.?\d*)', text)
-        if not numbers:
-            return None
-            
-        # Return the first number found
-        try:
-            return float(numbers[0])
-        except ValueError:
-            return None
-            
-    def _extract_unit(self, text: str) -> str:
+        match = re.search(r'(\d+\.?\d*)', text)
+        return float(match.group(1)) if match else None
+
+    def _extract_unit(self, text: str) -> Optional[str]:
         """Extract unit from dosing text."""
         if not text:
-            return ""
+            return None
             
-        units = re.findall(r'(?:mg|milligrams?|g|grams?|mcg|micrograms?|µg)', text, re.IGNORECASE)
-        return units[0] if units else ""
-        
-    def _extract_frequency(self, text: str) -> str:
+        unit_pattern = re.compile(r'(mg|milligrams?|g|grams?|mcg|micrograms?|µg)', re.IGNORECASE)
+        match = unit_pattern.search(text)
+        return match.group(1) if match else None
+
+    def _extract_frequency(self, text: str) -> Optional[str]:
         """Extract frequency from dosing text."""
         if not text:
-            return ""
+            return None
             
-        freq = re.findall(r'(?:per|a|each|every|q|q\.)\s*(?:day|daily|d|qd|od|q\.?d\.?|24\s*h(?:ours?)?|diem)|(?:once|twice|thrice|[1-4]x|q\.?d|bid|tid|qid)', text, re.IGNORECASE)
-        return freq[0] if freq else ""
-        
-    def _clean_sex(self, text: str) -> str:
+        freq_pattern = re.compile(r'(daily|once|twice|thrice|[1-4]x|q\.?d|bid|tid|qid|per\s+day|/day)', re.IGNORECASE)
+        match = freq_pattern.search(text)
+        return match.group(1) if match else None
+
+    def _clean_sex(self, text: str) -> Optional[str]:
         """Clean and standardize sex value."""
         if not text:
-            return ""
+            return None
             
         text = text.lower()
-        if any(term in text for term in ['male', 'man', 'boy', 'm/']):
-            return "male"
-        elif any(term in text for term in ['female', 'woman', 'girl', 'f/']):
-            return "female"
-        return ""
+        if any(m in text for m in ['male', 'man', 'm/', 'boy']):
+            return 'male'
+        elif any(f in text for f in ['female', 'woman', 'f/', 'girl']):
+            return 'female'
+        return None
 
     def extract_value(self, text: str, pattern: re.Pattern) -> Optional[str]:
         """Extract value from text using a compiled regex pattern."""
@@ -512,22 +558,16 @@ class CaseReportAnalyzer:
             return ""
         
         # Remove excessive whitespace
-        text = ' '.join(text.split())
+        text = re.sub(r'\s+', ' ', text)
         
-        # Fix common OCR/PDF extraction issues
-        text = text.replace('|', 'I')  # Common OCR error
-        text = text.replace('—', '-')  # Normalize dashes
-        text = text.replace('–', '-')
-        text = text.replace(''', "'")
-        text = text.replace('"', '"')
-        text = text.replace('"', '"')
+        # Fix common PDF extraction issues
+        text = text.replace('- ', '')  # Remove hyphenation
+        text = text.replace('•', '- ')  # Convert bullets to dashes
+        text = text.replace('\n', ' ')  # Convert newlines to spaces
+        text = text.replace('\t', ' ')  # Convert tabs to spaces
         
-        # Fix spacing around numbers and units
-        text = re.sub(r'(\d)([a-zA-Z])', r'\1 \2', text)  # Add space between number and unit
-        text = re.sub(r'(\d)\s+([.,])\s*(\d)', r'\1\2\3', text)  # Fix decimal numbers
-        
-        return text
-        
+        return text.strip()
+
 def analyze_papers(papers: List[Dict[str, Any]], drug_name: str) -> pd.DataFrame:
     """Analyze a list of papers and create a case report table."""
     analyzer = CaseReportAnalyzer()
