@@ -42,42 +42,45 @@ class CaseReportAnalyzer:
             # Enhanced ECG patterns with more variations
             'qtc': re.compile(r"""
                 (?:
-                    QTc[FBR]?|
-                    corrected\s+QT|
-                    QT\s*corrected|
-                    QT[c]?\s*interval\s*(?:corrected)?|
-                    corrected\s*QT\s*interval
+                    QTc[FBR]?[\s-]*(?:interval|duration|measurement|value)?|
+                    corrected\s+QT[\s-]*(?:interval|duration|measurement|value)?|
+                    QT[\s-]*(?:interval|duration|measurement|value)?\s*corrected|
+                    QT[c]?[\s-]*interval[\s-]*(?:corrected|correction)|
+                    corrected[\s-]*QT[\s-]*interval
                 )
-                [\s:]*
-                (?:interval|duration|measurement|prolongation|value)?
-                \s*
-                (?:of|was|is|=|:|measured|found|documented|recorded|increased\s+to|prolonged\s+to)?
+                [\s:=-]*
+                (?:of|was|is|=|:|measured|found|documented|recorded|increased\s+to|prolonged\s+to|approximately|~|≈|≅|about)?
                 \s*
                 (\d+(?:\.\d+)?)\s*
                 (?:ms(?:ec)?|milliseconds?|s(?:ec)?|seconds?)?
+                (?:\s*\([^)]*\))?  # Capture optional parenthetical notes
             """, re.VERBOSE | re.IGNORECASE),
 
             'qt': re.compile(r"""
                 (?:
-                    QT\s+interval|
-                    QT\s+duration|
-                    QT\s+measurement|
-                    QT\s+prolongation|
-                    QT\s+value|
-                    QT\s*=|
-                    QT\s*:|
-                    QT\s+was|
-                    QT\s+is|
-                    QT\s+of|
-                    \bQT\b
+                    (?<!QTc)(?<!QTcF)(?<!QTcB)(?<!QTcR)  # Negative lookbehind to avoid matching QTc
+                    (?:
+                        QT[\s-]*interval|
+                        QT[\s-]*duration|
+                        QT[\s-]*measurement|
+                        QT[\s-]*prolongation|
+                        QT[\s-]*value|
+                        QT[\s-]*=|
+                        QT[\s-]*:|
+                        QT[\s-]*was|
+                        QT[\s-]*is|
+                        QT[\s-]*of|
+                        \bQT\b
+                    )
                 )
                 \s*
                 (?:interval|duration|measurement|value)?
-                \s*
-                (?:of|was|is|=|:|measured|found|documented|recorded|increased\s+to|prolonged\s+to)?
+                [\s:=-]*
+                (?:of|was|is|=|:|measured|found|documented|recorded|increased\s+to|prolonged\s+to|approximately|~|≈|≅|about)?
                 \s*
                 (\d+(?:\.\d+)?)\s*
                 (?:ms(?:ec)?|milliseconds?|s(?:ec)?|seconds?)?
+                (?:\s*\([^)]*\))?  # Capture optional parenthetical notes
             """, re.VERBOSE | re.IGNORECASE),
             
             'heart_rate': re.compile(r'(?:heart\s+rate|HR|pulse|ventricular\s+rate|heart\s+rhythm|cardiac\s+rate)[\s:]*(?:of|was|is|=|:|decreased\s+to|increased\s+to)?\s*(\d+)(?:\s*(?:beats?\s*per\s*min(?:ute)?|bpm|min-1|/min))?', re.IGNORECASE),
