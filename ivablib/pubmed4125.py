@@ -604,6 +604,11 @@ def analyze_literature(drug_name: str) -> pd.DataFrame:
             logger.warning("No results found in PubMed")
             return pd.DataFrame()
             
+        # Ensure necessary columns exist
+        for col in ['DOI', 'PubMed URL']:
+            if col not in df.columns:
+                df[col] = ''
+        
         # Get PMIDs
         pmids = df['PMID'].tolist()
         logger.info(f"Found {len(pmids)} papers to analyze")
@@ -618,12 +623,11 @@ def analyze_literature(drug_name: str) -> pd.DataFrame:
                 pmid = report['pmid']
                 text = report.get('full_text', '')
                 
-                if text:
-                    combined_text = text
-                    logger.info(f"Text length for {pmid}: {len(combined_text)} characters")
+                if text and len(text) > 100:  # Ensure substantial text
+                    logger.info(f"Text length for {pmid}: {len(text)} characters")
                     
                     analyzer = CaseReportAnalyzer()
-                    analyzed = analyzer.analyze(combined_text)
+                    analyzed = analyzer.analyze(text)
                     
                     # Update DataFrame with analyzed fields
                     idx = df.index[df['PMID'] == pmid].tolist()
@@ -644,7 +648,7 @@ def analyze_literature(drug_name: str) -> pd.DataFrame:
                     else:
                         logger.warning(f"Could not find PMID {pmid} in DataFrame")
                 else:
-                    logger.warning(f"No text available for {pmid}")
+                    logger.warning(f"No substantial text available for {pmid}")
                     
             except Exception as e:
                 logger.error(f"Error analyzing paper {pmid}: {e}")
