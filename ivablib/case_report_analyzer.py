@@ -242,7 +242,7 @@ class CaseReportAnalyzer:
         }
         
         # Clean text
-        text = self.clean_text(text)
+        text = self._clean_text(text)
         
         # Extract each field
         for field, pattern in self.patterns.items():
@@ -553,20 +553,45 @@ class CaseReportAnalyzer:
         return None
 
     def _clean_text(self, text: str) -> str:
-        """Clean and normalize text."""
+        """Clean and normalize text for analysis."""
         if not text:
             return ""
+            
+        # Convert to lowercase
+        text = text.lower()
         
-        # Remove excessive whitespace
-        text = re.sub(r'\s+', ' ', text)
+        # Replace common abbreviations
+        replacements = {
+            'yo ': ' year old ',
+            'y/o': ' year old ',
+            'yr ': ' year ',
+            'yrs': ' years ',
+            'yo,': ' year old,',
+            'y/o,': ' year old,',
+            'yr,': ' year,',
+            'yrs,': ' years,',
+            'hr ': ' heart rate ',
+            'bp ': ' blood pressure ',
+            'qt ': ' QT ',
+            'qtc': ' QTc ',
+            'tdp': ' torsade de pointes ',
+            'pvt': ' polymorphic ventricular tachycardia ',
+            'bid': ' twice daily ',
+            'tid': ' three times daily ',
+            'qid': ' four times daily ',
+            'qd': ' once daily ',
+            'od': ' once daily ',
+            'po': ' orally ',
+            'p.o.': ' orally ',
+        }
         
-        # Fix common PDF extraction issues
-        text = text.replace('- ', '')  # Remove hyphenation
-        text = text.replace('•', '- ')  # Convert bullets to dashes
-        text = text.replace('\n', ' ')  # Convert newlines to spaces
-        text = text.replace('\t', ' ')  # Convert tabs to spaces
+        for old, new in replacements.items():
+            text = text.replace(old, new)
+            
+        # Remove extra whitespace
+        text = ' '.join(text.split())
         
-        return text.strip()
+        return text
 
 def analyze_papers(papers: List[Dict[str, Any]], drug_name: str) -> pd.DataFrame:
     """Analyze a list of papers and create a case report table."""
