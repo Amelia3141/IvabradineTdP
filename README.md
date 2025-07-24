@@ -8,7 +8,7 @@ This project emerged from my undergraduate dissertation research on Ivabradine a
 
 ### 📊 Thesis Presentation: "Ivabradine and the Risks of Torsades: a Case-Based Analysis"
 
-**[📄 View Full Presentation (PDF)](Ivabradine%20Thesis%20Presentation.pdf)**
+**[📄 View Full Presentation (PDF)](<Ivabradine Thesis Presentation.pdf>)**
 
 *Supervisor: Prof. J Hancox | University of Bristol | 2024*
 
